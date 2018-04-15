@@ -699,8 +699,8 @@ void savestate_slot(int num)
 
    if (savestate_save(filename))
    {
-	   driver->SetLineColor(255, 255, 255);
-	   driver->AddLine("Saved to %i slot", num);
+	   //driver->SetLineColor(255, 255, 255);
+	   //driver->AddLine("Saved to %i slot", num);
    }
    else
    {

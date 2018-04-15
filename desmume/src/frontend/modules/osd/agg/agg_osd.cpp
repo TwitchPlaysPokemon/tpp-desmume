@@ -589,7 +589,7 @@ void DrawHUD()
 		osd->addFixed(Hud.RTCDisplay.x, Hud.RTCDisplay.y, Hud.rtcString);
 	}
 
-	DrawStateSlots();
+	//DrawStateSlots();
 }
 
 
