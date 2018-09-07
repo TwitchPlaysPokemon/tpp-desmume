@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2017 DeSmuME team
+	Copyright (C) 2017-2018 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -18,12 +18,29 @@
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 
+#include "../../armcpu.h"
 #include "../../GPU.h"
 #include "../../movie.h"
 #include "../../NDSSystem.h"
+#include "../../gdbstub.h"
 #include "../../rtc.h"
 
+#include "ClientAVCaptureObject.h"
 #include "ClientExecutionControl.h"
+
+// Need to include assert.h this way so that GDB stub will work
+// with an optimized build.
+#if defined(GDB_STUB) && defined(NDEBUG)
+#define TEMP_NDEBUG
+#undef NDEBUG
+#endif
+
+#include <assert.h>
+
+#if defined(TEMP_NDEBUG)
+#undef TEMP_NDEBUG
+#define NDEBUG
+#endif
 
 
 ClientExecutionControl::ClientExecutionControl()
@@ -38,7 +55,19 @@ ClientExecutionControl::ClientExecutionControl()
 	
 	_frameTime = 0.0;
 	_framesToSkip = 0;
+	_lastSetFrameSkip = 0.0;
+	_unskipStep = 0;
+	_dynamicBiasStep = 0;
 	_prevExecBehavior = ExecutionBehavior_Pause;
+	
+	_isGdbStubStarted = false;
+	_enableGdbStubARM9 = false;
+	_enableGdbStubARM7 = false;
+	_gdbStubPortARM9 = 0;
+	_gdbStubPortARM7 = 0;
+	_gdbStubHandleARM9 = NULL;
+	_gdbStubHandleARM7 = NULL;
+	_isInDebugTrap = false;
 	
 	_settingsPending.cpuEngineID						= CPUEmulationEngineID_Interpreter;
 	_settingsPending.JITMaxBlockSize					= 12;
@@ -60,6 +89,8 @@ ClientExecutionControl::ClientExecutionControl()
 	_settingsPending.enableFirmwareBoot					= false;
 	_settingsPending.enableDebugConsole					= false;
 	_settingsPending.enableEnsataEmulation				= false;
+	_settingsPending.wifiMode							= WifiCommInterfaceID_AdHoc;
+	_settingsPending.wifiBridgeDeviceIndex				= 0;
 	
 	_settingsPending.enableExecutionSpeedLimiter		= true;
 	_settingsPending.executionSpeed						= SPEED_SCALAR_NORMAL;
@@ -70,6 +101,8 @@ ClientExecutionControl::ClientExecutionControl()
 	
 	_settingsPending.execBehavior						= ExecutionBehavior_Pause;
 	_settingsPending.jumpBehavior						= FrameJumpBehavior_Forward;
+	
+	_settingsPending.avCaptureObject					= NULL;
 	
 	_settingsApplied = _settingsPending;
 	_settingsApplied.filePathARM9BIOS					= _settingsPending.filePathARM9BIOS;
@@ -98,6 +131,35 @@ ClientExecutionControl::~ClientExecutionControl()
 	pthread_mutex_destroy(&this->_mutexSettingsPendingOnExecutionLoopStart);
 	pthread_mutex_destroy(&this->_mutexSettingsPendingOnNDSExec);
 	pthread_mutex_destroy(&this->_mutexOutputPostNDSExec);
+}
+
+ClientAVCaptureObject* ClientExecutionControl::GetClientAVCaptureObject()
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnNDSExec);
+	ClientAVCaptureObject *theCaptureObject = this->_settingsPending.avCaptureObject;
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnNDSExec);
+	
+	return theCaptureObject;
+}
+
+ClientAVCaptureObject* ClientExecutionControl::GetClientAVCaptureObjectApplied()
+{
+	return this->_settingsApplied.avCaptureObject;
+}
+
+void ClientExecutionControl::SetClientAVCaptureObject(ClientAVCaptureObject *theCaptureObject)
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnNDSExec);
+	
+	if (this->_settingsPending.avCaptureObject != theCaptureObject)
+	{
+		this->_settingsPending.avCaptureObject = theCaptureObject;
+		
+		this->_needResetFramesToSkip = true;
+		this->_newSettingsPendingOnNDSExec = true;
+	}
+	
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnNDSExec);
 }
 
 ClientInputHandler* ClientExecutionControl::GetClientInputHandler()
@@ -503,6 +565,60 @@ void ClientExecutionControl::SetEnableEnsataEmulation(bool enable)
 	pthread_mutex_unlock(&this->_mutexSettingsPendingOnNDSExec);
 }
 
+int ClientExecutionControl::GetWifiMode()
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnReset);
+	const int wifiMode = this->_settingsPending.wifiMode;
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnReset);
+	
+	return wifiMode;
+}
+
+void ClientExecutionControl::SetWifiMode(int wifiMode)
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnReset);
+	this->_settingsPending.wifiMode = wifiMode;
+	
+	this->_newSettingsPendingOnReset = true;
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnReset);
+}
+
+int ClientExecutionControl::GetWifiBridgeDeviceIndex()
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnReset);
+	const int wifiBridgeDeviceIndex = this->_settingsPending.wifiBridgeDeviceIndex;
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnReset);
+	
+	return wifiBridgeDeviceIndex;
+}
+
+void ClientExecutionControl::SetWifiBridgeDeviceIndex(int wifiBridgeDeviceIndex)
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnReset);
+	this->_settingsPending.wifiBridgeDeviceIndex = wifiBridgeDeviceIndex;
+	
+	this->_newSettingsPendingOnReset = true;
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnReset);
+}
+
+uint32_t ClientExecutionControl::GetWifiIP4Address()
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnReset);
+	const uint32_t ip4Address = this->_settingsPending.wifiIP4Address;
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnReset);
+	
+	return ip4Address;
+}
+
+void ClientExecutionControl::SetWifiIP4Address(uint32_t ip4Address)
+{
+	pthread_mutex_lock(&this->_mutexSettingsPendingOnReset);
+	this->_settingsPending.wifiIP4Address = ip4Address;
+	
+	this->_newSettingsPendingOnReset = true;
+	pthread_mutex_unlock(&this->_mutexSettingsPendingOnReset);
+}
+
 bool ClientExecutionControl::GetEnableCheats()
 {
 	pthread_mutex_lock(&this->_mutexSettingsPendingOnNDSExec);
@@ -530,6 +646,11 @@ bool ClientExecutionControl::GetEnableSpeedLimiter()
 	return enable;
 }
 
+bool ClientExecutionControl::GetEnableSpeedLimiterApplied()
+{
+	return this->_settingsApplied.enableExecutionSpeedLimiter;
+}
+
 void ClientExecutionControl::SetEnableSpeedLimiter(bool enable)
 {
 	pthread_mutex_lock(&this->_mutexSettingsPendingOnExecutionLoopStart);
@@ -546,6 +667,11 @@ double ClientExecutionControl::GetExecutionSpeed()
 	pthread_mutex_unlock(&this->_mutexSettingsPendingOnExecutionLoopStart);
 	
 	return speedScalar;
+}
+
+double ClientExecutionControl::GetExecutionSpeedApplied()
+{
+	return this->_settingsApplied.executionSpeed;
 }
 
 void ClientExecutionControl::SetExecutionSpeed(double speedScalar)
@@ -646,6 +772,138 @@ void ClientExecutionControl::SetFrameJumpTarget(uint64_t newJumpTarget)
 	pthread_mutex_unlock(&this->_mutexSettingsPendingOnExecutionLoopStart);
 }
 
+bool ClientExecutionControl::IsGDBStubARM9Enabled()
+{
+	return this->_enableGdbStubARM9;
+}
+
+void ClientExecutionControl::SetGDBStubARM9Enabled(bool theState)
+{
+	this->_enableGdbStubARM9 = theState;
+}
+
+bool ClientExecutionControl::IsGDBStubARM7Enabled()
+{
+	return this->_enableGdbStubARM7;
+}
+
+void ClientExecutionControl::SetGDBStubARM7Enabled(bool theState)
+{
+	this->_enableGdbStubARM7 = theState;
+}
+
+uint16_t ClientExecutionControl::GetGDBStubARM9Port()
+{
+	return this->_gdbStubPortARM9;
+}
+
+void ClientExecutionControl::SetGDBStubARM9Port(uint16_t portNumber)
+{
+	this->_gdbStubPortARM9 = portNumber;
+}
+
+uint16_t ClientExecutionControl::GetGDBStubARM7Port()
+{
+	return this->_gdbStubPortARM7;
+}
+
+void ClientExecutionControl::SetGDBStubARM7Port(uint16_t portNumber)
+{
+	this->_gdbStubPortARM7 = portNumber;
+}
+
+bool ClientExecutionControl::IsGDBStubStarted()
+{
+	return this->_isGdbStubStarted;
+}
+
+void ClientExecutionControl::SetIsGDBStubStarted(bool theState)
+{
+#ifdef GDB_STUB
+	if (theState)
+	{
+        gdbstub_mutex_init();
+        
+		if (this->_enableGdbStubARM9)
+		{
+			const uint16_t arm9Port = this->_gdbStubPortARM9;
+			if(arm9Port > 0)
+			{
+				this->_gdbStubHandleARM9 = createStub_gdb(arm9Port, &NDS_ARM9, &arm9_direct_memory_iface);
+				if (this->_gdbStubHandleARM9 == NULL)
+				{
+					printf("Failed to create ARM9 gdbstub on port %d\n", arm9Port);
+				}
+				else
+				{
+					activateStub_gdb(this->_gdbStubHandleARM9);
+				}
+			}
+		}
+		else
+		{
+			destroyStub_gdb(this->_gdbStubHandleARM9);
+			this->_gdbStubHandleARM9 = NULL;
+		}
+		
+		if (this->_enableGdbStubARM7)
+		{
+			const uint16_t arm7Port = this->_gdbStubPortARM7;
+			if (arm7Port > 0)
+			{
+				this->_gdbStubHandleARM7 = createStub_gdb(arm7Port, &NDS_ARM7, &arm7_base_memory_iface);
+				if (this->_gdbStubHandleARM7 == NULL)
+				{
+					printf("Failed to create ARM7 gdbstub on port %d\n", arm7Port);
+				}
+				else
+				{
+					activateStub_gdb(this->_gdbStubHandleARM7);
+				}
+			}
+		}
+		else
+		{
+			destroyStub_gdb(this->_gdbStubHandleARM7);
+			this->_gdbStubHandleARM7 = NULL;
+		}
+	}
+	else
+	{
+		destroyStub_gdb(this->_gdbStubHandleARM9);
+		this->_gdbStubHandleARM9 = NULL;
+		
+		destroyStub_gdb(this->_gdbStubHandleARM7);
+		this->_gdbStubHandleARM7 = NULL;
+
+        gdbstub_mutex_destroy();
+	}
+#endif
+	if ( (this->_gdbStubHandleARM9 == NULL) && (this->_gdbStubHandleARM7 == NULL) )
+	{
+		theState = false;
+	}
+	
+	this->_isGdbStubStarted = theState;
+}
+
+bool ClientExecutionControl::IsInDebugTrap()
+{
+	return this->_isInDebugTrap;
+}
+
+void ClientExecutionControl::SetIsInDebugTrap(bool theState)
+{
+	// If we're transitioning out of the debug trap, then ignore
+	// frame skipping this time.
+	if (this->_isInDebugTrap && !theState)
+	{
+		this->ResetFramesToSkip();
+	}
+	
+	this->_isInDebugTrap = theState;
+}
+
 ExecutionBehavior ClientExecutionControl::GetPreviousExecutionBehavior()
 {
 	pthread_mutex_lock(&this->_mutexSettingsPendingOnExecutionLoopStart);
@@ -714,6 +972,10 @@ void ClientExecutionControl::ApplySettingsOnReset()
 		this->_settingsApplied.enableExternalFirmware		= this->_settingsPending.enableExternalFirmware;
 		this->_settingsApplied.enableFirmwareBoot			= this->_settingsPending.enableFirmwareBoot;
 		
+		this->_settingsApplied.wifiMode						= this->_settingsPending.wifiMode;
+		this->_settingsApplied.wifiBridgeDeviceIndex		= this->_settingsPending.wifiBridgeDeviceIndex;
+		this->_settingsApplied.wifiIP4Address				= this->_settingsPending.wifiIP4Address;
+		
 		this->_settingsApplied.cpuEmulationEngineName		= this->_settingsPending.cpuEmulationEngineName;
 		this->_settingsApplied.slot1DeviceName				= this->_settingsPending.slot1DeviceName;
 		this->_ndsFrameInfo.cpuEmulationEngineName			= this->_settingsApplied.cpuEmulationEngineName;
@@ -732,8 +994,15 @@ void ClientExecutionControl::ApplySettingsOnReset()
 		CommonSettings.jit_max_block_size		= this->_settingsApplied.JITMaxBlockSize;
 		CommonSettings.UseExtBIOS				= this->_settingsApplied.enableExternalBIOS;
 		CommonSettings.UseExtFirmware			= this->_settingsApplied.enableExternalFirmware;
-		CommonSettings.UseExtFirmwareSettings	= this->_settingsApplied.enableExternalFirmware;
+		//CommonSettings.UseExtFirmwareSettings	= this->_settingsApplied.enableExternalFirmware;
+		CommonSettings.UseExtFirmwareSettings = false;
 		CommonSettings.BootFromFirmware			= this->_settingsApplied.enableFirmwareBoot;
+		CommonSettings.wifi.mode				= (WifiCommInterfaceID)this->_settingsApplied.wifiMode;
+		CommonSettings.wifi.infraBridgeAdapter	= this->_settingsApplied.wifiBridgeDeviceIndex;
+		
+		wifiHandler->SetIP4Address(this->_settingsApplied.wifiIP4Address);
+		wifiHandler->SetCommInterfaceID((WifiCommInterfaceID)this->_settingsApplied.wifiMode);
+		wifiHandler->SetBridgeDeviceIndex(this->_settingsApplied.wifiBridgeDeviceIndex);
 		
 		if (this->_settingsApplied.filePathARM9BIOS.length() == 0)
 		{
@@ -858,6 +1127,8 @@ void ClientExecutionControl::ApplySettingsOnNDSExec()
 		this->_settingsApplied.enableCheats						= this->_settingsPending.enableCheats;
 		
 		this->_settingsApplied.enableFrameSkip					= this->_settingsPending.enableFrameSkip;
+		
+		this->_settingsApplied.avCaptureObject					= this->_settingsPending.avCaptureObject;
 		
 		const bool needResetFramesToSkip = this->_needResetFramesToSkip;
 		
@@ -984,68 +1255,70 @@ double ClientExecutionControl::GetFrameTime()
 
 uint8_t ClientExecutionControl::CalculateFrameSkip(double startAbsoluteTime, double frameAbsoluteTime)
 {
-	static const double skipCurve[10]	= {0.60, 0.58, 0.55, 0.51, 0.46, 0.40, 0.30, 0.20, 0.10, 0.00};
-	static const double unskipCurve[10]	= {0.75, 0.70, 0.65, 0.60, 0.50, 0.40, 0.30, 0.20, 0.10, 0.00};
-	static size_t skipStep = 0;
-	static size_t unskipStep = 0;
-	static uint64_t lastSetFrameSkip = 0;
+	static const double unskipCurve[21]	= {0.98, 0.95, 0.91, 0.86, 0.80, 0.73, 0.65, 0.56, 0.46, 0.35, 0.23, 0.20, 0.17, 0.14, 0.11, 0.08, 0.06, 0.04, 0.02, 0.01, 0.00};
+	static const double dynamicBiasCurve[15] = {0.0, 0.2, 0.6, 1.2, 2.0, 3.0, 4.2, 5.6, 7.2, 9.0, 11.0, 13.2, 15.6, 18.2, 20.0};
 	
 	// Calculate the time remaining.
 	const double elapsed = this->GetCurrentAbsoluteTime() - startAbsoluteTime;
-	uint64_t framesToSkip = 0;
+	uint64_t framesToSkipInt = 0;
 	
 	if (elapsed > frameAbsoluteTime)
 	{
 		if (frameAbsoluteTime > 0)
 		{
-			framesToSkip = (uint64_t)( (((elapsed - frameAbsoluteTime) * FRAME_SKIP_AGGRESSIVENESS) / frameAbsoluteTime) + FRAME_SKIP_BIAS );
+			const double framesToSkipReal = ((elapsed * FRAME_SKIP_AGGRESSIVENESS) / frameAbsoluteTime) + dynamicBiasCurve[this->_dynamicBiasStep] + FRAME_SKIP_BIAS;
+			framesToSkipInt = (uint64_t)(framesToSkipReal + 0.5);
 			
-			if (framesToSkip > lastSetFrameSkip)
+			const double frameSkipDiff = framesToSkipReal - this->_lastSetFrameSkip;
+			if (this->_unskipStep > 0)
 			{
-				framesToSkip -= (uint64_t)((double)(framesToSkip - lastSetFrameSkip) * skipCurve[skipStep]);
-				if (skipStep < 9)
+				if (this->_dynamicBiasStep > 0)
 				{
-					skipStep++;
+					this->_dynamicBiasStep--;
 				}
 			}
-			else
+			else if (frameSkipDiff > 0.0)
 			{
-				framesToSkip += (uint64_t)((double)(lastSetFrameSkip - framesToSkip) * skipCurve[skipStep]);
-				if (skipStep > 0)
+				if (this->_dynamicBiasStep < 14)
 				{
-					skipStep--;
+					this->_dynamicBiasStep++;
 				}
 			}
+			
+			this->_unskipStep = 0;
+			this->_lastSetFrameSkip = framesToSkipReal;
 		}
 		else
 		{
 			static const double frameRate100x = (double)FRAME_SKIP_AGGRESSIVENESS / CalculateFrameAbsoluteTime(1.0/100.0);
-			framesToSkip = (uint64_t)(elapsed * frameRate100x);
+			framesToSkipInt = (uint64_t)(elapsed * frameRate100x);
 		}
-		
-		unskipStep = 0;
 	}
 	else
 	{
-		framesToSkip = (uint64_t)((double)lastSetFrameSkip * unskipCurve[unskipStep]);
-		if (unskipStep < 9)
+		const double framesToSkipReal = this->_lastSetFrameSkip * unskipCurve[this->_unskipStep];
+		framesToSkipInt = (uint64_t)(framesToSkipReal + 0.5);
+		
+		if (this->_unskipStep < 20)
 		{
-			unskipStep++;
+			this->_unskipStep++;
 		}
 		
-		skipStep = 0;
+		if (framesToSkipInt == 0)
+		{
+			this->_lastSetFrameSkip = 0.0;
+			this->_unskipStep = 20;
+		}
 	}
 	
 	// Bound the frame skip.
 	static const uint64_t kMaxFrameSkip = (uint64_t)MAX_FRAME_SKIP;
-	if (framesToSkip > kMaxFrameSkip)
+	if (framesToSkipInt > kMaxFrameSkip)
 	{
-		framesToSkip = kMaxFrameSkip;
+		framesToSkipInt = kMaxFrameSkip;
 	}
 	
-	lastSetFrameSkip = framesToSkip;
-	
-	return (uint8_t)framesToSkip;
+	return (uint8_t)framesToSkipInt;
 }
 
 double ClientExecutionControl::GetCurrentAbsoluteTime()
@@ -1066,4 +1339,34 @@ double ClientExecutionControl::CalculateFrameAbsoluteTime(double frameTimeScalar
 void ClientExecutionControl::WaitUntilAbsoluteTime(double deadlineAbsoluteTime)
 {
 	mach_wait_until((uint64_t)deadlineAbsoluteTime);
+}
+
+void* createThread_gdb(void (*thread_function)(void *data), void *thread_data)
+{
+	// Create the thread using POSIX routines.
+	pthread_attr_t  attr;
+	pthread_t*      posixThreadID = (pthread_t*)malloc(sizeof(pthread_t));
+	
+	assert(!pthread_attr_init(&attr));
+	assert(!pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE));
+	
+	int threadError = pthread_create(posixThreadID, &attr, (void* (*)(void *))thread_function, thread_data);
+	
+	assert(!pthread_attr_destroy(&attr));
+	
+	if (threadError != 0)
+	{
+		// Report an error.
+		return NULL;
+	}
+	else
+	{
+		return posixThreadID;
+	}
+}
+
+void joinThread_gdb(void *thread_handle)
+{
+	pthread_join(*(pthread_t *)thread_handle, NULL);
+	free(thread_handle);
 }

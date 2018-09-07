@@ -1,40 +1,33 @@
 /*
-	Copyright (C) 2007 Tim Seidel
-	Copyright (C) 2008-2015 DeSmuME team
+    Copyright (C) 2007 Tim Seidel
+    Copyright (C) 2014 pleonex
+    Copyright (C) 2008-2018 DeSmuME team
 
-	This file is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 2 of the License, or
-	(at your option) any later version.
+    This file is part of DeSmuME
 
-	This file is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+    DeSmuME is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-	You should have received a copy of the GNU General Public License
-	along with the this software.  If not, see <http://www.gnu.org/licenses/>.
+    DeSmuME is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with DeSmuME; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
 #ifndef WIFI_H
 #define WIFI_H
 
 #include <stdio.h>
-#include <queue>
 #include "types.h"
 
-#ifdef EXPERIMENTAL_WIFI_COMM
-	#ifdef HOST_WINDOWS
-		#define WIN32_LEAN_AND_MEAN
-	#endif
-
-	#include <pcap.h>
-	#define HAVE_REMOTE
-	#define WPCAP
-	#define PACKET_SIZE 65535
-	#define _INC_STDIO
-#endif
-
+#include <string>
+#include <vector>
 
 #define		REG_WIFI_ID					0x000
 #define     REG_WIFI_MODE       		0x004
@@ -81,17 +74,17 @@
 #define     REG_WIFI_CIRCBUFWR_SKIP     0x076
 
 // 078 - internal
-#define     REG_WIFI_TXBUF_BEACON       0x080
+#define     REG_WIFI_TXLOCBEACON        0x080
 #define     REG_WIFI_LISTENCOUNT        0x088
 #define     REG_WIFI_BEACONPERIOD       0x08C
 #define     REG_WIFI_LISTENINT          0x08E
-#define 	REG_WIFI_TXBUF_CMD			0x090
-#define		REG_WIFI_TXBUF_REPLY1		0x094
-#define		REG_WIFI_TXBUF_REPLY2		0x098
+#define 	REG_WIFI_TXLOCEXTRA			0x090
+// 094 - ?
+// 098 - ?
 // 09C - internal
-#define     REG_WIFI_TXBUF_LOC1         0x0A0
-#define     REG_WIFI_TXBUF_LOC2         0x0A4
-#define     REG_WIFI_TXBUF_LOC3         0x0A8
+#define     REG_WIFI_TXLOC1             0x0A0
+#define     REG_WIFI_TXLOC2             0x0A4
+#define     REG_WIFI_TXLOC3             0x0A8
 #define     REG_WIFI_TXREQ_RESET        0x0AC
 #define     REG_WIFI_TXREQ_SET          0x0AE
 #define		REG_WIFI_TXREQ_READ			0x0B0
@@ -168,7 +161,6 @@
 #define		REG_WIFI_RFSTATUS			0x214
 #define		REG_WIFI_IF_SET				0x21C
 #define 	REG_WIFI_TXSEQNO			0x210
-#define		REG_WIFI_RXTXADDR			0x268
 #define		REG_WIFI_POWERACK			0x2D0
 
 
@@ -412,34 +404,14 @@ typedef union
 #define WIFI_IRQ_TIMEBEACON             14
 #define WIFI_IRQ_TIMEPREBEACON          15
 
-struct Wifi_TXSlot
+typedef struct
 {
-	u16 RegVal;
+	bool enabled;
+	u16 address;
 
-	u16 CurAddr;
-	int RemPreamble; // preamble time in µs
-	int RemHWords;
-	u32 TimeMask; // 3 = 2mbps, 7 = 1mbps
-	bool NotStarted;
-};
-
-#define WIFI_TXSLOT_LOC1		0
-#define WIFI_TXSLOT_MPCMD		1
-#define WIFI_TXSLOT_LOC2		2
-#define WIFI_TXSLOT_LOC3		3
-#define WIFI_TXSLOT_BEACON		4
-#define WIFI_TXSLOT_MPREPLY		5
-#define WIFI_TXSLOT_NUM			6
-
-struct Wifi_RXPacket
-{
-	u8* Data;
-	int CurOffset;
-	int RemHWords;
-	bool NotStarted;
-};
-
-typedef std::queue<Wifi_RXPacket> Wifi_RXPacketQueue;
+	bool sending;
+	u16 remtime;
+} Wifi_TXLoc;
 
 enum EAPStatus
 {
@@ -448,14 +420,34 @@ enum EAPStatus
 	APStatus_Associated
 };
 
+enum WifiEmulationLevel
+{
+	WifiEmulationLevel_Off = 0,
+	WifiEmulationLevel_Normal = 10000,
+	WifiEmulationLevel_Compatibility = 65535,
+};
+
+enum WifiCommInterfaceID
+{
+	WifiCommInterfaceID_AdHoc = 0,
+	WifiCommInterfaceID_Infrastructure = 1
+};
+
+enum WifiMACMode
+{
+	WifiMACMode_Automatic = 0,
+	WifiMACMode_Manual = 1,
+	WifiMACMode_ReadFromFirmware = 2
+};
+
 /* wifimac_t: the buildin mac (arm7 addressrange: 0x04800000-0x04FFFFFF )*/
 /* http://www.akkit.org/info/dswifi.htm#WifiIOMap */
 
 typedef struct 
 {
 	/* power */
-	BOOL powerOn;
-	BOOL powerOnPending;
+	bool powerOn;
+	bool powerOnPending;
 
 	/* status */
 	u16 rfStatus;
@@ -468,27 +460,34 @@ typedef struct
 	/* modes */
 	u16 macMode;
 	u16 wepMode;
-	BOOL WEP_enable;
+	bool WEP_enable;
 
 	/* sending */
 	u16 TXStatCnt;
 	u16 TXPower;
+	u16 TXSlot[3];
 	u16 TXCnt;
+	u16 TXOpt;
 	u16 TXStat;
+	u16 BeaconAddr;
+	bool BeaconEnable;
+	u16 TXSlotExtra;
 	u16 TXSeqNo;
-	Wifi_TXSlot TXSlots[WIFI_TXSLOT_NUM];
-	int TXCurSlot;
-	u16 TXBusy;
+	u8 txCurSlot;
+	u8 txSlotBusy[3];
+	u32 txSlotAddr[3];
+	u32 txSlotLen[3];
+	u32 txSlotRemainingBytes[3];
+	bool ExtraSlotBusy;
+	u16 ExtraSlotAddr;
+	u16 ExtraSlotLen;
+	u16 ExtraSlotRemBytes;
 
 	/* receiving */
 	u16 RXCnt;
 	u16 RXCheckCounter;
 	u8 RXNum;
-	Wifi_RXPacketQueue RXPacketQueue;
 
-	u16 RXStatIncIF, RXStatIncIE;
-	u16 RXStatOvfIF, RXStatOvfIE;
-	u8 RXStat[16];
 	u16 RXTXAddr;
 
 	/* addressing/handshaking */
@@ -508,14 +507,13 @@ typedef struct
 	u16 retryLimit;
 
 	/* timing */
-	u64 GlobalUsecTimer;
-	BOOL crystalEnabled;
+	bool crystalEnabled;
 	u64 usec;
-	BOOL usecEnable;
+	bool usecEnable;
 	u64 ucmp;
-	BOOL ucmpEnable;
+	bool ucmpEnable;
 	u32 eCount;
-	BOOL eCountEnable;
+	bool eCountEnable;
 	u16 BeaconInterval;
 	u16 BeaconCount1;
 	u16 BeaconCount2;
@@ -547,6 +545,11 @@ typedef struct
 	u16         CircBufWrEnd;
 	u16         CircBufWrSkip;
 
+	/* tx packets */
+	s32 curPacketSize[3];
+	s32 curPacketPos[3];
+	bool curPacketSending[3];
+
 	/* I/O ports */
 	u16			IOPorts[0x800];
 
@@ -555,26 +558,7 @@ typedef struct
 
 } wifimac_t;
 
-
-typedef struct
-{
-	EAPStatus status;
-	u16 seqNum;
-
-} SoftAP_t;
-
-// desmume host communication
-#ifdef EXPERIMENTAL_WIFI_COMM
-typedef struct pcap pcap_t;
-extern pcap_t *wifi_bridge;
-#endif
-
 extern wifimac_t wifiMac;
-extern SoftAP_t SoftAP;
-
-bool WIFI_Init();
-void WIFI_DeInit();
-void WIFI_Reset();
 
 /* subchip communication IO functions */
 void WIFI_setRF_CNT(u16 val);
@@ -621,56 +605,198 @@ typedef struct _FW_WFCProfile
 
 } FW_WFCProfile;
 
-class WifiHandler
+class ClientPCapInterface
 {
 public:
-#ifdef EXPERIMENTAL_WIFI_COMM
-	virtual bool WIFI_SocketsAvailable() { return true; }
-	virtual bool WIFI_PCapAvailable() { return false; }
-	virtual void WIFI_GetUniqueMAC(u8* mac) {}
-	virtual bool WIFI_WFCWarning() { return false; }
+	virtual int findalldevs(void **alldevs, char *errbuf) = 0;
+	virtual void freealldevs(void *alldevs) = 0;
+	virtual void* open(const char *source, int snaplen, int flags, int readtimeout, char *errbuf) = 0;
+	virtual void close(void *dev) = 0;
+	virtual int setnonblock(void *dev, int nonblock, char *errbuf) = 0;
+	virtual int sendpacket(void *dev, const void *data, int len) = 0;
+	virtual int dispatch(void *dev, int num, void *callback, void *userdata) = 0;
+};
 
-	virtual int PCAP_findalldevs(pcap_if_t** alldevs, char* errbuf) { return -1; }
-	virtual void PCAP_freealldevs(pcap_if_t* alldevs) {}
-	virtual pcap_t* PCAP_open(const char* source, int snaplen, int flags, int readtimeout, char* errbuf) { return NULL; }
-	virtual void PCAP_close(pcap_t* dev) {}
-	virtual int PCAP_setnonblock(pcap_t* dev, int nonblock, char* errbuf) { return -1; }
-	virtual int PCAP_sendpacket(pcap_t* dev, const u_char* data, int len) { return -1; }
-	virtual int PCAP_dispatch(pcap_t* dev, int num, pcap_handler callback, u_char* userdata) { return -1; }
-#endif
+class DummyPCapInterface : public ClientPCapInterface
+{
+private:
+	void __CopyErrorString(char *errbuf);
+	
+public:
+	virtual int findalldevs(void **alldevs, char *errbuf);
+	virtual void freealldevs(void *alldevs);
+	virtual void* open(const char *source, int snaplen, int flags, int readtimeout, char *errbuf);
+	virtual void close(void *dev);
+	virtual int setnonblock(void *dev, int nonblock, char *errbuf);
+	virtual int sendpacket(void *dev, const void *data, int len);
+	virtual int dispatch(void *dev, int num, void *callback, void *userdata);
 };
 
 #ifndef HOST_WINDOWS
-class UnixWifiHandler : public WifiHandler
+
+class POSIXPCapInterface : public ClientPCapInterface
 {
-#ifdef EXPERIMENTAL_WIFI_COMM
-	virtual bool WIFI_SocketsAvailable() { return true; }
-	virtual bool WIFI_PCapAvailable() { return true; }
-	virtual bool WIFI_WFCWarning() { return false; }
-	
-	virtual int PCAP_findalldevs(pcap_if_t** alldevs, char* errbuf) {
-		return pcap_findalldevs(alldevs, errbuf); }
-	
-	virtual void PCAP_freealldevs(pcap_if_t* alldevs) {
-		pcap_freealldevs(alldevs); }
-	
-	virtual pcap_t* PCAP_open(const char* source, int snaplen, int flags, int readtimeout, char* errbuf) {
-		return pcap_open_live(source, snaplen, flags, readtimeout, errbuf); }
-	
-	virtual void PCAP_close(pcap_t* dev) {
-		pcap_close(dev); }
-	
-	virtual int PCAP_setnonblock(pcap_t* dev, int nonblock, char* errbuf) {
-		return pcap_setnonblock(dev, nonblock, errbuf); }
-	
-	virtual int PCAP_sendpacket(pcap_t* dev, const u_char* data, int len) {
-		return pcap_sendpacket(dev, data, len); }
-	
-	virtual int PCAP_dispatch(pcap_t* dev, int num, pcap_handler callback, u_char* userdata) {
-		return pcap_dispatch(dev, num, callback, userdata); }
-#endif
+public:
+	virtual int findalldevs(void **alldevs, char *errbuf);
+	virtual void freealldevs(void *alldevs);
+	virtual void* open(const char *source, int snaplen, int flags, int readtimeout, char *errbuf);
+	virtual void close(void *dev);
+	virtual int setnonblock(void *dev, int nonblock, char *errbuf);
+	virtual int sendpacket(void *dev, const void *data, int len);
+	virtual int dispatch(void *dev, int num, void *callback, void *userdata);
 };
+
 #endif
+
+class WifiCommInterface
+{
+protected:
+	WifiCommInterfaceID _commInterfaceID;
+	WifiEmulationLevel _emulationLevel;
+	u64 _usecCounter;
+	
+public:
+	WifiCommInterface();
+	virtual ~WifiCommInterface();
+	
+	virtual bool Start(WifiEmulationLevel emulationLevel) = 0;
+	virtual void Stop() = 0;
+	virtual void SendPacket(void *data, size_t len) = 0;
+	virtual void Trigger() = 0;
+};
+
+class AdhocCommInterface : public WifiCommInterface
+{
+protected:
+	void *_wifiSocket;
+	void *_sendAddr;
+	u8 *_packetBuffer;
+	
+public:
+	AdhocCommInterface();
+	~AdhocCommInterface();
+	
+	virtual bool Start(WifiEmulationLevel emulationLevel);
+	virtual void Stop();
+	virtual void SendPacket(void *data, size_t len);
+	virtual void Trigger();
+};
+
+class SoftAPCommInterface : public WifiCommInterface
+{
+protected:
+	ClientPCapInterface *_pcap;
+	int _bridgeDeviceIndex;
+	void *_bridgeDevice;
+	FILE *_packetCaptureFile; // PCAP file to store the Ethernet packets.
+	
+	u8 _curPacket[4096];
+	s32 _curPacketSize;
+	s32 _curPacketPos;
+	bool _curPacketSending;
+	
+	EAPStatus _status;
+	u16 _seqNum;
+	
+	void* _GetBridgeDeviceAtIndex(int deviceIndex, char *outErrorBuf);
+	bool _IsDNSRequestToWFC(u16 ethertype, u8 *body);
+	void _Deauthenticate();
+	void _SendBeacon();
+	
+public:
+	SoftAPCommInterface();
+	virtual ~SoftAPCommInterface();
+	
+	void SetPCapInterface(ClientPCapInterface *pcapInterface);
+	ClientPCapInterface* GetPCapInterface();
+	
+	int GetBridgeDeviceIndex();
+	void SetBridgeDeviceIndex(int deviceIndex);
+	
+	void PacketRX(const void *pktHeader, const u8 *pktData);
+	
+	void PacketCaptureFileOpen();
+	void PacketCaptureFileClose();
+	void PacketCaptureFileWrite(const u8 *packet, u32 len, bool isReceived);
+	
+	virtual bool Start(WifiEmulationLevel emulationLevel);
+	virtual void Stop();
+	virtual void SendPacket(void *data, size_t len);
+	virtual void Trigger();
+};
+
+class WifiHandler
+{
+protected:
+	AdhocCommInterface *_adhocCommInterface;
+	SoftAPCommInterface *_softAPCommInterface;
+	
+	WifiEmulationLevel _selectedEmulationLevel;
+	WifiEmulationLevel _currentEmulationLevel;
+	
+	WifiCommInterfaceID _selectedCommID;
+	WifiCommInterfaceID _currentCommID;
+	WifiCommInterface *_currentCommInterface;
+	
+	int _selectedBridgeDeviceIndex;
+	
+	ClientPCapInterface *_pcap;
+	bool _isSocketsSupported;
+	bool _didWarnWFCUser;
+	
+	WifiMACMode _adhocMACMode;
+	WifiMACMode _infrastructureMACMode;
+	u32 _ip4Address;
+	u32 _uniqueMACValue;
+	u8 _userMAC[3];
+	
+public:
+	WifiHandler();
+	~WifiHandler();
+	
+	void Reset();
+	
+	WifiEmulationLevel GetSelectedEmulationLevel();
+	WifiEmulationLevel GetCurrentEmulationLevel();
+	void SetEmulationLevel(WifiEmulationLevel emulationLevel);
+	
+	WifiCommInterfaceID GetSelectedCommInterfaceID();
+	WifiCommInterfaceID GetCurrentCommInterfaceID();
+	void SetCommInterfaceID(WifiCommInterfaceID commID);
+	
+	int GetBridgeDeviceList(std::vector<std::string> *deviceStringList);
+
+	int GetSelectedBridgeDeviceIndex();
+	int GetCurrentBridgeDeviceIndex();
+	void SetBridgeDeviceIndex(int deviceIndex);
+	
+	bool CommStart();
+	void CommStop();
+	void CommSendPacket(void *data, size_t len);
+	void CommTrigger();
+	
+	bool IsSocketsSupported();
+	void SetSocketsSupported(bool isSupported);
+	
+	bool IsPCapSupported();
+	ClientPCapInterface* GetPCapInterface();
+	void SetPCapInterface(ClientPCapInterface *pcapInterface);
+	
+	WifiMACMode GetMACModeForComm(WifiCommInterfaceID commID);
+	void SetMACModeForComm(WifiCommInterfaceID commID, WifiMACMode macMode);
+	
+	uint32_t GetIP4Address();
+	void SetIP4Address(u32 ip4Address);
+	
+	uint32_t GetUniqueMACValue();
+	void SetUniqueMACValue(u32 uniqueValue);
+	
+	void GetUserMACValues(u8 *outValue3, u8 *outValue4, u8 *outValue5);
+	void SetUserMACValues(u8 inValue3, u8 inValue4, u8 inValue5);
+	
+	void GenerateMACFromValues(u8 outMAC[6]);
+	void CopyMACFromUserValues(u8 outMAC[6]);
+};
 
 /* wifi data to be stored in firmware, when no firmware image was loaded */
 extern u8 FW_Mac[6];
@@ -682,6 +808,7 @@ extern const u8 FW_BBChannel[14];
 extern FW_WFCProfile FW_WFCProfile1;
 extern FW_WFCProfile FW_WFCProfile2;
 extern FW_WFCProfile FW_WFCProfile3;
-extern WifiHandler *CurrentWifiHandler;
+extern DummyPCapInterface dummyPCapInterface;
+extern WifiHandler *wifiHandler;
 
 #endif

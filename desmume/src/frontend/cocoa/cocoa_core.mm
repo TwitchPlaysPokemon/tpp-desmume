@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2011-2017 DeSmuME team
+	Copyright (C) 2011-2018 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,52 +25,17 @@
 #import "cocoa_rom.h"
 #import "cocoa_util.h"
 
+#include "macOS_driver.h"
+#include "ClientAVCaptureObject.h"
 #include "ClientExecutionControl.h"
 #include "ClientInputHandler.h"
 
 #include "../../movie.h"
 #include "../../NDSSystem.h"
-#include "../../armcpu.h"
-#include "../../driver.h"
-#include "../../gdbstub.h"
 #include "../../slot1.h"
 #include "../../slot2.h"
 #include "../../SPU.h"
 #undef BOOL
-
-// Need to include assert.h this way so that GDB stub will work
-// with an optimized build.
-#if defined(GDB_STUB) && defined(NDEBUG)
-	#define TEMP_NDEBUG
-	#undef NDEBUG
-#endif
-
-#include <assert.h>
-
-#if defined(TEMP_NDEBUG)
-	#undef TEMP_NDEBUG
-	#define NDEBUG
-#endif
-
-class OSXDriver : public BaseDriver
-{
-private:
-	pthread_mutex_t *mutexThreadExecute;
-	pthread_rwlock_t *rwlockCoreExecute;
-	CocoaDSCore *cdsCore;
-	
-public:
-	pthread_mutex_t* GetCoreThreadMutexLock();
-	void SetCoreThreadMutexLock(pthread_mutex_t *theMutex);
-	pthread_rwlock_t* GetCoreExecuteRWLock();
-	void SetCoreExecuteRWLock(pthread_rwlock_t *theRwLock);
-	void SetCore(CocoaDSCore *theCore);
-	
-	virtual void EMU_DebugIdleEnter();
-	virtual void EMU_DebugIdleUpdate();
-	virtual void EMU_DebugIdleWakeUp();
-};
-
 
 //accessed from other files
 volatile bool execute = true;
@@ -95,12 +60,12 @@ volatile bool execute = true;
 @dynamic frameJumpNumberFramesForward;
 @dynamic frameJumpToFrameIndex;
 
+@dynamic enableGdbStubARM9;
+@dynamic enableGdbStubARM7;
+@dynamic gdbStubPortARM9;
+@dynamic gdbStubPortARM7;
 @dynamic isGdbStubStarted;
 @dynamic isInDebugTrap;
-@synthesize enableGdbStubARM9;
-@synthesize enableGdbStubARM7;
-@synthesize gdbStubPortARM9;
-@synthesize gdbStubPortARM7;
 
 @dynamic emuFlagAdvancedBusLevelTiming;
 @dynamic emuFlagRigorousTiming;
@@ -135,15 +100,6 @@ volatile bool execute = true;
 		return self;
 	}
 	
-	isGdbStubStarted = NO;
-	isInDebugTrap = NO;
-	enableGdbStubARM9 = NO;
-	enableGdbStubARM7 = NO;
-	gdbStubPortARM9 = 0;
-	gdbStubPortARM7 = 0;
-	gdbStubHandleARM9 = NULL;
-	gdbStubHandleARM7 = NULL;
-	
 	int initResult = NDS_Init();
 	if (initResult == -1)
 	{
@@ -173,11 +129,13 @@ volatile bool execute = true;
 	
 	threadParam.cdsCore = self;
 	
+	wifiHandler->SetUniqueMACValue((uint32_t)[[NSProcessInfo processInfo] processIdentifier]);
+	wifiHandler->SetEmulationLevel(WifiEmulationLevel_Off);
+	
 	pthread_rwlock_init(&threadParam.rwlockOutputList, NULL);
 	pthread_mutex_init(&threadParam.mutexThreadExecute, NULL);
 	pthread_cond_init(&threadParam.condThreadExecute, NULL);
 	pthread_rwlock_init(&threadParam.rwlockCoreExecute, NULL);
-	pthread_create(&coreThread, NULL, &RunCoreThread, &threadParam);
 	
 	// The core emulation thread needs max priority since it is the sole
 	// producer thread for all output threads. Note that this is not being
@@ -191,19 +149,25 @@ volatile bool execute = true;
 	// lot of CPU time under certain conditions, which may interfere with
 	// other threads. (Example: Video tearing on display windows, even with
 	// V-sync enabled.)
+	
+	pthread_attr_t threadAttr;
+	pthread_attr_init(&threadAttr);
+	pthread_attr_setschedpolicy(&threadAttr, SCHED_RR);
+	
 	struct sched_param sp;
-	int thePolicy = 0;
 	memset(&sp, 0, sizeof(struct sched_param));
-	pthread_getschedparam(coreThread, &thePolicy, &sp);
-	sp.sched_priority = sched_get_priority_max(thePolicy);
-	pthread_setschedparam(coreThread, thePolicy, &sp);
+	sp.sched_priority = 42;
+	pthread_attr_setschedparam(&threadAttr, &sp);
+	
+	pthread_create(&coreThread, &threadAttr, &RunCoreThread, &threadParam);
+	pthread_attr_destroy(&threadAttr);
 	
 	[cdsGPU setOutputList:cdsOutputList rwlock:&threadParam.rwlockOutputList];
 	
-	OSXDriver *newDriver = new OSXDriver;
+	macOS_driver *newDriver = new macOS_driver;
 	newDriver->SetCoreThreadMutexLock(&threadParam.mutexThreadExecute);
 	newDriver->SetCoreExecuteRWLock(self.rwlockCoreExecute);
-	newDriver->SetCore(self);
+	newDriver->SetExecutionControl(execControl);
 	driver = newDriver;
 	
 	frameStatus = @"---";
@@ -381,96 +345,65 @@ volatile bool execute = true;
 	return (enable) ? YES : NO;
 }
 
+- (BOOL) enableGdbStubARM9
+{
+	const bool enable = execControl->IsGDBStubARM9Enabled();
+	return (enable) ? YES : NO;
+}
+
+- (void) setEnableGdbStubARM9:(BOOL)enable
+{
+	execControl->SetGDBStubARM9Enabled((enable) ? true : false);
+}
+
+- (BOOL) enableGdbStubARM7
+{
+	const bool enable = execControl->IsGDBStubARM7Enabled();
+	return (enable) ? YES : NO;
+}
+
+- (void) setEnableGdbStubARM7:(BOOL)enable
+{
+	execControl->SetGDBStubARM7Enabled((enable) ? true : false);
+}
+
+- (NSUInteger) gdbStubPortARM9
+{
+	const uint16_t portNumber = execControl->GetGDBStubARM9Port();
+	return (NSUInteger)portNumber;
+}
+
+- (void) setGdbStubPortARM9:(NSUInteger)portNumber
+{
+	execControl->SetGDBStubARM9Port((uint16_t)portNumber);
+}
+
+- (NSUInteger) gdbStubPortARM7
+{
+	const uint16_t portNumber = execControl->GetGDBStubARM7Port();
+	return (NSUInteger)portNumber;
+}
+
+- (void) setGdbStubPortARM7:(NSUInteger)portNumber
+{
+	execControl->SetGDBStubARM7Port((uint16_t)portNumber);
+}
+
 - (void) setIsGdbStubStarted:(BOOL)theState
 {
-#ifdef GDB_STUB
-	if (theState)
-	{
-        gdbstub_mutex_init();
-        
-		if ([self enableGdbStubARM9])
-		{
-			const uint16_t arm9Port = (uint16_t)[self gdbStubPortARM9];
-			if(arm9Port > 0)
-			{
-				gdbStubHandleARM9 = createStub_gdb(arm9Port, &NDS_ARM9, &arm9_direct_memory_iface);
-				if (gdbStubHandleARM9 == NULL)
-				{
-					NSLog(@"Failed to create ARM9 gdbstub on port %d\n", arm9Port);
-				}
-				else
-				{
-					activateStub_gdb(gdbStubHandleARM9);
-				}
-			}
-		}
-		else
-		{
-			destroyStub_gdb(gdbStubHandleARM9);
-			gdbStubHandleARM9 = NULL;
-		}
-		
-		if ([self enableGdbStubARM7])
-		{
-			const uint16_t arm7Port = (uint16_t)[self gdbStubPortARM7];
-			if (arm7Port > 0)
-			{
-				gdbStubHandleARM7 = createStub_gdb(arm7Port, &NDS_ARM7, &arm7_base_memory_iface);
-				if (gdbStubHandleARM7 == NULL)
-				{
-					NSLog(@"Failed to create ARM7 gdbstub on port %d\n", arm7Port);
-				}
-				else
-				{
-					activateStub_gdb(gdbStubHandleARM7);
-				}
-			}
-		}
-		else
-		{
-			destroyStub_gdb(gdbStubHandleARM7);
-			gdbStubHandleARM7 = NULL;
-		}
-	}
-	else
-	{
-		destroyStub_gdb(gdbStubHandleARM9);
-		gdbStubHandleARM9 = NULL;
-		
-		destroyStub_gdb(gdbStubHandleARM7);
-		gdbStubHandleARM7 = NULL;
-
-        gdbstub_mutex_destroy();
-	}
-#endif
-	if (gdbStubHandleARM9 == NULL && gdbStubHandleARM7 == NULL)
-	{
-		theState = NO;
-	}
-	
-	isGdbStubStarted = theState;
+	execControl->SetIsGDBStubStarted((theState) ? true : false);
 }
 
 - (BOOL) isGdbStubStarted
 {
-	return isGdbStubStarted;
-}
-
-- (void) setIsInDebugTrap:(BOOL)theState
-{
-	// If we're transitioning out of the debug trap, then ignore
-	// frame skipping this time.
-	if (isInDebugTrap && !theState)
-	{
-		execControl->ResetFramesToSkip();
-	}
-	
-	isInDebugTrap = theState;
+	const bool theState = execControl->IsGDBStubStarted();
+	return (theState) ? YES : NO;
 }
 
 - (BOOL) isInDebugTrap
 {
-	return isInDebugTrap;
+	const bool theState = execControl->IsInDebugTrap();
+	return (theState) ? YES : NO;
 }
 
 - (void) setEmuFlagAdvancedBusLevelTiming:(BOOL)enable
@@ -864,6 +797,7 @@ volatile bool execute = true;
 	[self setCoreState:ExecutionBehavior_Pause];
 	
 	pthread_mutex_lock(&threadParam.mutexThreadExecute);
+	execControl->SetWifiIP4Address([CocoaDSUtil hostIP4AddressAsUInt32]);
 	execControl->ApplySettingsOnReset();
 	NDS_Reset();
 	pthread_mutex_unlock(&threadParam.mutexThreadExecute);
@@ -1120,15 +1054,23 @@ static void* RunCoreThread(void *arg)
 	ClientInputHandler *inputHandler = execControl->GetClientInputHandler();
 	NSMutableArray *cdsOutputList = [cdsCore cdsOutputList];
 	const NDSFrameInfo &ndsFrameInfo = execControl->GetNDSFrameInfo();
+	ClientAVCaptureObject *avCaptureObject = NULL;
 	
 	double startTime = 0.0;
 	double frameTime = 0.0; // The amount of time that is expected for the frame to run.
 	
 	const double standardNDSFrameTime = execControl->CalculateFrameAbsoluteTime(1.0);
+	double lastSelectedExecSpeedSelected = 1.0;
 	double executionSpeedAverage = 0.0;
 	double executionSpeedAverageFramesCollected = 0.0;
+	double executionWaitBias = 1.0;
+	double lastExecutionWaitBias = 1.0;
+	double lastExecutionSpeedDifference = 0.0;
+	bool needRestoreExecutionWaitBias = false;
+	bool lastExecutionSpeedLimitEnable = execControl->GetEnableSpeedLimiter();
 	
 	ExecutionBehavior behavior = ExecutionBehavior_Pause;
+	ExecutionBehavior lastBehavior = ExecutionBehavior_Pause;
 	uint64_t frameJumpTarget = 0;
 	
 	[[[cdsCore cdsGPU] sharedData] semaphoreFramebufferCreate];
@@ -1150,12 +1092,37 @@ static void* RunCoreThread(void *arg)
 			behavior = execControl->GetExecutionBehaviorApplied();
 		}
 		
+		if ( (lastBehavior == ExecutionBehavior_Run) && (behavior != ExecutionBehavior_Run) )
+		{
+			lastExecutionWaitBias = executionWaitBias;
+			needRestoreExecutionWaitBias = true;
+		}
+		
+		if ( (behavior == ExecutionBehavior_Run) && lastExecutionSpeedLimitEnable && !execControl->GetEnableSpeedLimiter() )
+		{
+			lastExecutionWaitBias = executionWaitBias;
+		}
+		else if ( (behavior == ExecutionBehavior_Run) && !lastExecutionSpeedLimitEnable && execControl->GetEnableSpeedLimiter() )
+		{
+			needRestoreExecutionWaitBias = true;
+		}
+		
 		frameTime = execControl->GetFrameTime();
 		frameJumpTarget = execControl->GetFrameJumpTargetApplied();
 		
 		inputHandler->ProcessInputs();
 		inputHandler->ApplyInputs();
 		execControl->ApplySettingsOnNDSExec();
+		
+		avCaptureObject = execControl->GetClientAVCaptureObjectApplied();
+		if ( (avCaptureObject != NULL) && (avCaptureObject->IsCapturingVideo() || avCaptureObject->IsCapturingAudio()) )
+		{
+			avCaptureObject->StartFrame();
+		}
+		else
+		{
+			avCaptureObject = NULL;
+		}
 		
 		// Execute the frame and increment the frame counter.
 		pthread_rwlock_wrlock(&param->rwlockCoreExecute);
@@ -1178,6 +1145,11 @@ static void* RunCoreThread(void *arg)
 			continue;
 		}
 		
+		if ( (avCaptureObject != NULL) && !avCaptureObject->IsCapturingVideo() )
+		{
+			avCaptureObject->StreamWriteStart();
+		}
+		
 		// Make sure that the mic level is updated at least once every 8 frames, regardless
 		// of whether the NDS actually reads the mic or not.
 		if ((ndsFrameInfo.frameIndex & 0x07) == 0x07)
@@ -1194,7 +1166,39 @@ static void* RunCoreThread(void *arg)
 			{
 				if (executionSpeedAverageFramesCollected > 0.0001)
 				{
-					execControl->SetFrameInfoExecutionSpeed((executionSpeedAverage / executionSpeedAverageFramesCollected) * 100.0);
+					const double execSpeedSelected = execControl->GetExecutionSpeedApplied();
+					const double execSpeedCurrent = (executionSpeedAverage / executionSpeedAverageFramesCollected);
+					const double execSpeedDifference = execSpeedSelected - execSpeedCurrent;
+					
+					execControl->SetFrameInfoExecutionSpeed(execSpeedCurrent * 100.0);
+					
+					if ( (behavior == ExecutionBehavior_Run) && needRestoreExecutionWaitBias )
+					{
+						executionWaitBias = lastExecutionWaitBias;
+						needRestoreExecutionWaitBias = false;
+					}
+					else
+					{
+						if (lastSelectedExecSpeedSelected == execSpeedSelected)
+						{
+							executionWaitBias -= execSpeedDifference;
+							lastExecutionSpeedDifference = execSpeedDifference;
+							
+							if (executionWaitBias < EXECUTION_WAIT_BIAS_MIN)
+							{
+								executionWaitBias = EXECUTION_WAIT_BIAS_MIN;
+							}
+							else if (executionWaitBias > EXECUTION_WAIT_BIAS_MAX)
+							{
+								executionWaitBias = EXECUTION_WAIT_BIAS_MAX;
+							}
+						}
+						else
+						{
+							executionWaitBias = 1.0;
+							lastSelectedExecSpeedSelected = execSpeedSelected;
+						}
+					}
 				}
 				
 				executionSpeedAverage = 0.0;
@@ -1221,11 +1225,11 @@ static void* RunCoreThread(void *arg)
 					if ([cdsOutput isKindOfClass:[CocoaDSDisplay class]])
 					{
 						[(CocoaDSDisplay *)cdsOutput setNDSFrameInfo:ndsFrameInfo];
-					}
-					
-					if ( ![cdsOutput isKindOfClass:[CocoaDSSpeaker class]] && (![cdsOutput isKindOfClass:[CocoaDSDisplay class]] || (framesToSkip == 0)) )
-					{
-						[cdsOutput doCoreEmuFrame];
+						
+						if (framesToSkip == 0)
+						{
+							[cdsOutput doCoreEmuFrame];
+						}
 					}
 				}
 				break;
@@ -1241,7 +1245,7 @@ static void* RunCoreThread(void *arg)
 		{
 			case ExecutionBehavior_Run:
 			{
-				if (execControl->GetEnableFrameSkipApplied())
+				if (execControl->GetEnableFrameSkipApplied() && !avCaptureObject)
 				{
 					if (framesToSkip > 0)
 					{
@@ -1250,7 +1254,8 @@ static void* RunCoreThread(void *arg)
 					}
 					else
 					{
-						execControl->SetFramesToSkip( execControl->CalculateFrameSkip(startTime, frameTime) );
+						const double frameTimeBias = (lastExecutionSpeedDifference > 0.0) ? 1.0 - lastExecutionSpeedDifference : 1.0;
+						execControl->SetFramesToSkip( execControl->CalculateFrameSkip(startTime, frameTime * frameTimeBias) );
 					}
 				}
 				break;
@@ -1258,14 +1263,17 @@ static void* RunCoreThread(void *arg)
 			
 			case ExecutionBehavior_FrameJump:
 			{
-				if (framesToSkip > 0)
+				if (!avCaptureObject)
 				{
-					NDS_SkipNextFrame();
-					execControl->SetFramesToSkip(framesToSkip - 1);
-				}
-				else
-				{
-					execControl->SetFramesToSkip( (uint8_t)((DS_FRAMES_PER_SECOND * 1.0) + 0.85) );
+					if (framesToSkip > 0)
+					{
+						NDS_SkipNextFrame();
+						execControl->SetFramesToSkip(framesToSkip - 1);
+					}
+					else
+					{
+						execControl->SetFramesToSkip( (uint8_t)((DS_FRAMES_PER_SECOND * 1.0) + 0.85) );
+					}
 				}
 				break;
 			}
@@ -1296,9 +1304,14 @@ static void* RunCoreThread(void *arg)
 		else
 		{
 			// If there is any time left in the loop, go ahead and pad it.
-			if ( (execControl->GetCurrentAbsoluteTime() - startTime) < frameTime )
+			const double biasedFrameTime = frameTime * executionWaitBias;
+			
+			if (biasedFrameTime > 0.0)
 			{
-				execControl->WaitUntilAbsoluteTime(startTime + frameTime);
+				if ( (execControl->GetCurrentAbsoluteTime() - startTime) < frameTime )
+				{
+					execControl->WaitUntilAbsoluteTime(startTime + biasedFrameTime);
+				}
 			}
 		}
 		
@@ -1306,86 +1319,15 @@ static void* RunCoreThread(void *arg)
 		const double currentExecutionSpeed = standardNDSFrameTime / (endTime - startTime);
 		executionSpeedAverage += currentExecutionSpeed;
 		executionSpeedAverageFramesCollected += 1.0;
+		lastBehavior = behavior;
+		lastExecutionSpeedLimitEnable = execControl->GetEnableSpeedLimiterApplied();
 		
 	} while(true);
 	
+	if (avCaptureObject != NULL)
+	{
+		avCaptureObject->StreamWriteFinish();
+	}
+	
 	return NULL;
-}
-
-#pragma mark - OSXDriver
-
-pthread_mutex_t* OSXDriver::GetCoreThreadMutexLock()
-{
-	return this->mutexThreadExecute;
-}
-
-void OSXDriver::SetCoreThreadMutexLock(pthread_mutex_t *theMutex)
-{
-	this->mutexThreadExecute = theMutex;
-}
-
-pthread_rwlock_t* OSXDriver::GetCoreExecuteRWLock()
-{
-	return this->rwlockCoreExecute;
-}
-
-void OSXDriver::SetCoreExecuteRWLock(pthread_rwlock_t *theRwLock)
-{
-	this->rwlockCoreExecute = theRwLock;
-}
-
-void OSXDriver::SetCore(CocoaDSCore *theCore)
-{
-	this->cdsCore = theCore;
-}
-
-void OSXDriver::EMU_DebugIdleEnter()
-{
-	[this->cdsCore setIsInDebugTrap:YES];
-	pthread_rwlock_unlock(this->rwlockCoreExecute);
-	pthread_mutex_unlock(this->mutexThreadExecute);
-}
-
-void OSXDriver::EMU_DebugIdleUpdate()
-{
-	usleep(50);
-}
-
-void OSXDriver::EMU_DebugIdleWakeUp()
-{
-	pthread_mutex_lock(this->mutexThreadExecute);
-	pthread_rwlock_wrlock(this->rwlockCoreExecute);
-	[this->cdsCore setIsInDebugTrap:NO];
-}
-
-#pragma mark - GDB Stub implementation
-
-void* createThread_gdb(void (*thread_function)(void *data), void *thread_data)
-{
-	// Create the thread using POSIX routines.
-	pthread_attr_t  attr;
-	pthread_t*      posixThreadID = (pthread_t*)malloc(sizeof(pthread_t));
-	
-	assert(!pthread_attr_init(&attr));
-	assert(!pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE));
-	
-	int threadError = pthread_create(posixThreadID, &attr, (void* (*)(void *))thread_function, thread_data);
-	
-	assert(!pthread_attr_destroy(&attr));
-	
-	if (threadError != 0)
-	{
-		// Report an error.
-		return NULL;
-	}
-	else
-	{
-		return posixThreadID;
-	}
-}
-
-void joinThread_gdb(void *thread_handle)
-{
-	pthread_join(*(pthread_t *)thread_handle, NULL);
-	free(thread_handle);
 }

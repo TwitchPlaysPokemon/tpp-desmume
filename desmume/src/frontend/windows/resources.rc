@@ -202,19 +202,19 @@ BEGIN
     LTEXT           "Description:",-1,9,116,39,8
 END
 
-IDD_CHEAT_LIST DIALOGEX 0, 0, 499, 285
+IDD_CHEAT_LIST DIALOGEX 0, 0, 461, 285
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Cheats list"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "",IDC_LIST1,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,7,7,488,218
+    CONTROL         "",IDC_LIST1,"SysListView32",LVS_REPORT | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,7,7,450,218
     PUSHBUTTON      "internal",IDC_BADD,10,240,50,14
     PUSHBUTTON      "Action Replay",IDC_BADD_AR,66,240,67,14
     PUSHBUTTON      "Codebreaker",IDC_BADD_CB,139,240,67,14,WS_DISABLED
     PUSHBUTTON      "Edit",IDC_BEDIT,245,228,64,14,WS_DISABLED
     PUSHBUTTON      "Remove",IDC_BREMOVE,246,244,63,14,WS_DISABLED
     DEFPUSHBUTTON   "Save",IDOK,109,263,50,14,WS_DISABLED
-    PUSHBUTTON      "Cancel",IDCANCEL,163,263,50,14
+    PUSHBUTTON      "Cancel",IDCLOSE,163,263,50,14
     GROUPBOX        " Add cheats code as... ",IDC_STATIC,7,230,205,31
     PUSHBUTTON      "Cheats Database",IDC_EXPORT,246,263,63,14
 END
@@ -1236,19 +1236,21 @@ BEGIN
     LTEXT           "frames",IDC_STATIC,428,167,16,8
 END
 
-IDD_WIFISETTINGS DIALOGEX 0, 0, 331, 142
+IDD_WIFISETTINGS DIALOGEX 0, 0, 331, 158
 STYLE DS_SETFONT | DS_CENTER | WS_CAPTION | WS_SYSMENU
 CAPTION "Wifi settings"
 FONT 8, "Ms Shell Dlg", 0, 0, 0x0
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,222,120,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,276,120,50,14
-    GROUPBOX        "Infrastructure settings",IDC_STATIC,6,60,319,54
-    LTEXT           "Bridge network adapter:",IDC_STATIC,12,78,306,8
-    COMBOBOX        IDC_BRIDGEADAPTER,12,90,306,45,CBS_DROPDOWNLIST | CBS_HASSTRINGS
-    GROUPBOX        "Wifi mode",IDC_STATIC,6,6,318,48
-    CONTROL         "Ad-hoc",IDC_WIFIMODE0,"Button",BS_AUTORADIOBUTTON,12,24,306,10
-    CONTROL         "Infrastructure",IDC_WIFIMODE1,"Button",BS_AUTORADIOBUTTON,12,36,306,10
+    DEFPUSHBUTTON   "OK",IDOK,222,136,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,276,136,50,14
+    GROUPBOX        "Infrastructure settings",IDC_STATIC,6,76,319,54
+    LTEXT           "Bridge network adapter:",IDC_STATIC,12,94,306,8
+    COMBOBOX        IDC_BRIDGEADAPTER,12,106,306,45,CBS_DROPDOWNLIST | CBS_HASSTRINGS
+    GROUPBOX        "Wifi mode",IDC_STATIC,6,22,318,48
+    CONTROL         "Ad-hoc",IDC_WIFIMODE0,"Button",BS_AUTORADIOBUTTON,12,40,306,10
+    CONTROL         "Infrastructure",IDC_WIFIMODE1,"Button",BS_AUTORADIOBUTTON,12,52,306,10
+    CONTROL         "Enable WiFi Emulation",IDC_WIFI_ENABLED,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,6,150,10
+    CONTROL         "Compatibility Mode",IDC_WIFI_COMPAT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,170,6,150,10
 END
 
 IDD_INPUTCONFIG DIALOGEX 0, 0, 339, 148
@@ -1398,7 +1400,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "OK",IDOK,50,45,50,14
     PUSHBUTTON      "Cancel",IDCANCEL,104,45,50,14
-    COMBOBOX        IDC_FONTCOMBO,7,23,147,199,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_FONTCOMBO,7,23,147,199,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Select a HUD font",IDC_START,7,7,74,14
 END
 
@@ -1609,6 +1611,17 @@ BEGIN
             MENUITEM "&Always On Top",              IDM_ALWAYS_ON_TOP
             MENUITEM "&Lockdown",                   IDM_LOCKDOWN
         END
+        POPUP "Screen Size Ratio (L:R)"
+        BEGIN
+            MENUITEM "1.0 : 1.0",                   IDC_SCR_RATIO_1p0
+            MENUITEM "1.1 : 0.9",                   IDC_SCR_RATIO_1p1
+            MENUITEM "1.2 : 0.8",                   IDC_SCR_RATIO_1p2
+            MENUITEM "1.3 : 0.7",                   IDC_SCR_RATIO_1p3
+            MENUITEM "1.4 : 0.6",                   IDC_SCR_RATIO_1p4
+            MENUITEM "1.5 : 0.5",                   IDC_SCR_RATIO_1p5
+            MENUITEM SEPARATOR
+            MENUITEM "Center Vertically",           IDC_SCR_VCENTER
+        END
         POPUP "Screen &Gap"
         BEGIN
             MENUITEM "&None\t(0 px)",               IDM_SCREENSEP_NONE
@@ -1621,6 +1634,12 @@ BEGIN
             MENUITEM "&White",                      IDM_SCREENSEP_COLORWHITE
             MENUITEM "&Gray",                       IDM_SCREENSEP_COLORGRAY
             MENUITEM "&Black",                      IDM_SCREENSEP_COLORBLACK
+        END
+        POPUP "Fullscreen Options"
+        BEGIN
+            MENUITEM "Force Windowed Fullscreen",   IDM_FS_WINDOW
+            MENUITEM "Show Menu",                   IDM_FS_MENU
+            MENUITEM "Auto-Hide Cursor",            IDM_FS_HIDE_CURSOR
         END
         POPUP "Magnification &Filter"
         BEGIN
@@ -1854,7 +1873,6 @@ BEGIN
 
     IDD_CHEAT_LIST, DIALOG
     BEGIN
-        RIGHTMARGIN, 495
         BOTTOMMARGIN, 277
     END
 
@@ -1904,7 +1922,7 @@ BEGIN
 
     IDD_WIFISETTINGS, DIALOG
     BEGIN
-        BOTTOMMARGIN, 140
+        BOTTOMMARGIN, 156
     END
 
     IDD_INPUTCONFIG, DIALOG
@@ -2102,16 +2120,11 @@ BEGIN
     IDM_FILE_STOPAVI        "Stop AVI"
     IDM_FILE_STOPWAV        "Stop WAV"
     IDM_FILE_RECORDAVI      "Record AVI"
-END
-
-STRINGTABLE
-BEGIN
     IDM_FILE_RECORDWAV      "Record WAV"
 END
 
 STRINGTABLE
 BEGIN
-    ID_RAMSEARCH_CAPTIONTEXT " RAM Search"
     ID_HOTKEYS_TITLE        "Hotkey Configuration"
 END
 
@@ -2120,47 +2133,23 @@ BEGIN
     ID_LABEL_HK1            "Open ROM"
     ID_LABEL_HK2            "Reset"
     ID_LABEL_HK3            "Pause"
+    ID_LABEL_HK3b           "CPU mode"
+    ID_LABEL_HK3c           "Increase JIT block size"
+    ID_LABEL_HK3d           "Decrease JIT block size"
     ID_LABEL_HK4            "Frame Advance"
     ID_LABEL_HK5            "Fast Forward"
     ID_LABEL_HK6            "Fast Forward Toggle"
     ID_LABEL_HK7            "Increase Speed"
     ID_LABEL_HK8            "Decrease Speed"
+    ID_LABEL_HK8b           "Limit Framerate Toggle"
     ID_LABEL_HK9            "Microphone"
     ID_LABEL_HK10           "Auto-Hold"
     ID_LABEL_HK11           "Auto-Hold Clear"
     ID_LABEL_HK12           "Toggle Rasterizer"
     ID_LABEL_HK13           "Save Screenshot as"
+    ID_LABEL_HK13b          "Quick Screenshot"
     ID_LABEL_HK14           "Record WAV"
     ID_LABEL_HK15           "Record AVI"
-END
-
-STRINGTABLE
-BEGIN
-    ID_LABEL_HK8b           "Limit Framerate Toggle"
-END
-
-STRINGTABLE
-BEGIN
-    ID_LABEL_HK48           "Turbo A"
-    ID_LABEL_HK49           "Turbo Y"
-    ID_LABEL_HK50           "Turbo X"
-    ID_LABEL_HK51           "Turbo R"
-    ID_LABEL_HK52           "Turbo L"
-    ID_LABEL_HK53           "Reload ROM"
-    ID_LABEL_HK13b          "Quick Screenshot"
-    ID_LABEL_HK54           "Search Cheats"
-    ID_LABEL_HK55           "Increase Pressure"
-    ID_LABEL_HK56           "Decrease Pressure"
-    ID_LABEL_HK57           "Rotation 0"
-    ID_LABEL_HK58           "Rotation 90"
-    ID_LABEL_HK59           "Rotation 180"
-    ID_LABEL_HK60           "Rotation 270"
-    ID_LABEL_HK61           "Toggle Stylus Jitter"
-    ID_LABEL_HK62           "Toggle Cursor"
-END
-
-STRINGTABLE
-BEGIN
     ID_LABEL_HK16           "Toggle Frame Display"
     ID_LABEL_HK17           "Toggle FPS Display"
     ID_LABEL_HK18           "Toggle Input Display"
@@ -2177,10 +2166,6 @@ BEGIN
     ID_LABEL_HK29           "Stylus Auto-Hold"
     ID_LABEL_HK30           "LCDs layout mode"
     ID_LABEL_HK31           "LCDs swap"
-END
-
-STRINGTABLE
-BEGIN
     ID_LABEL_HK32           "Increase Volume"
     ID_LABEL_HK33           "Decrease Volume"
     ID_LABEL_HK34           "Save to Slot "
@@ -2197,17 +2182,35 @@ BEGIN
     ID_LABEL_HK45           "Turbo Select"
     ID_LABEL_HK46           "Turbo Start"
     ID_LABEL_HK47           "Turbo B"
-END
-
-STRINGTABLE
-BEGIN
-    ID_LABEL_HK3b           "CPU mode"
-    ID_LABEL_HK3c           "Increase JIT block size"
-END
-
-STRINGTABLE
-BEGIN
-    ID_LABEL_HK3d           "Decrease JIT block size"
+    ID_LABEL_HK48           "Turbo A"
+    ID_LABEL_HK49           "Turbo Y"
+    ID_LABEL_HK50           "Turbo X"
+    ID_LABEL_HK51           "Turbo R"
+    ID_LABEL_HK52           "Turbo L"
+    ID_LABEL_HK53           "Reload ROM"
+    ID_LABEL_HK54           "Search Cheats"
+    ID_LABEL_HK55           "Increase Pressure"
+    ID_LABEL_HK56           "Decrease Pressure"
+    ID_LABEL_HK57           "Rotation 0"
+    ID_LABEL_HK58           "Rotation 90"
+    ID_LABEL_HK59           "Rotation 180"
+    ID_LABEL_HK60           "Rotation 270"
+    ID_LABEL_HK61           "Toggle Stylus Jitter"
+    ID_LABEL_HK62           "Toggle Cursor"
+    ID_LABEL_HK63           "List Cheats"
+    ID_LABEL_HK64           "Toggle Cheats"
+    ID_LABEL_HK65           "Toggle Main GPU"
+    ID_LABEL_HK66           "Toggle Main BG 0 Layer"
+    ID_LABEL_HK67           "Toggle Main BG 1 Layer"
+    ID_LABEL_HK68           "Toggle Main BG 2 Layer"
+    ID_LABEL_HK69           "Toggle Main BG 3 Layer"
+    ID_LABEL_HK70           "Toggle Main OBJ Layer"
+    ID_LABEL_HK71           "Toggle Sub GPU"
+    ID_LABEL_HK72           "Toggle Sub BG 0 Layer"
+    ID_LABEL_HK73           "Toggle Sub BG 1 Layer"
+    ID_LABEL_HK74           "Toggle Sub BG 2 Layer"
+    ID_LABEL_HK75           "Toggle Sub BG 3 Layer"
+    ID_LABEL_HK76           "Toggle Sub OBJ Layer"
 END
 
 #endif    // English (United States) resources

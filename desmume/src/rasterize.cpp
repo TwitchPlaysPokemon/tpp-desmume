@@ -497,7 +497,7 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_shade(const PolygonMode polygonMode,
 	}
 }
 
-template<bool RENDERER> template<bool ISSHADOWPOLYGON>
+template<bool RENDERER> template<bool ISFRONTFACING, bool ISSHADOWPOLYGON>
 FORCEINLINE void RasterizerUnit<RENDERER>::_pixel(const POLYGON_ATTR polyAttr, const bool isTranslucent, const size_t fragmentIndex, FragmentColor &dstColor, float r, float g, float b, float invu, float invv, float w, float z)
 {
 	FragmentColor srcColor;
@@ -510,6 +510,7 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_pixel(const POLYGON_ATTR polyAttr, c
 	u8 &dstAttributeStencil				= this->_softRender->_framebufferAttributes->stencil[fragmentIndex];
 	u8 &dstAttributeIsFogged			= this->_softRender->_framebufferAttributes->isFogged[fragmentIndex];
 	u8 &dstAttributeIsTranslucentPoly	= this->_softRender->_framebufferAttributes->isTranslucentPoly[fragmentIndex];
+	u8 &dstAttributePolyFacing			= this->_softRender->_framebufferAttributes->polyFacing[fragmentIndex];
 	
 	// not sure about the w-buffer depth value: this value was chosen to make the skybox, castle window decals, and water level render correctly in SM64
 	//
@@ -520,9 +521,13 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_pixel(const POLYGON_ATTR polyAttr, c
 	
 	// run the depth test
 	bool depthFail = false;
+	
 	if (polyAttr.DepthEqualTest_Enable)
 	{
-		const u32 minDepth = max<u32>(0x00000000, dstAttributeDepth - DEPTH_EQUALS_TEST_TOLERANCE);
+		// The EQUAL depth test is used if the polygon requests it. Note that the NDS doesn't perform
+		// a true EQUAL test -- there is a set tolerance to it that makes it easier for pixels to
+		// pass the depth test.
+		const u32 minDepth = (u32)max<s32>(0x00000000, (s32)dstAttributeDepth - DEPTH_EQUALS_TEST_TOLERANCE);
 		const u32 maxDepth = min<u32>(0x00FFFFFF, dstAttributeDepth + DEPTH_EQUALS_TEST_TOLERANCE);
 		
 		if (newDepth < minDepth || newDepth > maxDepth)
@@ -530,8 +535,21 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_pixel(const POLYGON_ATTR polyAttr, c
 			depthFail = true;
 		}
 	}
+	else if ( (ISFRONTFACING && (dstAttributePolyFacing == PolyFacing_Back)) && (dstColor.a == 0x1F))
+	{
+		// The LEQUAL test is used in the special case where an incoming front-facing polygon's pixel
+		// is to be drawn on top of a back-facing polygon's opaque pixel.
+		//
+		// Test case: The Customize status screen in Sands of Destruction requires this type of depth
+		// test in order to correctly show the animating characters.
+		if (newDepth > dstAttributeDepth)
+		{
+			depthFail = true;
+		}
+	}
 	else
 	{
+		// The LESS depth test is the default type of depth test for all other conditions.
 		if (newDepth >= dstAttributeDepth)
 		{
 			depthFail = true;
@@ -624,13 +642,15 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_pixel(const POLYGON_ATTR polyAttr, c
 		dstAttributeIsFogged = (dstAttributeIsFogged && polyAttr.Fog_Enable);
 	}
 	
+	dstAttributePolyFacing = (ISFRONTFACING) ? PolyFacing_Front : PolyFacing_Back;
+	
 	//depth writing
 	if (isOpaquePixel || polyAttr.TranslucentDepthWrite_Enable)
 		dstAttributeDepth = newDepth;
 }
 
 //draws a single scanline
-template<bool RENDERER> template<bool ISSHADOWPOLYGON, bool USELINEHACK>
+template<bool RENDERER> template<bool ISFRONTFACING, bool ISSHADOWPOLYGON, bool USELINEHACK>
 FORCEINLINE void RasterizerUnit<RENDERER>::_drawscanline(const POLYGON_ATTR polyAttr, const bool isTranslucent, FragmentColor *dstColor, const size_t framebufferWidth, const size_t framebufferHeight, edge_fx_fl *pLeft, edge_fx_fl *pRight)
 {
 	int XStart = pLeft->X;
@@ -717,7 +737,7 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_drawscanline(const POLYGON_ATTR poly
 	
 	while (width-- > 0)
 	{
-		this->_pixel<ISSHADOWPOLYGON>(polyAttr, isTranslucent, adr, dstColor[adr], color[0], color[1], color[2], u, v, 1.0f/invw, z);
+		this->_pixel<ISFRONTFACING, ISSHADOWPOLYGON>(polyAttr, isTranslucent, adr, dstColor[adr], color[0], color[1], color[2], u, v, 1.0f/invw, z);
 		adr++;
 		x++;
 
@@ -732,7 +752,7 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_drawscanline(const POLYGON_ATTR poly
 }
 
 //runs several scanlines, until an edge is finished
-template<bool RENDERER> template<bool SLI, bool ISSHADOWPOLYGON, bool USELINEHACK, bool ISHORIZONTAL>
+template<bool RENDERER> template<bool SLI, bool ISFRONTFACING, bool ISSHADOWPOLYGON, bool USELINEHACK, bool ISHORIZONTAL>
 void RasterizerUnit<RENDERER>::_runscanlines(const POLYGON_ATTR polyAttr, const bool isTranslucent, FragmentColor *dstColor, const size_t framebufferWidth, const size_t framebufferHeight, edge_fx_fl *left, edge_fx_fl *right)
 {
 	//oh lord, hack city for edge drawing
@@ -744,14 +764,14 @@ void RasterizerUnit<RENDERER>::_runscanlines(const POLYGON_ATTR polyAttr, const 
 	//HACK: special handling for horizontal line poly
 	if ( USELINEHACK && (left->Height == 0) && (right->Height == 0) && (left->Y < framebufferHeight) && (left->Y >= 0) )
 	{
-		const bool draw = (!SLI || (left->Y & this->_SLI_Mask) == this->_SLI_Value);
-		if (draw) this->_drawscanline<ISSHADOWPOLYGON, USELINEHACK>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, left, right);
+		const bool draw = ( !SLI || ((left->Y >= this->_SLI_startLine) && (left->Y < this->_SLI_endLine)) );
+		if (draw) this->_drawscanline<ISFRONTFACING, ISSHADOWPOLYGON, USELINEHACK>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, left, right);
 	}
 
 	while (Height--)
 	{
-		const bool draw = (!SLI || (left->Y & this->_SLI_Mask) == this->_SLI_Value);
-		if (draw) this->_drawscanline<ISSHADOWPOLYGON, USELINEHACK>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, left, right);
+		const bool draw = ( !SLI || ((left->Y >= this->_SLI_startLine) && (left->Y < this->_SLI_endLine)) );
+		if (draw) this->_drawscanline<ISFRONTFACING, ISSHADOWPOLYGON, USELINEHACK>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, left, right);
 		const int xl = left->X;
 		const int xr = right->X;
 		const int y = left->Y;
@@ -834,11 +854,16 @@ FORCEINLINE void RasterizerUnit<RENDERER>::_rot_verts()
 
 //rotate verts until vert0.y is minimum, and then vert0.x is minimum in case of ties
 //this is a necessary precondition for our shape engine
-template<bool RENDERER> template<bool ISBACKWARDS, int TYPE>
+template<bool RENDERER> template<bool ISFRONTFACING, int TYPE>
 void RasterizerUnit<RENDERER>::_sort_verts()
 {
 	//if the verts are backwards, reorder them first
-	if (ISBACKWARDS)
+	//
+	// At least... that's what the last comment says. But historically, we've
+	// always been using front-facing polygons the entire time, and so the
+	// comment should actually read, "if the verts are front-facing, reorder
+	// them first". So what is the real behavior for this? - rogerman, 2018/08/01
+	if (ISFRONTFACING)
 		for (size_t i = 0; i < TYPE/2; i++)
 			swap(this->_verts[i],this->_verts[TYPE-i-1]);
 
@@ -871,21 +896,21 @@ void RasterizerUnit<RENDERER>::_sort_verts()
 //verts must be clockwise.
 //I didnt reference anything for this algorithm but it seems like I've seen it somewhere before.
 //Maybe it is like crow's algorithm
-template<bool RENDERER> template<bool SLI, bool ISBACKWARDS, bool ISSHADOWPOLYGON, bool USELINEHACK>
+template<bool RENDERER> template<bool SLI, bool ISFRONTFACING, bool ISSHADOWPOLYGON, bool USELINEHACK>
 void RasterizerUnit<RENDERER>::_shape_engine(const POLYGON_ATTR polyAttr, const bool isTranslucent, FragmentColor *dstColor, const size_t framebufferWidth, const size_t framebufferHeight, int type)
 {
 	bool failure = false;
 
 	switch (type)
 	{
-		case 3: this->_sort_verts<ISBACKWARDS, 3>(); break;
-		case 4: this->_sort_verts<ISBACKWARDS, 4>(); break;
-		case 5: this->_sort_verts<ISBACKWARDS, 5>(); break;
-		case 6: this->_sort_verts<ISBACKWARDS, 6>(); break;
-		case 7: this->_sort_verts<ISBACKWARDS, 7>(); break;
-		case 8: this->_sort_verts<ISBACKWARDS, 8>(); break;
-		case 9: this->_sort_verts<ISBACKWARDS, 9>(); break;
-		case 10: this->_sort_verts<ISBACKWARDS, 10>(); break;
+		case 3: this->_sort_verts<ISFRONTFACING, 3>(); break;
+		case 4: this->_sort_verts<ISFRONTFACING, 4>(); break;
+		case 5: this->_sort_verts<ISFRONTFACING, 5>(); break;
+		case 6: this->_sort_verts<ISFRONTFACING, 6>(); break;
+		case 7: this->_sort_verts<ISFRONTFACING, 7>(); break;
+		case 8: this->_sort_verts<ISFRONTFACING, 8>(); break;
+		case 9: this->_sort_verts<ISFRONTFACING, 9>(); break;
+		case 10: this->_sort_verts<ISFRONTFACING, 10>(); break;
 		default: printf("skipping type %d\n", type); return;
 	}
 
@@ -914,11 +939,11 @@ void RasterizerUnit<RENDERER>::_shape_engine(const POLYGON_ATTR polyAttr, const 
 		const bool horizontal = (left.Y == right.Y);
 		if (horizontal)
 		{
-			this->_runscanlines<SLI, ISSHADOWPOLYGON, USELINEHACK, true>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, &left, &right);
+			this->_runscanlines<SLI, ISFRONTFACING, ISSHADOWPOLYGON, USELINEHACK, true>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, &left, &right);
 		}
 		else
 		{
-			this->_runscanlines<SLI, ISSHADOWPOLYGON, USELINEHACK, false>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, &left, &right);
+			this->_runscanlines<SLI, ISFRONTFACING, ISSHADOWPOLYGON, USELINEHACK, false>(polyAttr, isTranslucent, dstColor, framebufferWidth, framebufferHeight, &left, &right);
 		}
 		
 		//if we ran out of an edge, step to the next one
@@ -939,11 +964,11 @@ void RasterizerUnit<RENDERER>::_shape_engine(const POLYGON_ATTR polyAttr, const 
 }
 
 template<bool RENDERER>
-void RasterizerUnit<RENDERER>::SetSLI(u32 value, u32 mask, bool debug)
+void RasterizerUnit<RENDERER>::SetSLI(u32 startLine, u32 endLine, bool debug)
 {
-	this->_SLI_Value = value;
-	this->_SLI_Mask = mask;
 	this->_debug_thisPoly = debug;
+	this->_SLI_startLine = startLine;
+	this->_SLI_endLine = endLine;
 }
 
 template<bool RENDERER>
@@ -1442,9 +1467,10 @@ SoftRasterizerRenderer::SoftRasterizerRenderer()
 	_enableLineHack = CommonSettings.GFX3D_LineHack;
 	_enableFragmentSamplingHack = CommonSettings.GFX3D_TXTHack;
 	
-	_HACK_viewer_rasterizerUnit.SetSLI(0, 1, false);
+	_HACK_viewer_rasterizerUnit.SetSLI(0, _framebufferHeight, false);
 	
-	_threadCount = CommonSettings.num_cores;
+	const size_t coreCount = CommonSettings.num_cores;
+	_threadCount = coreCount;
 	
 	if (_threadCount > SOFTRASTERIZER_MAX_THREADS)
 	{
@@ -1460,9 +1486,6 @@ SoftRasterizerRenderer::SoftRasterizerRenderer()
 		_customLinesPerThread = _framebufferHeight;
 		_customPixelsPerThread = _framebufferPixCount;
 		
-		_rasterizerUnit[0].SetSLI(0, 0, false);
-		_rasterizerUnit[0].SetRenderer(this);
-		
 		_threadPostprocessParam[0].renderer = this;
 		_threadPostprocessParam[0].startLine = 0;
 		_threadPostprocessParam[0].endLine = _framebufferHeight;
@@ -1474,6 +1497,9 @@ SoftRasterizerRenderer::SoftRasterizerRenderer()
 		_threadClearParam[0].renderer = this;
 		_threadClearParam[0].startPixel = 0;
 		_threadClearParam[0].endPixel = _framebufferPixCount;
+		
+		_rasterizerUnit[0].SetSLI(_threadPostprocessParam[0].startLine, _threadPostprocessParam[0].endLine, false);
+		_rasterizerUnit[0].SetRenderer(this);
 	}
 	else
 	{
@@ -1486,9 +1512,6 @@ SoftRasterizerRenderer::SoftRasterizerRenderer()
 		
 		for (size_t i = 0; i < _threadCount; i++)
 		{
-			_rasterizerUnit[i].SetSLI(i, _threadCount - 1, false);
-			_rasterizerUnit[i].SetRenderer(this);
-			
 			_threadPostprocessParam[i].renderer = this;
 			_threadPostprocessParam[i].startLine = i * _customLinesPerThread;
 			_threadPostprocessParam[i].endLine = (i < _threadCount - 1) ? (i + 1) * _customLinesPerThread : _framebufferHeight;
@@ -1501,14 +1524,31 @@ SoftRasterizerRenderer::SoftRasterizerRenderer()
 			_threadClearParam[i].startPixel = i * _customPixelsPerThread;
 			_threadClearParam[i].endPixel = (i < _threadCount - 1) ? (i + 1) * _customPixelsPerThread : _framebufferPixCount;
 			
+			_rasterizerUnit[i].SetSLI(_threadPostprocessParam[i].startLine, _threadPostprocessParam[i].endLine, false);
+			_rasterizerUnit[i].SetRenderer(this);
+			
+#ifdef DESMUME_COCOA
+			// The Cocoa port takes advantage of hand-optimized thread priorities
+			// to help stabilize performance when running SoftRasterizer.
+			_task[i].start(false, 43);
+#else
 			_task[i].start(false);
+#endif
 		}
 	}
 	
 	InitTables();
 	Reset();
 	
-	printf("SoftRast Initialized with cores=%d\n", (int)this->_threadCount);
+	if (_threadCount == 0)
+	{
+		printf("SoftRasterizer: Running directly on the emulation thread. (Multithreading disabled.)\n");
+	}
+	else
+	{
+		printf("SoftRasterizer: Running using %d additional %s. (Multithreading enabled.)\n",
+			   (int)_threadCount, (_threadCount == 1) ? "thread" : "threads");
+	}
 }
 
 SoftRasterizerRenderer::~SoftRasterizerRenderer()
@@ -2138,6 +2178,7 @@ Render3DError SoftRasterizerRenderer::ClearUsingImage(const u16 *__restrict colo
 			this->_framebufferAttributes->opaquePolyID[iw] = polyIDBuffer[ir];
 			this->_framebufferAttributes->translucentPolyID[iw] = kUnsetTranslucentPolyID;
 			this->_framebufferAttributes->isTranslucentPoly[iw] = 0;
+			this->_framebufferAttributes->polyFacing[iw] = PolyFacing_Unwritten;
 			this->_framebufferAttributes->stencil[iw] = 0;
 		}
 	}
@@ -2319,6 +2360,8 @@ Render3DError SoftRasterizerRenderer::SetFramebufferSize(size_t w, size_t h)
 		
 		this->_threadClearParam[0].startPixel = 0;
 		this->_threadClearParam[0].endPixel = pixCount;
+		
+		this->_rasterizerUnit[0].SetSLI(this->_threadPostprocessParam[0].startLine, this->_threadPostprocessParam[0].endLine, false);
 	}
 	else
 	{
@@ -2332,6 +2375,8 @@ Render3DError SoftRasterizerRenderer::SetFramebufferSize(size_t w, size_t h)
 			
 			this->_threadClearParam[i].startPixel = i * this->_customPixelsPerThread;
 			this->_threadClearParam[i].endPixel = (i < this->_threadCount - 1) ? (i + 1) * this->_customPixelsPerThread : pixCount;
+			
+			this->_rasterizerUnit[i].SetSLI(this->_threadPostprocessParam[i].startLine, this->_threadPostprocessParam[i].endLine, false);
 		}
 	}
 	
@@ -2423,6 +2468,8 @@ Render3DError SoftRasterizer_SIMD<SIMDBYTES>::SetFramebufferSize(size_t w, size_
 		
 		this->_threadClearParam[0].startPixel = 0;
 		this->_threadClearParam[0].endPixel = pixCount;
+		
+		this->_rasterizerUnit[0].SetSLI(this->_threadPostprocessParam[0].startLine, this->_threadPostprocessParam[0].endLine, false);
 	}
 	else
 	{
@@ -2438,6 +2485,8 @@ Render3DError SoftRasterizer_SIMD<SIMDBYTES>::SetFramebufferSize(size_t w, size_
 			
 			this->_threadClearParam[i].startPixel = i * pixelsPerThread;
 			this->_threadClearParam[i].endPixel = (i < this->_threadCount - 1) ? (i + 1) * pixelsPerThread : pixCount;
+			
+			this->_rasterizerUnit[i].SetSLI(this->_threadPostprocessParam[i].startLine, this->_threadPostprocessParam[i].endLine, false);
 		}
 	}
 	
@@ -2457,6 +2506,7 @@ void SoftRasterizerRenderer_AVX2::LoadClearValues(const FragmentColor &clearColo
 	this->_clearAttrStencil_v256u8				= _mm256_set1_epi8(clearAttributes.stencil);
 	this->_clearAttrIsFogged_v256u8				= _mm256_set1_epi8(clearAttributes.isFogged);
 	this->_clearAttrIsTranslucentPoly_v256u8	= _mm256_set1_epi8(clearAttributes.isTranslucentPoly);
+	this->_clearAttrPolyFacing_v256u8			= _mm256_set1_epi8(clearAttributes.polyFacing);
 }
 
 void SoftRasterizerRenderer_AVX2::ClearUsingValues_Execute(const size_t startPixel, const size_t endPixel)
@@ -2478,6 +2528,7 @@ void SoftRasterizerRenderer_AVX2::ClearUsingValues_Execute(const size_t startPix
 		_mm256_stream_si256((v256u8 *)(this->_framebufferAttributes->stencil + i), this->_clearAttrStencil_v256u8);
 		_mm256_stream_si256((v256u8 *)(this->_framebufferAttributes->isFogged + i), this->_clearAttrIsFogged_v256u8);
 		_mm256_stream_si256((v256u8 *)(this->_framebufferAttributes->isTranslucentPoly + i), this->_clearAttrIsTranslucentPoly_v256u8);
+		_mm256_stream_si256((v256u8 *)(this->_framebufferAttributes->polyFacing + i), this->_clearAttrPolyFacing_v256u8);
 	}
 }
 
@@ -2492,6 +2543,7 @@ void SoftRasterizerRenderer_SSE2::LoadClearValues(const FragmentColor &clearColo
 	this->_clearAttrStencil_v128u8				= _mm_set1_epi8(clearAttributes.stencil);
 	this->_clearAttrIsFogged_v128u8				= _mm_set1_epi8(clearAttributes.isFogged);
 	this->_clearAttrIsTranslucentPoly_v128u8	= _mm_set1_epi8(clearAttributes.isTranslucentPoly);
+	this->_clearAttrPolyFacing_v128u8			= _mm_set1_epi8(clearAttributes.polyFacing);
 }
 
 void SoftRasterizerRenderer_SSE2::ClearUsingValues_Execute(const size_t startPixel, const size_t endPixel)
@@ -2513,6 +2565,7 @@ void SoftRasterizerRenderer_SSE2::ClearUsingValues_Execute(const size_t startPix
 		_mm_stream_si128((v128u8 *)(this->_framebufferAttributes->stencil + i), this->_clearAttrStencil_v128u8);
 		_mm_stream_si128((v128u8 *)(this->_framebufferAttributes->isFogged + i), this->_clearAttrIsFogged_v128u8);
 		_mm_stream_si128((v128u8 *)(this->_framebufferAttributes->isTranslucentPoly + i), this->_clearAttrIsTranslucentPoly_v128u8);
+		_mm_stream_si128((v128u8 *)(this->_framebufferAttributes->polyFacing + i), this->_clearAttrPolyFacing_v128u8);
 	}
 }
 
@@ -2520,34 +2573,60 @@ void SoftRasterizerRenderer_SSE2::ClearUsingValues_Execute(const size_t startPix
 
 void SoftRasterizerRenderer_Altivec::LoadClearValues(const FragmentColor &clearColor6665, const FragmentAttributes &clearAttributes)
 {
-	this->_clearColor_v128u32					= vec_splat_u32(clearColor6665.color);
-	this->_clearDepth_v128u32					= vec_splat_u32(clearAttributes.depth);
-	this->_clearAttrOpaquePolyID_v128u8			= vec_splat_u8(clearAttributes.opaquePolyID);
-	this->_clearAttrTranslucentPolyID_v128u8	= vec_splat_u8(clearAttributes.translucentPolyID);
-	this->_clearAttrStencil_v128u8				= vec_splat_u8(clearAttributes.stencil);
-	this->_clearAttrIsFogged_v128u8				= vec_splat_u8(clearAttributes.isFogged);
-	this->_clearAttrIsTranslucentPoly_v128u8	= vec_splat_u8(clearAttributes.isTranslucentPoly);
+	this->_clearColor_v128u32					= (v128u32){clearColor6665.color,clearColor6665.color,clearColor6665.color,clearColor6665.color};
+	this->_clearDepth_v128u32					= (v128u32){clearAttributes.depth,clearAttributes.depth,clearAttributes.depth,clearAttributes.depth};
+	
+	this->_clearAttrOpaquePolyID_v128u8			= (v128u8){clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,
+												           clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,
+												           clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,
+												           clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID,clearAttributes.opaquePolyID};
+	
+	this->_clearAttrTranslucentPolyID_v128u8	= (v128u8){clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,
+												           clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,
+												           clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,
+												           clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID,clearAttributes.translucentPolyID};
+	
+	this->_clearAttrStencil_v128u8	= (v128u8){clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil,
+									           clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil,
+									           clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil,
+									           clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil,clearAttributes.stencil};
+	
+	this->_clearAttrIsFogged_v128u8	= (v128u8){clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged,
+									           clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged,
+									           clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged,
+									           clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged,clearAttributes.isFogged};
+	
+	this->_clearAttrIsTranslucentPoly_v128u8	= (v128u8){clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,
+												           clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,
+												           clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,
+												           clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly,clearAttributes.isTranslucentPoly};
+	
+	this->_clearAttrPolyFacing_v128u8	= (v128u8){clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing,
+										           clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing,
+										           clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing,
+										           clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing,clearAttributes.polyFacing};
 }
 
 void SoftRasterizerRenderer_Altivec::ClearUsingValues_Execute(const size_t startPixel, const size_t endPixel)
 {
 	for (size_t i = startPixel; i < endPixel; i+=16)
 	{
-		vec_st(this->_clearColor_v128u32, i +  0, this->_framebufferColor);
-		vec_st(this->_clearColor_v128u32, i + 16, this->_framebufferColor);
-		vec_st(this->_clearColor_v128u32, i + 32, this->_framebufferColor);
-		vec_st(this->_clearColor_v128u32, i + 48, this->_framebufferColor);
+		vec_st(this->_clearColor_v128u32, (i * 4) +  0, this->_framebufferColor);
+		vec_st(this->_clearColor_v128u32, (i * 4) + 16, this->_framebufferColor);
+		vec_st(this->_clearColor_v128u32, (i * 4) + 32, this->_framebufferColor);
+		vec_st(this->_clearColor_v128u32, (i * 4) + 48, this->_framebufferColor);
 		
-		vec_st(this->_clearDepth_v128u32, i +  0, this->_framebufferAttributes->depth);
-		vec_st(this->_clearDepth_v128u32, i + 16, this->_framebufferAttributes->depth);
-		vec_st(this->_clearDepth_v128u32, i + 32, this->_framebufferAttributes->depth);
-		vec_st(this->_clearDepth_v128u32, i + 48, this->_framebufferAttributes->depth);
+		vec_st(this->_clearDepth_v128u32, (i * 4) +  0, this->_framebufferAttributes->depth);
+		vec_st(this->_clearDepth_v128u32, (i * 4) + 16, this->_framebufferAttributes->depth);
+		vec_st(this->_clearDepth_v128u32, (i * 4) + 32, this->_framebufferAttributes->depth);
+		vec_st(this->_clearDepth_v128u32, (i * 4) + 48, this->_framebufferAttributes->depth);
 		
 		vec_st(this->_clearAttrOpaquePolyID_v128u8, i, this->_framebufferAttributes->opaquePolyID);
 		vec_st(this->_clearAttrTranslucentPolyID_v128u8, i, this->_framebufferAttributes->translucentPolyID);
 		vec_st(this->_clearAttrStencil_v128u8, i, this->_framebufferAttributes->stencil);
 		vec_st(this->_clearAttrIsFogged_v128u8, i, this->_framebufferAttributes->isFogged);
 		vec_st(this->_clearAttrIsTranslucentPoly_v128u8, i, this->_framebufferAttributes->isTranslucentPoly);
+		vec_st(this->_clearAttrPolyFacing_v128u8, i, this->_framebufferAttributes->polyFacing);
 	}
 }
 

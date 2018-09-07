@@ -90,6 +90,18 @@
 		AB23567416C2F6F400DA782E /* macosx_10_5_compat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB23567216C2F6F400DA782E /* macosx_10_5_compat.cpp */; };
 		AB23567516C2FAD800DA782E /* OGLRender_3_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB68A0DA16B139BC00DE0546 /* OGLRender_3_2.cpp */; };
 		AB26D87C16B5253D00A2305C /* OGLRender_3_2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB68A0DA16B139BC00DE0546 /* OGLRender_3_2.cpp */; };
+		AB28624F20AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624820AE3E7A00EAED43 /* MacBaseCaptureTool.mm */; };
+		AB28625020AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624820AE3E7A00EAED43 /* MacBaseCaptureTool.mm */; };
+		AB28625120AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624820AE3E7A00EAED43 /* MacBaseCaptureTool.mm */; };
+		AB28625220AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624820AE3E7A00EAED43 /* MacBaseCaptureTool.mm */; };
+		AB28625920AE3E9F00EAED43 /* macOS_driver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625320AE3E9E00EAED43 /* macOS_driver.cpp */; };
+		AB28625A20AE3E9F00EAED43 /* macOS_driver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625320AE3E9E00EAED43 /* macOS_driver.cpp */; };
+		AB28625B20AE3E9F00EAED43 /* macOS_driver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625320AE3E9E00EAED43 /* macOS_driver.cpp */; };
+		AB28625C20AE3E9F00EAED43 /* macOS_driver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625320AE3E9E00EAED43 /* macOS_driver.cpp */; };
+		AB28626120AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625720AE3E9F00EAED43 /* ClientAVCaptureObject.cpp */; };
+		AB28626220AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625720AE3E9F00EAED43 /* ClientAVCaptureObject.cpp */; };
+		AB28626320AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625720AE3E9F00EAED43 /* ClientAVCaptureObject.cpp */; };
+		AB28626420AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB28625720AE3E9F00EAED43 /* ClientAVCaptureObject.cpp */; };
 		AB29B16218313AF5009B7982 /* slot2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB29B16118313AF5009B7982 /* slot2.cpp */; };
 		AB29B16318313AF5009B7982 /* slot2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB29B16118313AF5009B7982 /* slot2.cpp */; };
 		AB29B16418313AF5009B7982 /* slot2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB29B16118313AF5009B7982 /* slot2.cpp */; };
@@ -241,7 +253,6 @@
 		AB405694169F5DCC0016AC3E /* x86util.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB405676169F5DCC0016AC3E /* x86util.cpp */; };
 		AB405695169F5DCC0016AC3E /* x86util.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB405676169F5DCC0016AC3E /* x86util.cpp */; };
 		AB407F371A6206FB00313213 /* xbrz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB47B52C18A3F722009A42AF /* xbrz.cpp */; };
-		AB4676F314AB12D60002FF94 /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AB0A0D1914AACA9600E83E91 /* libz.dylib */; };
 		AB47B52E18A3F722009A42AF /* xbrz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB47B52C18A3F722009A42AF /* xbrz.cpp */; };
 		AB47B52F18A45C35009A42AF /* xbrz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB47B52C18A3F722009A42AF /* xbrz.cpp */; };
 		AB4C81E41B21676C00ACECD5 /* hq3x.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB4C81E31B21676C00ACECD5 /* hq3x.cpp */; };
@@ -251,6 +262,16 @@
 		AB4FCEBD1692AB82000F498F /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB4FCEBC1692AB82000F498F /* Accelerate.framework */; };
 		AB4FCEBE1692AB82000F498F /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB4FCEBC1692AB82000F498F /* Accelerate.framework */; };
 		AB4FCEBF1692AB82000F498F /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB4FCEBC1692AB82000F498F /* Accelerate.framework */; };
+		AB53B0BE211E63FE003D0ED9 /* libpcap.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BC211E63E4003D0ED9 /* libpcap.tbd */; };
+		AB53B0BF211E63FF003D0ED9 /* libpcap.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BC211E63E4003D0ED9 /* libpcap.tbd */; };
+		AB53B0C0211E6400003D0ED9 /* libpcap.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BC211E63E4003D0ED9 /* libpcap.tbd */; };
+		AB53B0C1211E6400003D0ED9 /* libpcap.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BC211E63E4003D0ED9 /* libpcap.tbd */; };
+		AB53B0C2211E6401003D0ED9 /* libpcap.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BC211E63E4003D0ED9 /* libpcap.tbd */; };
+		AB53B0C3211E6405003D0ED9 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BD211E63E8003D0ED9 /* libz.tbd */; };
+		AB53B0C4211E6405003D0ED9 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BD211E63E8003D0ED9 /* libz.tbd */; };
+		AB53B0C5211E6406003D0ED9 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BD211E63E8003D0ED9 /* libz.tbd */; };
+		AB53B0C6211E6407003D0ED9 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BD211E63E8003D0ED9 /* libz.tbd */; };
+		AB53B0C7211E6407003D0ED9 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AB53B0BD211E63E8003D0ED9 /* libz.tbd */; };
 		AB54718B1E27610500508C5C /* MacMetalDisplayViewShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = AB54718A1E27610500508C5C /* MacMetalDisplayViewShaders.metal */; };
 		AB54718C1E27610500508C5C /* MacMetalDisplayViewShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = AB54718A1E27610500508C5C /* MacMetalDisplayViewShaders.metal */; };
 		AB54718D1E27610500508C5C /* MacMetalDisplayViewShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = AB54718A1E27610500508C5C /* MacMetalDisplayViewShaders.metal */; };
@@ -477,7 +498,6 @@
 		AB796D6915CDCBA200C59155 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97325FDCFA39411CA2CEA /* Foundation.framework */; };
 		AB796D6A15CDCBA200C59155 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB350BA41478AC96007165AC /* IOKit.framework */; };
 		AB796D6B15CDCBA200C59155 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABC570D4134431DA00E7B0B1 /* OpenGL.framework */; };
-		AB796D6C15CDCBA200C59155 /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AB0A0D1914AACA9600E83E91 /* libz.dylib */; };
 		AB7EC7F4189B2B92009D198A /* Icon_AutoholdClear_420x420.png in Resources */ = {isa = PBXBuildFile; fileRef = AB7EC7F2189B2B92009D198A /* Icon_AutoholdClear_420x420.png */; };
 		AB7EC7F5189B2B92009D198A /* Icon_AutoholdClear_420x420.png in Resources */ = {isa = PBXBuildFile; fileRef = AB7EC7F2189B2B92009D198A /* Icon_AutoholdClear_420x420.png */; };
 		AB7EC7F6189B2B92009D198A /* Icon_AutoholdSet_420x420.png in Resources */ = {isa = PBXBuildFile; fileRef = AB7EC7F3189B2B92009D198A /* Icon_AutoholdSet_420x420.png */; };
@@ -777,7 +797,6 @@
 		AB8F3D261A53AC2600A80BF6 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97325FDCFA39411CA2CEA /* Foundation.framework */; };
 		AB8F3D271A53AC2600A80BF6 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB350BA41478AC96007165AC /* IOKit.framework */; };
 		AB8F3D281A53AC2600A80BF6 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABC570D4134431DA00E7B0B1 /* OpenGL.framework */; };
-		AB8F3D291A53AC2600A80BF6 /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AB0A0D1914AACA9600E83E91 /* libz.dylib */; };
 		AB901BDE1420706100348EEC /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB901BDD1420706100348EEC /* Localizable.strings */; };
 		AB9038A617C5ECFD00F410BD /* advanscene.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB9038A517C5ECFD00F410BD /* advanscene.cpp */; };
 		AB9038A717C5ECFD00F410BD /* advanscene.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB9038A517C5ECFD00F410BD /* advanscene.cpp */; };
@@ -883,7 +902,6 @@
 		ABB3C6661501BF8A00E0C22E /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		ABB3C6671501BF8A00E0C22E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29B97325FDCFA39411CA2CEA /* Foundation.framework */; };
 		ABB3C6691501BF8A00E0C22E /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABC570D4134431DA00E7B0B1 /* OpenGL.framework */; };
-		ABB3C66A1501BF8A00E0C22E /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AB0A0D1914AACA9600E83E91 /* libz.dylib */; };
 		ABB3C66C1501C04F00E0C22E /* NDSGameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABB3C63E1501BB8300E0C22E /* NDSGameCore.mm */; };
 		ABB3C6701501C04F00E0C22E /* videofilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB817A35143EE2DB00A7DFE9 /* videofilter.cpp */; };
 		ABB3C6721501C04F00E0C22E /* cocoa_file.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB58F32C1364F44B0074C376 /* cocoa_file.mm */; };
@@ -1416,7 +1434,6 @@
 		ABE145AF1FBBA71A0097A4A8 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB350BA41478AC96007165AC /* IOKit.framework */; };
 		ABE145B11FBBA71A0097A4A8 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABC570D4134431DA00E7B0B1 /* OpenGL.framework */; };
 		ABE145B21FBBA71A0097A4A8 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB3BF4321E2562F2003E2B24 /* QuartzCore.framework */; };
-		ABE145B31FBBA71A0097A4A8 /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = AB0A0D1914AACA9600E83E91 /* libz.dylib */; };
 		ABE145B41FBBA71A0097A4A8 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABAE1F6E1F6873E70080EFE3 /* CoreVideo.framework */; };
 		ABE5DE95143F781900835AD8 /* videofilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB817A35143EE2DB00A7DFE9 /* videofilter.cpp */; };
 		ABE5DFE5143FB1DA00835AD8 /* cocoa_videofilter.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABE5DFE4143FB1DA00835AD8 /* cocoa_videofilter.mm */; };
@@ -1434,6 +1451,10 @@
 		ABEFCF64141AB82A000CC0CD /* AppIcon_SaveState.icns in Resources */ = {isa = PBXBuildFile; fileRef = ABEFCF60141AB82A000CC0CD /* AppIcon_SaveState.icns */; };
 		ABF2B9FB16904133000FF7C0 /* troubleshootingWindowDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABF2B9FA16904133000FF7C0 /* troubleshootingWindowDelegate.mm */; };
 		ABF2B9FC16904133000FF7C0 /* troubleshootingWindowDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABF2B9FA16904133000FF7C0 /* troubleshootingWindowDelegate.mm */; };
+		ABF3B52220AE6D3C007DE9FF /* MacAVCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624720AE3E7A00EAED43 /* MacAVCaptureTool.mm */; };
+		ABF3B52320AE6D3C007DE9FF /* MacAVCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624720AE3E7A00EAED43 /* MacAVCaptureTool.mm */; };
+		ABF3B52420AE6D3D007DE9FF /* MacAVCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624720AE3E7A00EAED43 /* MacAVCaptureTool.mm */; };
+		ABF3B52520AE6D3E007DE9FF /* MacAVCaptureTool.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB28624720AE3E7A00EAED43 /* MacAVCaptureTool.mm */; };
 		ABFE150714C92FF5005D6699 /* 2xsai.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABFE14FA14C92FF5005D6699 /* 2xsai.cpp */; };
 		ABFE150814C92FF5005D6699 /* bilinear.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABFE14FB14C92FF5005D6699 /* bilinear.cpp */; };
 		ABFE150914C92FF5005D6699 /* epx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABFE14FC14C92FF5005D6699 /* epx.cpp */; };
@@ -1526,7 +1547,6 @@
 		AB01005D170D07B000D70FBE /* InputProfileController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = InputProfileController.mm; sourceTree = "<group>"; };
 		AB02475B13886BF300E9F9AB /* KeyNames.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = KeyNames.plist; sourceTree = "<group>"; };
 		AB02791814415E4C0075E58C /* Info (Debug).plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Info (Debug).plist"; sourceTree = "<group>"; };
-		AB0A0D1914AACA9600E83E91 /* libz.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libz.dylib; path = usr/lib/libz.dylib; sourceTree = SDKROOT; };
 		AB0F28FE14BE6E68009ABC6F /* Icon_Execute_420x420.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_Execute_420x420.png; path = images/Icon_Execute_420x420.png; sourceTree = "<group>"; };
 		AB0F28FF14BE6E68009ABC6F /* Icon_Pause_420x420.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_Pause_420x420.png; path = images/Icon_Pause_420x420.png; sourceTree = "<group>"; };
 		AB0F290014BE6E68009ABC6F /* Icon_Speed1x_420x420.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_Speed1x_420x420.png; path = images/Icon_Speed1x_420x420.png; sourceTree = "<group>"; };
@@ -1579,6 +1599,14 @@
 		AB1B9E611501A78000464647 /* coreaudiosound.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = coreaudiosound.h; sourceTree = "<group>"; };
 		AB1B9E621501A78000464647 /* ringbuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ringbuffer.h; sourceTree = "<group>"; };
 		AB23567216C2F6F400DA782E /* macosx_10_5_compat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = macosx_10_5_compat.cpp; sourceTree = "<group>"; };
+		AB28624720AE3E7A00EAED43 /* MacAVCaptureTool.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MacAVCaptureTool.mm; sourceTree = "<group>"; };
+		AB28624820AE3E7A00EAED43 /* MacBaseCaptureTool.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = MacBaseCaptureTool.mm; sourceTree = "<group>"; };
+		AB28624920AE3E7B00EAED43 /* MacAVCaptureTool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MacAVCaptureTool.h; sourceTree = "<group>"; };
+		AB28624A20AE3E7B00EAED43 /* MacBaseCaptureTool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MacBaseCaptureTool.h; sourceTree = "<group>"; };
+		AB28625320AE3E9E00EAED43 /* macOS_driver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = macOS_driver.cpp; sourceTree = "<group>"; };
+		AB28625520AE3E9E00EAED43 /* macOS_driver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = macOS_driver.h; sourceTree = "<group>"; };
+		AB28625720AE3E9F00EAED43 /* ClientAVCaptureObject.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ClientAVCaptureObject.cpp; sourceTree = "<group>"; };
+		AB28625820AE3E9F00EAED43 /* ClientAVCaptureObject.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ClientAVCaptureObject.h; sourceTree = "<group>"; };
 		AB29B15C18313ACD009B7982 /* slot2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = slot2.h; sourceTree = "<group>"; };
 		AB29B16118313AF5009B7982 /* slot2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = slot2.cpp; sourceTree = "<group>"; };
 		AB29B16518313C14009B7982 /* slot2_auto.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = slot2_auto.cpp; sourceTree = "<group>"; };
@@ -1761,6 +1789,8 @@
 		AB47B52C18A3F722009A42AF /* xbrz.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = xbrz.cpp; sourceTree = "<group>"; };
 		AB4C81E31B21676C00ACECD5 /* hq3x.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hq3x.cpp; sourceTree = "<group>"; };
 		AB4FCEBC1692AB82000F498F /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		AB53B0BC211E63E4003D0ED9 /* libpcap.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libpcap.tbd; path = usr/lib/libpcap.tbd; sourceTree = SDKROOT; };
+		AB53B0BD211E63E8003D0ED9 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		AB54718A1E27610500508C5C /* MacMetalDisplayViewShaders.metal */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.metal; path = MacMetalDisplayViewShaders.metal; sourceTree = "<group>"; };
 		AB5648FD186E6EA8002740F4 /* cocoa_slot2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cocoa_slot2.h; sourceTree = "<group>"; };
 		AB5648FE186E6EA8002740F4 /* cocoa_slot2.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = cocoa_slot2.mm; sourceTree = "<group>"; };
@@ -2277,6 +2307,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB4FCEBE1692AB82000F498F /* Accelerate.framework in Frameworks */,
+				AB53B0C5211E6406003D0ED9 /* libz.tbd in Frameworks */,
+				AB53B0BE211E63FE003D0ED9 /* libpcap.tbd in Frameworks */,
 				ABC5720D1344346600E7B0B1 /* AppKit.framework in Frameworks */,
 				ABACB8DD1710B656003B845D /* AudioToolbox.framework in Frameworks */,
 				ABC570D1134431CE00E7B0B1 /* AudioUnit.framework in Frameworks */,
@@ -2289,7 +2321,6 @@
 				AB3BF4421E262959003E2B24 /* Metal.framework in Frameworks */,
 				ABC570D5134431DA00E7B0B1 /* OpenGL.framework in Frameworks */,
 				AB3BF4341E256309003E2B24 /* QuartzCore.framework in Frameworks */,
-				AB4676F314AB12D60002FF94 /* libz.dylib in Frameworks */,
 				ABAE1F711F6874090080EFE3 /* CoreVideo.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2299,6 +2330,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB4FCEBD1692AB82000F498F /* Accelerate.framework in Frameworks */,
+				AB53B0C7211E6407003D0ED9 /* libz.tbd in Frameworks */,
+				AB53B0C1211E6400003D0ED9 /* libpcap.tbd in Frameworks */,
 				AB796D6615CDCBA200C59155 /* AppKit.framework in Frameworks */,
 				ABACB8DC1710B621003B845D /* AudioToolbox.framework in Frameworks */,
 				AB796D6715CDCBA200C59155 /* AudioUnit.framework in Frameworks */,
@@ -2312,7 +2345,6 @@
 				AB78B5C21E384F2200297FED /* Metal.framework in Frameworks */,
 				AB796D6B15CDCBA200C59155 /* OpenGL.framework in Frameworks */,
 				AB3BF4331E2562F2003E2B24 /* QuartzCore.framework in Frameworks */,
-				AB796D6C15CDCBA200C59155 /* libz.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2321,6 +2353,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB8F3D1F1A53AC2600A80BF6 /* Accelerate.framework in Frameworks */,
+				AB53B0C6211E6407003D0ED9 /* libz.tbd in Frameworks */,
+				AB53B0C0211E6400003D0ED9 /* libpcap.tbd in Frameworks */,
 				AB8F3D201A53AC2600A80BF6 /* AppKit.framework in Frameworks */,
 				AB8F3D211A53AC2600A80BF6 /* AudioToolbox.framework in Frameworks */,
 				AB8F3D221A53AC2600A80BF6 /* AudioUnit.framework in Frameworks */,
@@ -2333,7 +2367,6 @@
 				AB78B5C11E384F2100297FED /* Metal.framework in Frameworks */,
 				AB8F3D281A53AC2600A80BF6 /* OpenGL.framework in Frameworks */,
 				AB3BF4351E256309003E2B24 /* QuartzCore.framework in Frameworks */,
-				AB8F3D291A53AC2600A80BF6 /* libz.dylib in Frameworks */,
 				ABAE1F701F6874090080EFE3 /* CoreVideo.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2343,13 +2376,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB4FCEBF1692AB82000F498F /* Accelerate.framework in Frameworks */,
+				AB53B0C3211E6405003D0ED9 /* libz.tbd in Frameworks */,
 				ABB3C6641501BF8A00E0C22E /* AppKit.framework in Frameworks */,
 				ABACB8DE1710B65F003B845D /* AudioToolbox.framework in Frameworks */,
 				ABB3C6651501BF8A00E0C22E /* AudioUnit.framework in Frameworks */,
 				ABB3C6661501BF8A00E0C22E /* Cocoa.framework in Frameworks */,
 				ABB3C6671501BF8A00E0C22E /* Foundation.framework in Frameworks */,
+				AB53B0C2211E6401003D0ED9 /* libpcap.tbd in Frameworks */,
 				ABB3C6691501BF8A00E0C22E /* OpenGL.framework in Frameworks */,
-				ABB3C66A1501BF8A00E0C22E /* libz.dylib in Frameworks */,
 				ABC503B11AAC4355002FCD43 /* CoreAudio.framework in Frameworks */,
 				AB5785FD17176AFC002C5FC7 /* OpenEmuBase.framework in Frameworks */,
 			);
@@ -2363,15 +2397,16 @@
 				ABE145A71FBBA71A0097A4A8 /* AppKit.framework in Frameworks */,
 				ABE145A81FBBA71A0097A4A8 /* AudioToolbox.framework in Frameworks */,
 				ABE145A91FBBA71A0097A4A8 /* AudioUnit.framework in Frameworks */,
+				AB53B0C4211E6405003D0ED9 /* libz.tbd in Frameworks */,
 				ABE145AA1FBBA71A0097A4A8 /* Carbon.framework in Frameworks */,
 				ABE145AB1FBBA71A0097A4A8 /* Cocoa.framework in Frameworks */,
 				ABE145AC1FBBA71A0097A4A8 /* CoreAudio.framework in Frameworks */,
 				ABE145AD1FBBA71A0097A4A8 /* ForceFeedback.framework in Frameworks */,
+				AB53B0BF211E63FF003D0ED9 /* libpcap.tbd in Frameworks */,
 				ABE145AE1FBBA71A0097A4A8 /* Foundation.framework in Frameworks */,
 				ABE145AF1FBBA71A0097A4A8 /* IOKit.framework in Frameworks */,
 				ABE145B11FBBA71A0097A4A8 /* OpenGL.framework in Frameworks */,
 				ABE145B21FBBA71A0097A4A8 /* QuartzCore.framework in Frameworks */,
-				ABE145B31FBBA71A0097A4A8 /* libz.dylib in Frameworks */,
 				ABE145B41FBBA71A0097A4A8 /* CoreVideo.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2386,17 +2421,20 @@
 				AB3ACB6514C2361100D7D192 /* userinterface */,
 				AB82445A1704AE9A00B8EE20 /* utilities.c */,
 				ABD10AE51715FCDD00B5729D /* audiosamplegenerator.cpp */,
+				AB28625720AE3E9F00EAED43 /* ClientAVCaptureObject.cpp */,
 				ABAD07DA1E19CAA6007867CA /* ClientDisplayView.cpp */,
 				ABB1C9461F5281AE0004844F /* ClientExecutionControl.cpp */,
 				AB11AD871F6757F800CB298E /* ClientInputHandler.cpp */,
 				AB1B9E5F1501A78000464647 /* coreaudiosound.cpp */,
+				AB28625320AE3E9E00EAED43 /* macOS_driver.cpp */,
 				AB23567216C2F6F400DA782E /* macosx_10_5_compat.cpp */,
 				ABD10AE61715FCDD00B5729D /* mic_ext.cpp */,
-				ABE6840B189E33BC007FD69C /* OGLDisplayOutput.cpp */,
 				ABB24F6B1A81EE92006C1108 /* OGLDisplayOutput_3_2.cpp */,
+				ABE6840B189E33BC007FD69C /* OGLDisplayOutput.cpp */,
 				AB1B9E601501A78000464647 /* ringbuffer.cpp */,
 				ABD104141346652500AF11D1 /* sndOSX.cpp */,
 				ABD10AE31715FCDD00B5729D /* audiosamplegenerator.h */,
+				AB28625820AE3E9F00EAED43 /* ClientAVCaptureObject.h */,
 				ABAD07DB1E19CAA6007867CA /* ClientDisplayView.h */,
 				ABB1C9471F5281AE0004844F /* ClientExecutionControl.h */,
 				AB11AD881F6757F800CB298E /* ClientInputHandler.h */,
@@ -2413,10 +2451,11 @@
 				AB80E050142BC4FA00A52038 /* cocoa_util.h */,
 				ABE5DFE3143FB1DA00835AD8 /* cocoa_videofilter.h */,
 				AB1B9E611501A78000464647 /* coreaudiosound.h */,
+				AB28625520AE3E9E00EAED43 /* macOS_driver.h */,
 				ABD10AE41715FCDD00B5729D /* mic_ext.h */,
-				AB1B9E621501A78000464647 /* ringbuffer.h */,
-				ABE6840E189E33D5007FD69C /* OGLDisplayOutput.h */,
 				ABB24F6C1A81EE92006C1108 /* OGLDisplayOutput_3_2.h */,
+				ABE6840E189E33D5007FD69C /* OGLDisplayOutput.h */,
+				AB1B9E621501A78000464647 /* ringbuffer.h */,
 				ABD104011346652500AF11D1 /* sndOSX.h */,
 				AB82445E1704AEC400B8EE20 /* utilities.h */,
 				ABA6574A14511EC90077E5E9 /* cocoa_cheat.mm */,
@@ -2451,7 +2490,8 @@
 				AB3BF4401E262943003E2B24 /* Metal.framework */,
 				ABC570D4134431DA00E7B0B1 /* OpenGL.framework */,
 				AB3BF4321E2562F2003E2B24 /* QuartzCore.framework */,
-				AB0A0D1914AACA9600E83E91 /* libz.dylib */,
+				AB53B0BC211E63E4003D0ED9 /* libpcap.tbd */,
+				AB53B0BD211E63E8003D0ED9 /* libz.tbd */,
 			);
 			name = "Linked Frameworks";
 			sourceTree = "<group>";
@@ -2808,6 +2848,8 @@
 				AB29B32F16D4BEBF000EF671 /* InputManager.h */,
 				AB3ACB6E14C2361100D7D192 /* inputPrefsView.h */,
 				AB01005C170D07AF00D70FBE /* InputProfileController.h */,
+				AB28624920AE3E7B00EAED43 /* MacAVCaptureTool.h */,
+				AB28624A20AE3E7B00EAED43 /* MacBaseCaptureTool.h */,
 				AB3BF43F1E2628B6003E2B24 /* MacMetalDisplayView.h */,
 				AB3BF4051E22FEA8003E2B24 /* MacOGLDisplayView.h */,
 				ABD1FBF41F7B7EA600B4F648 /* MacScreenshotCaptureTool.h */,
@@ -2825,6 +2867,8 @@
 				AB29B33016D4BEBF000EF671 /* InputManager.mm */,
 				AB3ACB6F14C2361100D7D192 /* inputPrefsView.mm */,
 				AB01005D170D07B000D70FBE /* InputProfileController.mm */,
+				AB28624720AE3E7A00EAED43 /* MacAVCaptureTool.mm */,
+				AB28624820AE3E7A00EAED43 /* MacBaseCaptureTool.mm */,
 				AB3BF43B1E26289E003E2B24 /* MacMetalDisplayView.mm */,
 				AB3BF4011E22FE01003E2B24 /* MacOGLDisplayView.mm */,
 				ABD1FBF01F7B7E7E00B4F648 /* MacScreenshotCaptureTool.mm */,
@@ -4345,6 +4389,7 @@
 				ABD1FF571345ACBF00AF11D1 /* header.cpp in Sources */,
 				ABD1FF621345ACBF00AF11D1 /* libfat.cpp in Sources */,
 				ABD1FF631345ACBF00AF11D1 /* libfat_public_api.cpp in Sources */,
+				ABF3B52220AE6D3C007DE9FF /* MacAVCaptureTool.mm in Sources */,
 				ABD1FF641345ACBF00AF11D1 /* lock.cpp in Sources */,
 				ABA7315F1BB51E7000B26147 /* pshinter.c in Sources */,
 				ABD1FEE81345AC8400AF11D1 /* matrix.cpp in Sources */,
@@ -4371,6 +4416,7 @@
 				ABD1FF0B1345AC9C00AF11D1 /* slot1_none.cpp in Sources */,
 				ABD1FF0C1345AC9C00AF11D1 /* slot1_r4.cpp in Sources */,
 				ABFEA8861BB4EC1100B08C25 /* cff.c in Sources */,
+				AB28625220AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */,
 				AB6FBEF6139B6258007BB045 /* slot1_retail_nand.cpp in Sources */,
 				ABCFA9F5178BDE920030C8BA /* encrypt.cpp in Sources */,
 				ABD1FF0E1345AC9C00AF11D1 /* slot2_expMemory.cpp in Sources */,
@@ -4466,6 +4512,7 @@
 				AB405634169F5DBB0016AC3E /* compiler.cpp in Sources */,
 				AB405637169F5DBB0016AC3E /* compilercontext.cpp in Sources */,
 				AB2ABA451C9F9CFA00173B15 /* rthreads.c in Sources */,
+				AB28625C20AE3E9F00EAED43 /* macOS_driver.cpp in Sources */,
 				ABFEA8561BB4EC1100B08C25 /* ftsynth.c in Sources */,
 				AB40563A169F5DBB0016AC3E /* compilerfunc.cpp in Sources */,
 				AB40563D169F5DBB0016AC3E /* compileritem.cpp in Sources */,
@@ -4504,6 +4551,7 @@
 				AB23567516C2FAD800DA782E /* OGLRender_3_2.cpp in Sources */,
 				ABFEA81A1BB4EC1000B08C25 /* ftfntfmt.c in Sources */,
 				AB3A655F16CC5421001F5D4A /* EmuControllerDelegate.mm in Sources */,
+				AB28626420AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */,
 				AB3A656216CC5438001F5D4A /* cocoa_GPU.mm in Sources */,
 				AB9038B917C5ED2200F410BD /* slot1comp_rom.cpp in Sources */,
 				AB8967DA16D2ED0700F826F1 /* DisplayWindowController.mm in Sources */,
@@ -4567,6 +4615,7 @@
 				AB796D0815CDCBA200C59155 /* FIFOSampleBuffer.cpp in Sources */,
 				AB796D0915CDCBA200C59155 /* file_allocation_table.cpp in Sources */,
 				AB796D0A15CDCBA200C59155 /* filetime.cpp in Sources */,
+				ABF3B52520AE6D3E007DE9FF /* MacAVCaptureTool.mm in Sources */,
 				AB796D0B15CDCBA200C59155 /* FIRFilter.cpp in Sources */,
 				AB796D0C15CDCBA200C59155 /* firmware.cpp in Sources */,
 				ABFEA8521BB4EC1100B08C25 /* ftstroke.c in Sources */,
@@ -4593,6 +4642,7 @@
 				AB796D1C15CDCBA200C59155 /* movie.cpp in Sources */,
 				AB9038B817C5ED2200F410BD /* slot1comp_rom.cpp in Sources */,
 				AB796D1D15CDCBA200C59155 /* NDSSystem.cpp in Sources */,
+				AB28624F20AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */,
 				ABFEA8401BB4EC1100B08C25 /* ftpatent.c in Sources */,
 				AB796D1E15CDCBA200C59155 /* OGLRender.cpp in Sources */,
 				AB796D1F15CDCBA200C59155 /* partition.cpp in Sources */,
@@ -4688,6 +4738,7 @@
 				AB796D6415CDCBA200C59155 /* arm_jit.cpp in Sources */,
 				ABFEA8CA1BB4EC1100B08C25 /* smooth.c in Sources */,
 				ABF2B9FB16904133000FF7C0 /* troubleshootingWindowDelegate.mm in Sources */,
+				AB28625920AE3E9F00EAED43 /* macOS_driver.cpp in Sources */,
 				AB40562A169F5DBB0016AC3E /* assembler.cpp in Sources */,
 				AB40562D169F5DBB0016AC3E /* assert.cpp in Sources */,
 				AB405630169F5DBB0016AC3E /* buffer.cpp in Sources */,
@@ -4726,6 +4777,7 @@
 				ABFEA8551BB4EC1100B08C25 /* ftsynth.c in Sources */,
 				AB405690169F5DCC0016AC3E /* x86operand.cpp in Sources */,
 				AB405693169F5DCC0016AC3E /* x86util.cpp in Sources */,
+				AB28626120AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */,
 				AB26D87C16B5253D00A2305C /* OGLRender_3_2.cpp in Sources */,
 				AB3A655E16CC5421001F5D4A /* EmuControllerDelegate.mm in Sources */,
 				AB3A656116CC5438001F5D4A /* cocoa_GPU.mm in Sources */,
@@ -4771,6 +4823,7 @@
 				ABFEA8571BB4EC1100B08C25 /* ftsynth.c in Sources */,
 				ABFEA80C1BB4EC1000B08C25 /* ftbitmap.c in Sources */,
 				ABFEA82A1BB4EC1100B08C25 /* ftgxval.c in Sources */,
+				AB28626220AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */,
 				AB8F3C751A53AC2600A80BF6 /* AAFilter.cpp in Sources */,
 				AB8F3C761A53AC2600A80BF6 /* arm_instructions.cpp in Sources */,
 				AB8F3C771A53AC2600A80BF6 /* armcpu.cpp in Sources */,
@@ -4865,9 +4918,11 @@
 				AB8F3CC41A53AC2600A80BF6 /* task.cpp in Sources */,
 				AB8F3CC51A53AC2600A80BF6 /* TDStretch.cpp in Sources */,
 				AB8F3CC61A53AC2600A80BF6 /* texcache.cpp in Sources */,
+				ABF3B52420AE6D3D007DE9FF /* MacAVCaptureTool.mm in Sources */,
 				AB8F3CC71A53AC2600A80BF6 /* thumb_instructions.cpp in Sources */,
 				AB8F3CC81A53AC2600A80BF6 /* Timestretcher.cpp in Sources */,
 				AB35BD901DEBF41800844310 /* encoding_utf.c in Sources */,
+				AB28625A20AE3E9F00EAED43 /* macOS_driver.cpp in Sources */,
 				AB8F3CC91A53AC2600A80BF6 /* tinystr.cpp in Sources */,
 				AB8F3CCA1A53AC2600A80BF6 /* slot1comp_mc.cpp in Sources */,
 				AB8F3CCB1A53AC2600A80BF6 /* tinyxml.cpp in Sources */,
@@ -4905,6 +4960,7 @@
 				AB8F3CEA1A53AC2600A80BF6 /* hq4x.cpp in Sources */,
 				ABD1FBF21F7B7E7E00B4F648 /* MacScreenshotCaptureTool.mm in Sources */,
 				AB8F3CEB1A53AC2600A80BF6 /* advanscene.cpp in Sources */,
+				AB28625020AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */,
 				AB8F3CEC1A53AC2600A80BF6 /* lq2x.cpp in Sources */,
 				AB8F3CED1A53AC2600A80BF6 /* xbrz.cpp in Sources */,
 				ABB24F6F1A81EE92006C1108 /* OGLDisplayOutput_3_2.cpp in Sources */,
@@ -5219,6 +5275,7 @@
 				ABE1451D1FBBA71A0097A4A8 /* slot2_mpcf.cpp in Sources */,
 				ABE1451E1FBBA71A0097A4A8 /* OGLDisplayOutput.cpp in Sources */,
 				ABE1451F1FBBA71A0097A4A8 /* slot2_none.cpp in Sources */,
+				ABF3B52320AE6D3C007DE9FF /* MacAVCaptureTool.mm in Sources */,
 				ABE145201FBBA71A0097A4A8 /* slot2_paddle.cpp in Sources */,
 				ABE145211FBBA71A0097A4A8 /* slot2_piano.cpp in Sources */,
 				ABE145221FBBA71A0097A4A8 /* Database.cpp in Sources */,
@@ -5232,6 +5289,7 @@
 				ABE1452A1FBBA71A0097A4A8 /* slot1_retail_auto.cpp in Sources */,
 				ABE1452B1FBBA71A0097A4A8 /* SPU.cpp in Sources */,
 				ABE1452C1FBBA71A0097A4A8 /* sse_optimized.cpp in Sources */,
+				AB28625120AE3E7B00EAED43 /* MacBaseCaptureTool.mm in Sources */,
 				ABE1452D1FBBA71A0097A4A8 /* task.cpp in Sources */,
 				ABE1452E1FBBA71A0097A4A8 /* TDStretch.cpp in Sources */,
 				ABE1452F1FBBA71A0097A4A8 /* texcache.cpp in Sources */,
@@ -5273,6 +5331,7 @@
 				ABE145551FBBA71A0097A4A8 /* cocoa_videofilter.mm in Sources */,
 				ABE145561FBBA71A0097A4A8 /* OGLRender.cpp in Sources */,
 				ABE145571FBBA71A0097A4A8 /* slot1comp_protocol.cpp in Sources */,
+				AB28626320AE3E9F00EAED43 /* ClientAVCaptureObject.cpp in Sources */,
 				ABE145581FBBA71A0097A4A8 /* appDelegate.mm in Sources */,
 				ABE145591FBBA71A0097A4A8 /* cheatWindowDelegate.mm in Sources */,
 				ABE1455A1FBBA71A0097A4A8 /* retro_stat.c in Sources */,
@@ -5286,6 +5345,7 @@
 				ABE145621FBBA71A0097A4A8 /* advanscene.cpp in Sources */,
 				ABE145631FBBA71A0097A4A8 /* lq2x.cpp in Sources */,
 				ABE145641FBBA71A0097A4A8 /* xbrz.cpp in Sources */,
+				AB28625B20AE3E9F00EAED43 /* macOS_driver.cpp in Sources */,
 				ABE145651FBBA71A0097A4A8 /* scanline.cpp in Sources */,
 				ABE145661FBBA71A0097A4A8 /* coreaudiosound.cpp in Sources */,
 				ABE145671FBBA71A0097A4A8 /* ringbuffer.cpp in Sources */,

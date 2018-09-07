@@ -24,8 +24,8 @@
 
 #include "types.h"
 #include "ROMReader.h"
+#include "wifi.h"
 
-class BaseDriver;
 class CFIRMWARE;
 class EMUFILE;
 
@@ -72,7 +72,6 @@ extern BOOL click;
 #define NDS_FW_LANG_CHI 6
 #define NDS_FW_LANG_RES 7
 
-extern BaseDriver *driver;
 extern CFIRMWARE *firmware;
 
 #define DSGBA_LOADER_SIZE 512
@@ -566,8 +565,7 @@ extern struct TCommonSettings
 		strcpy(ARM7BIOS, "biosnds7.bin");
 		strcpy(Firmware, "firmware.bin");
 
-		/* WIFI mode: adhoc = 0, infrastructure = 1 */
-		wifi.mode = 1;
+		wifi.mode = WifiCommInterfaceID_Infrastructure;
 		wifi.infraBridgeAdapter = 0;
 
 		for(int i=0;i<16;i++)
@@ -649,7 +647,7 @@ extern struct TCommonSettings
 	u32	jit_max_block_size;
 	
 	struct _Wifi {
-		int mode;
+		WifiCommInterfaceID mode;
 		int infraBridgeAdapter;
 	} wifi;
 

@@ -168,6 +168,9 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 - (void) fetchNativeDisplayByID:(const NDSDisplayID)displayID bufferIndex:(const u8)bufferIndex blitCommandEncoder:(id<MTLBlitCommandEncoder>)bce;
 - (void) fetchCustomDisplayByID:(const NDSDisplayID)displayID bufferIndex:(const u8)bufferIndex blitCommandEncoder:(id<MTLBlitCommandEncoder>)bce;
 
+- (void) flushMultipleViews:(const std::vector<ClientDisplay3DView *> &)cdvFlushList;;
+- (void) finalizeFlushMultipleViews:(const std::vector<ClientDisplay3DView *> &)cdvFlushList;
+
 @end
 
 @interface MacMetalDisplayPresenterObject : NSObject
@@ -246,7 +249,8 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 			outputPipelineState:(id<MTLRenderPipelineState>)outputPipelineState
 			   hudPipelineState:(id<MTLRenderPipelineState>)hudPipelineState
 					texDisplays:(MetalTexturePair)texDisplay
-						   mrfi:(MetalRenderFrameInfo)mrfi;
+						   mrfi:(MetalRenderFrameInfo)mrfi
+						doYFlip:(BOOL)willFlip;
 - (void) renderStartAtIndex:(uint8_t)index;
 - (void) renderFinishAtIndex:(uint8_t)index;
 - (ClientDisplayBufferState) renderBufferStateAtIndex:(uint8_t)index;
@@ -260,13 +264,17 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 	MacDisplayLayeredView *_cdv;
 	MacMetalDisplayPresenterObject *presenterObject;
 	dispatch_semaphore_t _semDrawable;
+	id<CAMetalDrawable> layerDrawable;
 }
 
 @property (readonly, nonatomic) MacMetalDisplayPresenterObject *presenterObject;
+@property (retain) id<CAMetalDrawable> layerDrawable;
 
 - (id) initWithDisplayPresenterObject:(MacMetalDisplayPresenterObject *)thePresenterObject;
 - (void) setupLayer;
-- (void) renderToDrawable;
+- (void) renderToDrawableUsingCommandBuffer:(id<MTLCommandBuffer>)cb;
+- (void) presentDrawableWithCommandBuffer:(id<MTLCommandBuffer>)cb;
+- (void) renderAndPresentDrawableImmediate;
 
 @end
 
@@ -359,7 +367,9 @@ public:
 	virtual void SetAllowViewFlushes(bool allowFlushes);
 	
 	// Client view interface
-	virtual void FlushView();
+	virtual void FlushView(void *userData);
+	virtual void FinalizeFlush(void *userData);
+	virtual void FlushAndFinalizeImmediate();
 };
 
 #pragma mark -

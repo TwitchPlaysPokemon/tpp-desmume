@@ -466,8 +466,10 @@
 #define IDC_EVALUE                      1065
 #define IDC_TEX_DEPOSTERIZE2            1065
 #define IDC_TEX_SMOOTH                  1065
+#define IDC_WIFI_ENABLED                1065
 #define IDC_STATIC_RANGE                1066
 #define IDC_TEXSCALE_1                  1066
+#define IDC_WIFI_COMPAT                 1066
 #define IDC_TEXSCALE_2                  1067
 #define IDC_BADD                        1068
 #define IDC_LIST                        1069
@@ -840,6 +842,20 @@
 #define ID_LABEL_HK60                   4525
 #define ID_LABEL_HK61                   4526
 #define ID_LABEL_HK62                   4527
+#define ID_LABEL_HK63                   4528
+#define ID_LABEL_HK64                   4529
+#define ID_LABEL_HK65                   4530
+#define ID_LABEL_HK66                   4531
+#define ID_LABEL_HK67                   4532
+#define ID_LABEL_HK68                   4533
+#define ID_LABEL_HK69                   4534
+#define ID_LABEL_HK70                   4535
+#define ID_LABEL_HK71                   4536
+#define ID_LABEL_HK72                   4537
+#define ID_LABEL_HK73                   4538
+#define ID_LABEL_HK74                   4539
+#define ID_LABEL_HK75                   4540
+#define ID_LABEL_HK76                   4541
 #define IDD_MICROPHONE                  5000
 #define IDM_MICROPHONESETTINGS          5001
 #define IDC_MICSAMPLEBROWSE             5003
@@ -905,7 +921,6 @@
 #define ID_LCDS_SUBGPU                  40061
 #define IDM_CHEATS_DISABLE              40062
 #define IDM_CHEATS_SEARCH               40063
-#define ID_RAMSEARCH_CAPTIONTEXT        40064
 #define IDM_LOCKDOWN                    40066
 #define IDM_SHOWTOOLBAR                 40069
 #define ID_CONFIG_DISPLAYMETHOD         40070
@@ -958,6 +973,16 @@
 #define IDM_RENDER_3XBRZ                40123
 #define IDM_RENDER_4XBRZ                40124
 #define IDM_RENDER_5XBRZ                40125
+#define IDC_SCR_RATIO_1p0               40143
+#define IDC_SCR_RATIO_1p1               40144
+#define IDC_SCR_RATIO_1p2               40145
+#define IDC_SCR_RATIO_1p3               40146
+#define IDC_SCR_RATIO_1p4               40147
+#define IDC_SCR_RATIO_1p5               40148
+#define IDC_SCR_VCENTER                 40149
+#define IDM_FS_MENU                     40150
+#define IDM_FS_WINDOW                   40151
+#define IDM_FS_HIDE_CURSOR              40152
 #define ID_LABEL_HK3b                   44670
 #define ID_LABEL_HK3c                   44671
 #define ID_LABEL_HK3d                   44672
@@ -1072,8 +1097,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        128
-#define _APS_NEXT_COMMAND_VALUE         40126
-#define _APS_NEXT_CONTROL_VALUE         1065
+#define _APS_NEXT_COMMAND_VALUE         40153
+#define _APS_NEXT_CONTROL_VALUE         1066
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

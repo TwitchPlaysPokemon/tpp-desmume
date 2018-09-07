@@ -40,6 +40,9 @@ AC_DEFINE_UNQUOTED([SVN_REV_STR], ["$REVISION"], [subversion revision number str
 dnl - Check for zlib
 AC_CHECK_LIB(z, gzopen, [], [AC_MSG_ERROR([zlib was not found, we can't go further. Please install it or specify the location where it's installed.])])
 
+dnl - Check for libpcap
+AC_CHECK_LIB(pcap, main, [LIBS="$LIBS -lpcap"], [AC_MSG_ERROR([libpcap was not found, we can't go further. Please install it or specify the location where it's installed.])])
+
 dnl - Check for zziplib
 AC_CHECK_LIB(zzip, zzip_open, [
 	LIBS="-lzzip $LIBS"
@@ -52,6 +55,9 @@ AC_CHECK_LIB(zzip, zzip_open, [
 		AC_DEFINE([ZZIP_OLD_READ])
 		AC_MSG_RESULT(no))
 ])
+
+dnl - Check for X11
+AC_PATH_X
 
 dnl - Check for SDL
 AC_PATH_PROGS(SDLCONFIG, [sdl-config sdl11-config])
@@ -202,7 +208,7 @@ if test ! "x$HAVE_OPENAL" = "xyes" ; then
 fi
 AM_CONDITIONAL([HAVE_ALSA], [test "${HAVE_ALSA}" = "yes"])
 
-PKG_CHECK_MODULES(LIBAGG, libagg >= 2.5.0, FOUND_LIBAGG=yes, FOUND_LIBAGG=no)
+PKG_CHECK_MODULES(LIBAGG, libagg >= 2.4.0, FOUND_LIBAGG=yes, FOUND_LIBAGG=no)
 AM_CONDITIONAL([HAVE_LIBAGG], [test "x$libagg" = "xyes" -a "${FOUND_LIBAGG}" = "yes"])
 if test "x$libagg" = "xyes" ; then
    if test "x$FOUND_LIBAGG" = "xyes" ; then
@@ -258,13 +264,12 @@ AM_CONDITIONAL([HAVE_JIT], [test "x$HAVE_JIT" = "xyes"])
 
 dnl - wifi support
 AC_ARG_ENABLE(wifi,
-	      [AC_HELP_STRING(--enable-wifi, enable experimental wifi comm support)],
-	      [
-		AC_CHECK_LIB(pcap, main,[
-		  AC_DEFINE(EXPERIMENTAL_WIFI_COMM)
-		  LIBS="$LIBS -lpcap"],
-		  [AC_MSG_WARN([pcap library not found, wifi will not work])])
-	      ])
+              [AC_HELP_STRING(--enable-wifi, enable wifi support)],
+              [wifisupport=yes])
+
+if test "x$wifisupport" = "xyes" ; then
+    AC_DEFINE(EXPERIMENTAL_WIFI_COMM)
+fi
 
 dnl Set compiler library flags per host architecture
 case $host in

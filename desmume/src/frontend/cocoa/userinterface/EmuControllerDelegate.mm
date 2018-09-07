@@ -20,6 +20,7 @@
 #import "InputManager.h"
 #import "cheatWindowDelegate.h"
 #import "Slot2WindowDelegate.h"
+#import "MacAVCaptureTool.h"
 #import "MacScreenshotCaptureTool.h"
 
 #import "cocoa_globals.h"
@@ -44,6 +45,7 @@
 
 @synthesize cheatWindowDelegate;
 @synthesize screenshotCaptureToolDelegate;
+@synthesize avCaptureToolDelegate;
 @synthesize firmwarePanelController;
 @synthesize romInfoPanelController;
 @synthesize cdsCoreController;
@@ -1628,6 +1630,7 @@
 	[self pauseCore];
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
+	[cdsCore execControl]->SetWifiIP4Address([CocoaDSUtil hostIP4AddressAsUInt32]);
 	[cdsCore execControl]->ApplySettingsOnReset();
 	[cdsCore updateSlot1DeviceStatus];
 	[self writeDefaultsSlot1Settings:nil];
@@ -1759,6 +1762,7 @@
 	// Update the UI to indicate that a ROM has indeed been loaded.
 	[self updateAllWindowTitles];
 	[screenshotCaptureToolDelegate setRomName:[currentRom internalName]];
+	[avCaptureToolDelegate setRomName:[currentRom internalName]];
 	
 	for (DisplayWindowController *windowController in windowList)
 	{
@@ -1778,6 +1782,7 @@
 		[[windowController window] displayIfNeeded];
 	}
 	
+	[cdsCore execControl]->SetWifiIP4Address([CocoaDSUtil hostIP4AddressAsUInt32]);
 	[cdsCore execControl]->ApplySettingsOnReset();
 	[cdsCore setMasterExecute:YES];
 	
@@ -1841,6 +1846,7 @@
 	// Update the UI to indicate that the ROM has finished unloading.
 	[self updateAllWindowTitles];
 	[screenshotCaptureToolDelegate setRomName:[currentRom internalName]];
+	[avCaptureToolDelegate setRomName:[currentRom internalName]];
 	
 	[[cdsCore cdsGPU] clearWithColor:0x8000];
 	for (DisplayWindowController *windowController in windowList)
@@ -2213,6 +2219,7 @@
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 	[screenshotCaptureToolDelegate setSharedData:[[cdsCore cdsGPU] sharedData]];
+	[avCaptureToolDelegate setSharedData:[[cdsCore cdsGPU] sharedData]];
 }
 
 - (void) readUserDefaults
@@ -2231,6 +2238,7 @@
 	
 	[inputManager setMappingsWithMappings:userMappings];
 	[[inputManager hidManager] setDeviceListController:inputDeviceListController];
+	[[inputManager hidManager] setRunLoop:[NSRunLoop currentRunLoop]];
 	
 	// Set the microphone settings per user preferences.
 	[[cdsCore cdsController] setHardwareMicMute:[[NSUserDefaults standardUserDefaults] boolForKey:@"Microphone_HardwareMicMute"]];
@@ -2270,14 +2278,16 @@
 	// Set up the ROM Info panel.
 	[romInfoPanel setupUserDefaults];
 	
-	// Set up the screenshot capture tool defaults.
+	// Set up the capture tool defaults.
 	[screenshotCaptureToolDelegate readUserDefaults];
+	[avCaptureToolDelegate readUserDefaults];
 }
 
 - (void) writeUserDefaults
 {
 	[romInfoPanel writeDefaults];
 	[screenshotCaptureToolDelegate writeUserDefaults];
+	[avCaptureToolDelegate writeUserDefaults];
 }
 
 - (void) restoreDisplayWindowStates
@@ -2731,6 +2741,11 @@
 		if ([(id)theItem isMemberOfClass:[NSMenuItem class]])
 		{
 			[(NSMenuItem*)theItem setTitle:([cdsCore isFrameSkipEnabled]) ? NSSTRING_TITLE_DISABLE_AUTO_FRAME_SKIP : NSSTRING_TITLE_ENABLE_AUTO_FRAME_SKIP];
+		}
+		
+		if ([avCaptureToolDelegate isRecording])
+		{
+			enable = NO;
 		}
 	}
 	else if (theAction == @selector(toggleCheats:))

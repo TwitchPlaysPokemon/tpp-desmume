@@ -33,7 +33,7 @@
 
 #ifdef GDB_STUB
 #include "../armcpu.h"
-#include "../gdbstub/gdbstub.h"
+#include "../gdbstub.h"
 #endif
 
 #ifdef GTKGLEXT_AVAILABLE
@@ -532,6 +532,12 @@ int main(int argc, char *argv[]) {
   textdomain (GETTEXT_PACKAGE);
 
   init_configured_features( &my_config);
+
+  /* X11 multi-threading support */
+  if(!XInitThreads())
+    {
+      fprintf(stderr, "Warning: X11 not thread-safe\n");
+    }
 
   if (!g_thread_supported())
     g_thread_init( NULL);

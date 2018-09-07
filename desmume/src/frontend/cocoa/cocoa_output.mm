@@ -23,6 +23,8 @@
 #import "cocoa_core.h"
 #include "sndOSX.h"
 
+#include "ClientAVCaptureObject.h"
+
 #include "../../NDSSystem.h"
 #include "../../common.h"
 #include "../../GPU.h"
@@ -34,7 +36,9 @@
 
 #import <Cocoa/Cocoa.h>
 
+#ifdef BOOL
 #undef BOOL
+#endif
 
 
 @implementation CocoaDSOutput
@@ -93,7 +97,18 @@
 {
 	pthread_mutex_init(&_mutexMessageLoop, NULL);
 	pthread_cond_init(&_condSignalMessage, NULL);
-	pthread_create(&_pthread, NULL, &RunOutputThread, self);
+	
+	pthread_attr_t threadAttr;
+	pthread_attr_init(&threadAttr);
+	pthread_attr_setschedpolicy(&threadAttr, SCHED_RR);
+	
+	struct sched_param sp;
+	memset(&sp, 0, sizeof(struct sched_param));
+	sp.sched_priority = 45;
+	pthread_attr_setschedparam(&threadAttr, &sp);
+	
+	pthread_create(&_pthread, &threadAttr, &RunOutputThread, self);
+	pthread_attr_destroy(&threadAttr);
 }
 
 - (void) exitThread
@@ -538,6 +553,70 @@
 	OSSpinLockLock(&spinlockNDSFrameInfo);
 	_ndsFrameInfo.copyFrom(ndsFrameInfo);
 	OSSpinLockUnlock(&spinlockNDSFrameInfo);
+}
+
+@end
+
+@implementation CocoaDSVideoCapture
+
+@synthesize _cdp;
+@synthesize avCaptureObject;
+
+- (id)init
+{
+	self = [super init];
+	if (self == nil)
+	{
+		return self;
+	}
+	
+	_cdp = NULL;
+	avCaptureObject = NULL;
+	_videoCaptureBuffer = NULL;
+	
+	pthread_mutex_init(&_mutexCaptureBuffer, NULL);
+	
+	return self;
+}
+
+- (void)dealloc
+{
+	pthread_mutex_lock(&_mutexCaptureBuffer);
+	free_aligned(_videoCaptureBuffer);
+	pthread_mutex_unlock(&_mutexCaptureBuffer);
+	
+	pthread_mutex_destroy(&_mutexCaptureBuffer);
+	
+	[super dealloc];
+}
+
+- (void) handleReceiveGPUFrame
+{
+	[super handleReceiveGPUFrame];
+	
+	if ( (_cdp == NULL) || (avCaptureObject == NULL) )
+	{
+		return;
+	}
+	
+	const ClientDisplayPresenterProperties &cdpProperty = _cdp->GetPresenterProperties();
+	
+	_cdp->LoadDisplays();
+	_cdp->ProcessDisplays();
+	_cdp->UpdateLayout();
+	
+	pthread_mutex_lock(&_mutexCaptureBuffer);
+	
+	if (_videoCaptureBuffer == NULL)
+	{
+		_videoCaptureBuffer = (uint32_t *)malloc_alignedPage(cdpProperty.clientWidth * cdpProperty.clientHeight * sizeof(uint32_t));
+	}
+	
+	_cdp->CopyFrameToBuffer(_videoCaptureBuffer);
+	avCaptureObject->CaptureVideoFrame(_videoCaptureBuffer, (size_t)cdpProperty.clientWidth, (size_t)cdpProperty.clientHeight, NDSColorFormat_BGR888_Rev);
+	avCaptureObject->StreamWriteStart();
+	
+	pthread_mutex_unlock(&_mutexCaptureBuffer);
 }
 
 @end

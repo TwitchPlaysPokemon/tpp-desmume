@@ -1,5 +1,5 @@
 /*
-	Copyright 2008-2017 DeSmuME team
+	Copyright 2008-2018 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -582,6 +582,8 @@ const char* _CDECL_ FCEUI_LoadMovie(const char *fname, bool _read_only, bool tas
 		bool success = MovieData::loadSramFrom(&currMovieData.sram);
 		if(!success) return "failed to load sram";
 	}
+	else
+		MMU_new.backupDevice.load_movie_blank();
 	freshMovie = true;
 	ClearAutoHold();
 
@@ -605,7 +607,7 @@ static void openRecordingMovie(const char* fname)
 bool MovieData::loadSramFrom(std::vector<u8>* buf)
 {
 	EMUFILE_MEMORY ms(buf);
-	MMU_new.backupDevice.load_movie(ms);
+	MMU_new.backupDevice.load_movie(&ms);
 	return true;
 }
 

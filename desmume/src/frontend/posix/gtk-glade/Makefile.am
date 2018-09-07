@@ -31,9 +31,7 @@ desmume_glade_SOURCES =  \
 	../../../driver.h ../../../driver.cpp
 
 desmume_glade_LDADD = ../libdesmume.a \
+			$(X_LIBS) -lX11 \
 			$(SDL_LIBS) $(GTKGLEXT_LIBS) $(LIBGLADE_LIBS) \
 			$(GTHREAD_LIBS) $(ALSA_LIBS) $(LIBAGG_LIBS) \
 			$(LIBSOUNDTOUCH_LIBS)
-if HAVE_GDB_STUB
-desmume_glade_LDADD += ../gdbstub/libgdbstub.a
-endif

@@ -1,7 +1,7 @@
 /*
 	Copyright (C) 2006 thoduv
 	Copyright (C) 2006 Theo Berkau
-	Copyright (C) 2008-2017 DeSmuME team
+	Copyright (C) 2008-2018 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -147,9 +147,8 @@ public:
 	bool export_raw(const char* filename);
 	bool no_gba_unpack(u8 *&buf, u32 &size);
 	
-	bool load_movie(EMUFILE &is);
-
-	bool isMovieMode;
+	bool load_movie(EMUFILE *is);
+	void load_movie_blank();
 
 	u32 importDataSize(const char *filename);
 	bool importData(const char *filename, u32 force_size = 0);

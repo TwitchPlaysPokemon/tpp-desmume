@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2017 DeSmuME team
+	Copyright (C) 2017-2018 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,7 +25,10 @@
 #include "ClientInputHandler.h"
 
 #include "../../slot1.h"
+
+#ifdef BOOL
 #undef BOOL
+#endif
 
 #define SPEED_SCALAR_QUARTER						0.25		// Speed scalar for quarter execution speed.
 #define SPEED_SCALAR_HALF							0.5			// Speed scalar for half execution speed.
@@ -37,10 +40,15 @@
 #define DS_FRAMES_PER_SECOND						59.8261		// Number of DS frames per second.
 #define DS_SECONDS_PER_FRAME						(1.0 / DS_FRAMES_PER_SECOND) // The length of time in seconds that, ideally, a frame should be processed within.
 
-#define FRAME_SKIP_AGGRESSIVENESS					9.0			// Must be a value between 0.0 (inclusive) and positive infinity.
+#define FRAME_SKIP_AGGRESSIVENESS					1.0			// Must be a value between 0.0 (inclusive) and positive infinity.
 																// This value acts as a scalar multiple of the frame skip.
-#define FRAME_SKIP_BIAS								0.1			// May be any real number. This value acts as a vector addition to the frame skip.
+#define FRAME_SKIP_BIAS								0.9			// May be any real number. This value acts as a vector addition to the frame skip.
 #define MAX_FRAME_SKIP								(DS_FRAMES_PER_SECOND / 2.98)
+
+#define EXECUTION_WAIT_BIAS_MIN						0.70
+#define EXECUTION_WAIT_BIAS_MAX						1.10
+
+class ClientAVCaptureObject;
 
 enum ExecutionBehavior
 {
@@ -87,6 +95,10 @@ struct ClientExecutionControlSettings
 	bool enableDebugConsole;
 	bool enableEnsataEmulation;
 	
+	int wifiMode;
+	int wifiBridgeDeviceIndex;
+	uint32_t wifiIP4Address;
+	
 	bool enableCheats;
 	
 	bool enableExecutionSpeedLimiter;
@@ -98,6 +110,8 @@ struct ClientExecutionControlSettings
 	
 	ExecutionBehavior execBehavior;
 	FrameJumpBehavior jumpBehavior;
+	
+	ClientAVCaptureObject *avCaptureObject;
 };
 
 struct NDSFrameInfo
@@ -184,6 +198,8 @@ struct NDSFrameInfo
 	}
 };
 
+typedef void *gdbstub_handle_t;
+
 class ClientExecutionControl
 {
 protected:
@@ -202,7 +218,19 @@ protected:
 	
 	double _frameTime;
 	uint8_t _framesToSkip;
+	double _lastSetFrameSkip;
+	size_t _unskipStep;
+	size_t _dynamicBiasStep;
 	ExecutionBehavior _prevExecBehavior;
+	
+	bool _isGdbStubStarted;
+	bool _enableGdbStubARM9;
+	bool _enableGdbStubARM7;
+	uint16_t _gdbStubPortARM9;
+	uint16_t _gdbStubPortARM7;
+	volatile gdbstub_handle_t _gdbStubHandleARM9;
+	volatile gdbstub_handle_t _gdbStubHandleARM7;
+	bool _isInDebugTrap;
 	
 	std::string _cpuEmulationEngineNameOut;
 	std::string _slot1DeviceNameOut;
@@ -216,6 +244,10 @@ protected:
 public:
 	ClientExecutionControl();
 	~ClientExecutionControl();
+	
+	ClientAVCaptureObject* GetClientAVCaptureObject();
+	ClientAVCaptureObject* GetClientAVCaptureObjectApplied();
+	void SetClientAVCaptureObject(ClientAVCaptureObject *theCaptureObject);
 	
 	ClientInputHandler* GetClientInputHandler();
 	void SetClientInputHandler(ClientInputHandler *inputHandler);
@@ -273,13 +305,24 @@ public:
 	bool GetEnableEnsataEmulation();
 	void SetEnableEnsataEmulation(bool enable);
 	
+	int GetWifiMode();
+	void SetWifiMode(int wifiMode);
+	
+	int GetWifiBridgeDeviceIndex();
+	void SetWifiBridgeDeviceIndex(int wifiBridgeDeviceIndex);
+	
+	uint32_t GetWifiIP4Address();
+	void SetWifiIP4Address(uint32_t ip4Address);
+	
 	bool GetEnableCheats();
 	void SetEnableCheats(bool enable);
 	
 	bool GetEnableSpeedLimiter();
+	bool GetEnableSpeedLimiterApplied();
 	void SetEnableSpeedLimiter(bool enable);
 	
 	double GetExecutionSpeed();
+	double GetExecutionSpeedApplied();
 	void SetExecutionSpeed(double speedScalar);
 	
 	bool GetEnableFrameSkip();
@@ -296,6 +339,21 @@ public:
 	uint64_t GetFrameJumpTarget();
 	uint64_t GetFrameJumpTargetApplied();
 	void SetFrameJumpTarget(uint64_t newJumpTarget);
+	
+	bool IsGDBStubARM9Enabled();
+	void SetGDBStubARM9Enabled(bool theState);
+	bool IsGDBStubARM7Enabled();
+	void SetGDBStubARM7Enabled(bool theState);
+	
+	uint16_t GetGDBStubARM9Port();
+	void SetGDBStubARM9Port(uint16_t portNumber);
+	uint16_t GetGDBStubARM7Port();
+	void SetGDBStubARM7Port(uint16_t portNumber);
+	
+	bool IsGDBStubStarted();
+	void SetIsGDBStubStarted(bool theState);
+	bool IsInDebugTrap();
+	void SetIsInDebugTrap(bool theState);
 	
 	ExecutionBehavior GetPreviousExecutionBehavior();
 	ExecutionBehavior GetExecutionBehavior();
