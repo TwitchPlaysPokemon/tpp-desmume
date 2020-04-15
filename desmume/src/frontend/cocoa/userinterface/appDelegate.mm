@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2011-2017 DeSmuME Team
+	Copyright (C) 2011-2018 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #import "EmuControllerDelegate.h"
 #import "FileMigrationDelegate.h"
 #import "MacAVCaptureTool.h"
+#import "WifiSettingsPanel.h"
 #import "preferencesWindowDelegate.h"
 #import "troubleshootingWindowDelegate.h"
 #import "cheatWindowDelegate.h"
@@ -50,11 +51,13 @@
 @synthesize prefWindowController;
 @synthesize cdsCoreController;
 @synthesize avCaptureToolDelegate;
+@synthesize wifiSettingsPanelDelegate;
 @synthesize migrationDelegate;
 
 @synthesize isAppRunningOnIntel;
 @synthesize isDeveloperPlusBuild;
-
+@synthesize didApplicationFinishLaunching;
+@synthesize delayedROMFileName;
 
 - (id)init
 {
@@ -77,6 +80,9 @@
     isDeveloperPlusBuild = NO;
 #endif
 	
+	didApplicationFinishLaunching = NO;
+	delayedROMFileName = nil;
+	
 	RGBA8888ToNSColorValueTransformer *nsColorTransformer = [[[RGBA8888ToNSColorValueTransformer alloc] init] autorelease];
 	[NSValueTransformer setValueTransformer:nsColorTransformer forName:@"RGBA8888ToNSColorValueTransformer"];
 	
@@ -87,6 +93,33 @@
 - (BOOL)application:(NSApplication *)theApplication openFile:(NSString *)filename
 {
 	BOOL result = NO;
+	
+	// Apparently, we can't be too sure when macOS will try to call this method if the user tries to
+	// open a ROM file while launching the app (i.e. the user double-clicks a ROM file from the Finder).
+	// Will this method be called before or after [NSApplicationDelgate applicationDidFinishLaunching:]
+	// is finished? Who knows? And so since we really don't know when this method will be called, we will
+	// keep a flag for ourselves that is set whenever [NSApplicationDelgate applicationDidFinishLaunching:]
+	// actually finishes. This way, we can prevent any race conditions that may occur by ensuring that the
+	// app finishes launching BEFORE trying to load a ROM file.
+	//
+	// If this method is called AFTER [NSApplicationDelgate applicationDidFinishLaunching:] finishes, then
+	// nothing special happens and everything works as it normally does.
+	//
+	// If this method is called BEFORE [NSApplicationDelgate applicationDidFinishLaunching:] finishes, then
+	// simply save the passed in file name, and then automatically call this method again with our
+	// previously saved file name the moment before [NSApplicationDelgate applicationDidFinishLaunching:]
+	// finishes.
+	//
+	// We'll do the delayed ROM loading only for Mavericks and later, since this delayed loading code
+	// doesn't seem to work on older macOS versions.
+	
+	if (IsOSXVersionSupported(10, 9, 0) && ![self didApplicationFinishLaunching])
+	{
+		[self setDelayedROMFileName:filename];
+		result = YES;
+		return result;
+	}
+	
 	NSURL *fileURL = [NSURL fileURLWithPath:filename];
 	EmuControllerDelegate *emuControl = (EmuControllerDelegate *)[emuControlController content];
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
@@ -141,10 +174,12 @@
 	// On macOS v10.13 and later, some unwanted menu items will show up in the View menu.
 	// Disable automatic window tabbing for all NSWindows in order to rid ourselves of
 	// these unwanted menu items.
+#if defined(MAC_OS_X_VERSION_10_13) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_13)
 	if ([[NSWindow class] respondsToSelector:@selector(setAllowsAutomaticWindowTabbing:)])
 	{
 		[NSWindow setAllowsAutomaticWindowTabbing:NO];
 	}
+#endif
 	
 	// Setup the About window.
 	NSString *descriptionStr = [[[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleName"] stringByAppendingString:@" "] stringByAppendingString:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"]];
@@ -188,6 +223,9 @@
 	[avCaptureToolDelegate setCdsCore:newCore];
 	[avCaptureToolDelegate setExecControl:[newCore execControl]];
 	
+	[wifiSettingsPanelDelegate setExecControl:[newCore execControl]];
+	[wifiSettingsPanelDelegate fillLibpcapDeviceMenu];
+	
 	// Init the DS speakers.
 	CocoaDSSpeaker *newSpeaker = [[[CocoaDSSpeaker alloc] init] autorelease];
 	[newCore addOutput:newSpeaker];
@@ -198,6 +236,7 @@
 	[prefWindowController setContent:[prefWindowDelegate bindings]];
 	
 	[emuControl appInit];
+	[prefWindowDelegate markUnsupportedOpenGLMSAAMenuItems];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
@@ -304,6 +343,15 @@
 	[appFirstTimeRunDict setValue:[NSNumber numberWithBool:isFirstTimeRun] forKey:bundleVersionString];
 	[[NSUserDefaults standardUserDefaults] setObject:appFirstTimeRunDict forKey:@"General_AppFirstTimeRun"];
 	[appFirstTimeRunDict release];
+	
+	// If the user is trying to load a ROM file while launching the app, then ensure that the
+	// ROM file is loaded at the end of this method and never any time before that.
+	[self setDidApplicationFinishLaunching:YES];
+	if (IsOSXVersionSupported(10, 9, 0) && [self delayedROMFileName] != nil)
+	{
+		[self application:NSApp openFile:[self delayedROMFileName]];
+		[self setDelayedROMFileName:nil];
+	}
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
@@ -350,6 +398,7 @@
 #endif
 	
 	[cdsCoreController setContent:nil];
+	[self setDelayedROMFileName:nil];
 }
 
 #pragma mark IBActions
@@ -426,6 +475,37 @@
 	PreferencesWindowDelegate *prefWindowDelegate = [prefWindow delegate];
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 	
+	// Setup the ARM7 BIOS, ARM9 BIOS, and firmware image paths per user preferences.
+	NSString *arm7BiosImagePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"BIOS_ARM7ImagePath"];
+	if (arm7BiosImagePath != nil)
+	{
+		[cdsCore setArm7ImageURL:[NSURL fileURLWithPath:arm7BiosImagePath]];
+	}
+	else
+	{
+		[cdsCore setArm7ImageURL:nil];
+	}
+	
+	NSString *arm9BiosImagePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"BIOS_ARM9ImagePath"];
+	if (arm9BiosImagePath != nil)
+	{
+		[cdsCore setArm9ImageURL:[NSURL fileURLWithPath:arm9BiosImagePath]];
+	}
+	else
+	{
+		[cdsCore setArm9ImageURL:nil];
+	}
+	
+	NSString *firmwareImagePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"Emulation_FirmwareImagePath"];
+	if (firmwareImagePath != nil)
+	{
+		[cdsCore setFirmwareImageURL:[NSURL fileURLWithPath:firmwareImagePath]];
+	}
+	else
+	{
+		[cdsCore setFirmwareImageURL:nil];
+	}
+	
 	// Set the emulation flags.
 	[cdsCore setEmuFlagAdvancedBusLevelTiming:[[NSUserDefaults standardUserDefaults] boolForKey:@"Emulation_AdvancedBusLevelTiming"]];
 	[cdsCore setEmuFlagRigorousTiming:[[NSUserDefaults standardUserDefaults] boolForKey:@"Emulation_RigorousTiming"]];
@@ -459,48 +539,122 @@
 	[cdsCore setIsCheatingEnabled:[[NSUserDefaults standardUserDefaults] boolForKey:@"CoreControl_EnableCheats"]];
 	
 	// Set up the firmware per user preferences.
-	NSMutableDictionary *newFWDict = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-									  [[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_Nickname"], @"Nickname",
-									  [[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_Message"], @"Message",
-									  [[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_FavoriteColor"], @"FavoriteColor",
-									  [[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_Birthday"], @"Birthday",
-									  [[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_Language"], @"Language",
-									  nil];
+	CocoaDSFirmware *newFirmware = [[[CocoaDSFirmware alloc] init] autorelease];
+	BOOL needUserDefaultSynchronize = NO;
+	uint32_t defaultMACAddress_u32 = 0;
 	
-	CocoaDSFirmware *newFirmware = [[[CocoaDSFirmware alloc] initWithDictionary:newFWDict] autorelease];
-	[newFirmware update];
+	[newFirmware setExecControl:[cdsCore execControl]];
+	
+	if ([[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_FirmwareMACAddress"] != nil)
+	{
+		defaultMACAddress_u32 = (uint32_t)[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_FirmwareMACAddress"];
+	}
+	
+	if (defaultMACAddress_u32 == 0)
+	{
+		defaultMACAddress_u32 = [newFirmware firmwareMACAddressPendingValue];
+		[[NSUserDefaults standardUserDefaults] setInteger:defaultMACAddress_u32 forKey:@"FirmwareConfig_FirmwareMACAddress"];
+		needUserDefaultSynchronize = YES;
+	}
+	else
+	{
+		[newFirmware setFirmwareMACAddressPendingValue:defaultMACAddress_u32];
+	}
+	
+	defaultMACAddress_u32 = 0;
+	if ([[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_CustomMACAddress"] != nil)
+	{
+		defaultMACAddress_u32 = (uint32_t)[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_CustomMACAddress"];
+	}
+	
+	if (defaultMACAddress_u32 == 0)
+	{
+		defaultMACAddress_u32 = [newFirmware customMACAddressValue];
+		[[NSUserDefaults standardUserDefaults] setInteger:defaultMACAddress_u32 forKey:@"FirmwareConfig_CustomMACAddress"];
+		needUserDefaultSynchronize = YES;
+	}
+	else
+	{
+		[newFirmware setCustomMACAddressValue:defaultMACAddress_u32];
+	}
+	
+	if (needUserDefaultSynchronize)
+	{
+		[[NSUserDefaults standardUserDefaults] synchronize];
+	}
+	
+	[wifiSettingsPanelDelegate updateCustomMACAddressStrings];
+	
+	[newFirmware setIpv4Address_AP1_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP1_1"]];
+	[newFirmware setIpv4Address_AP1_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP1_2"]];
+	[newFirmware setIpv4Address_AP1_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP1_3"]];
+	[newFirmware setIpv4Address_AP1_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP1_4"]];
+	[newFirmware setIpv4Gateway_AP1_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP1_1"]];
+	[newFirmware setIpv4Gateway_AP1_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP1_2"]];
+	[newFirmware setIpv4Gateway_AP1_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP1_3"]];
+	[newFirmware setIpv4Gateway_AP1_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP1_4"]];
+	[newFirmware setIpv4PrimaryDNS_AP1_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_1"]];
+	[newFirmware setIpv4PrimaryDNS_AP1_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_2"]];
+	[newFirmware setIpv4PrimaryDNS_AP1_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_3"]];
+	[newFirmware setIpv4PrimaryDNS_AP1_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_4"]];
+	[newFirmware setIpv4SecondaryDNS_AP1_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_1"]];
+	[newFirmware setIpv4SecondaryDNS_AP1_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_2"]];
+	[newFirmware setIpv4SecondaryDNS_AP1_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_3"]];
+	[newFirmware setIpv4SecondaryDNS_AP1_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_4"]];
+	[newFirmware setSubnetMask_AP1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_SubnetMask_AP1"]];
+	
+	[newFirmware setIpv4Address_AP2_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP2_1"]];
+	[newFirmware setIpv4Address_AP2_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP2_2"]];
+	[newFirmware setIpv4Address_AP2_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP2_3"]];
+	[newFirmware setIpv4Address_AP2_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP2_4"]];
+	[newFirmware setIpv4Gateway_AP2_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP2_1"]];
+	[newFirmware setIpv4Gateway_AP2_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP2_2"]];
+	[newFirmware setIpv4Gateway_AP2_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP2_3"]];
+	[newFirmware setIpv4Gateway_AP2_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP2_4"]];
+	[newFirmware setIpv4PrimaryDNS_AP2_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_1"]];
+	[newFirmware setIpv4PrimaryDNS_AP2_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_2"]];
+	[newFirmware setIpv4PrimaryDNS_AP2_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_3"]];
+	[newFirmware setIpv4PrimaryDNS_AP2_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_4"]];
+	[newFirmware setIpv4SecondaryDNS_AP2_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_1"]];
+	[newFirmware setIpv4SecondaryDNS_AP2_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_2"]];
+	[newFirmware setIpv4SecondaryDNS_AP2_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_3"]];
+	[newFirmware setIpv4SecondaryDNS_AP2_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_4"]];
+	[newFirmware setSubnetMask_AP2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_SubnetMask_AP2"]];
+	
+	[newFirmware setIpv4Address_AP3_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP3_1"]];
+	[newFirmware setIpv4Address_AP3_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP3_2"]];
+	[newFirmware setIpv4Address_AP3_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP3_3"]];
+	[newFirmware setIpv4Address_AP3_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Address_AP3_4"]];
+	[newFirmware setIpv4Gateway_AP3_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP3_1"]];
+	[newFirmware setIpv4Gateway_AP3_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP3_2"]];
+	[newFirmware setIpv4Gateway_AP3_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP3_3"]];
+	[newFirmware setIpv4Gateway_AP3_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4Gateway_AP3_4"]];
+	[newFirmware setIpv4PrimaryDNS_AP3_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_1"]];
+	[newFirmware setIpv4PrimaryDNS_AP3_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_2"]];
+	[newFirmware setIpv4PrimaryDNS_AP3_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_3"]];
+	[newFirmware setIpv4PrimaryDNS_AP3_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_4"]];
+	[newFirmware setIpv4SecondaryDNS_AP3_1:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_1"]];
+	[newFirmware setIpv4SecondaryDNS_AP3_2:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_2"]];
+	[newFirmware setIpv4SecondaryDNS_AP3_3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_3"]];
+	[newFirmware setIpv4SecondaryDNS_AP3_4:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_4"]];
+	[newFirmware setSubnetMask_AP3:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_SubnetMask_AP3"]];
+	
+	//[newFirmware setConsoleType:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_ConsoleType"]];
+	[newFirmware setNickname:[[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_Nickname"]];
+	[newFirmware setMessage:[[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_Message"]];
+	[newFirmware setFavoriteColor:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_FavoriteColor"]];
+	[newFirmware setBirthday:[[NSUserDefaults standardUserDefaults] objectForKey:@"FirmwareConfig_Birthday"]];
+	[newFirmware setLanguage:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_Language"]];
+	//[newFirmware setBacklightLevel:[[NSUserDefaults standardUserDefaults] integerForKey:@"FirmwareConfig_BacklightLevel"]];
+	
+	[prefWindowDelegate updateFirmwareMACAddressString:nil];
+	[prefWindowDelegate updateSubnetMaskString_AP1:nil];
+	[prefWindowDelegate updateSubnetMaskString_AP2:nil];
+	[prefWindowDelegate updateSubnetMaskString_AP3:nil];
+	
+	[newFirmware applySettings];
+	[cdsCore updateFirmwareMACAddressString];
 	[emuControl setCdsFirmware:newFirmware];
-	
-	// Setup the ARM7 BIOS, ARM9 BIOS, and firmware image paths per user preferences.
-	NSString *arm7BiosImagePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"BIOS_ARM7ImagePath"];
-	if (arm7BiosImagePath != nil)
-	{
-		[cdsCore setArm7ImageURL:[NSURL fileURLWithPath:arm7BiosImagePath]];
-	}
-	else
-	{
-		[cdsCore setArm7ImageURL:nil];
-	}
-	
-	NSString *arm9BiosImagePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"BIOS_ARM9ImagePath"];
-	if (arm9BiosImagePath != nil)
-	{
-		[cdsCore setArm9ImageURL:[NSURL fileURLWithPath:arm9BiosImagePath]];
-	}
-	else
-	{
-		[cdsCore setArm9ImageURL:nil];
-	}
-	
-	NSString *firmwareImagePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"Emulation_FirmwareImagePath"];
-	if (firmwareImagePath != nil)
-	{
-		[cdsCore setFirmwareImageURL:[NSURL fileURLWithPath:firmwareImagePath]];
-	}
-	else
-	{
-		[cdsCore setFirmwareImageURL:nil];
-	}
 	
 	// Set up GDB stub settings per user preferences.
 #ifdef GDB_STUB
@@ -517,6 +671,7 @@
 	
 	// Set up the rest of the emulation-related user defaults.
 	[emuControl readUserDefaults];
+	[wifiSettingsPanelDelegate readUserDefaults];
 	
 	// Set up the preferences window.
 	[prefWindowDelegate setupUserDefaults];

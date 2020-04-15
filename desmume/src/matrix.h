@@ -1,6 +1,6 @@
 /*  
 	Copyright (C) 2006-2007 shash
-	Copyright (C) 2007-2018 DeSmuME team
+	Copyright (C) 2007-2019 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
 #endif
 
 #ifdef ENABLE_SSE4_1
-#include "smmintrin.h"
+#include <smmintrin.h>
 #endif
 
 enum MatrixMode
@@ -65,15 +65,15 @@ void MatrixSet(s32 (&mtx)[16], const size_t x, const size_t y, const s32 value);
 void MatrixSet(float (&mtx)[16], const size_t x, const size_t y, const float value);
 void MatrixSet(float (&mtx)[16], const size_t x, const size_t y, const s32 value);
 
-void MatrixCopy(s32 (&mtxDst)[16], const s32 (&mtxSrc)[16]);
-void MatrixCopy(float (&mtxDst)[16], const float (&mtxSrc)[16]);
+void MatrixCopy(s32 (&__restrict mtxDst)[16], const s32 (&__restrict mtxSrc)[16]);
+void MatrixCopy(float (&__restrict mtxDst)[16], const float (&__restrict mtxSrc)[16]);
 void MatrixCopy(float (&__restrict mtxDst)[16], const s32 (&__restrict mtxSrc)[16]);
 
-int MatrixCompare(const s32 (&mtxDst)[16], const s32 (&mtxSrc)[16]);
-int MatrixCompare(const float (&mtxDst)[16], const float (&mtxSrc)[16]);
+int MatrixCompare(const s32 (&__restrict mtxDst)[16], const s32 (&__restrict mtxSrc)[16]);
+int MatrixCompare(const float (&__restrict mtxDst)[16], const float (&__restrict mtxSrc)[16]);
 
-s32	MatrixGetMultipliedIndex(const u32 index, const s32 (&mtxA)[16], const s32 (&mtxB)[16]);
-float MatrixGetMultipliedIndex(const u32 index, const float (&mtxA)[16], const float (&mtxB)[16]);
+s32	MatrixGetMultipliedIndex(const u32 index, const s32 (&__restrict mtxA)[16], const s32 (&__restrict mtxB)[16]);
+float MatrixGetMultipliedIndex(const u32 index, const float (&__restrict mtxA)[16], const float (&__restrict mtxB)[16]);
 
 template<MatrixMode MODE> void MatrixStackInit(MatrixStack<MODE> *stack);
 template<MatrixMode MODE> s32* MatrixStackGet(MatrixStack<MODE> *stack);
@@ -147,9 +147,55 @@ FORCEINLINE s32 s32floor(double d)
 	return s32floor((float)d);
 }
 
+FORCEINLINE s32 sfx32_shiftdown(const s64 a)
+{
+	//TODO: replace me with direct calls to sfx32_shiftdown
+	return fx32_shiftdown(a);
+}
+
 // SIMD Functions
 //-------------
-#if defined(ENABLE_AVX2)
+#if defined(ENABLE_AVX512_0)
+
+static void memset_u16(void *dst, const u16 val, const size_t elementCount)
+{
+	v512u16 *dst_vec512 = (v512u16 *)dst;
+	const size_t length_vec512 = elementCount / (sizeof(v512u16) / sizeof(u16));
+	
+	const v512u16 val_vec512 = _mm512_set1_epi16(val);
+	for (size_t i = 0; i < length_vec512; i++)
+		_mm512_stream_si512(dst_vec512 + i, val_vec512);
+}
+
+template <size_t ELEMENTCOUNT>
+static void memset_u16_fast(void *dst, const u16 val)
+{
+	v512u16 *dst_vec512 = (v512u16 *)dst;
+	
+	const v512u16 val_vec512 = _mm512_set1_epi16(val);
+	MACRODO_N(ELEMENTCOUNT / (sizeof(v512u16) / sizeof(u16)), _mm512_store_si512(dst_vec512 + (X), val_vec512));
+}
+
+static void memset_u32(void *dst, const u32 val, const size_t elementCount)
+{
+	v512u32 *dst_vec512 = (v512u32 *)dst;
+	const size_t length_vec512 = elementCount / (sizeof(v512u32) / sizeof(u32));
+	
+	const v512u32 val_vec512 = _mm512_set1_epi32(val);
+	for (size_t i = 0; i < length_vec512; i++)
+		_mm512_stream_si512(dst_vec512 + i, val_vec512);
+}
+
+template <size_t ELEMENTCOUNT>
+static void memset_u32_fast(void *dst, const u32 val)
+{
+	v512u32 *dst_vec512 = (v512u32 *)dst;
+	
+	const v512u32 val_vec512 = _mm512_set1_epi32(val);
+	MACRODO_N(ELEMENTCOUNT / (sizeof(v512u32) / sizeof(u32)), _mm512_store_si512(dst_vec512 + (X), val_vec512));
+}
+
+#elif defined(ENABLE_AVX)
 
 static void memset_u16(void *dst, const u16 val, const size_t elementCount)
 {

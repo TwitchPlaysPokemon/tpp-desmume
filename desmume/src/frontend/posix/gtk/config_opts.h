@@ -62,9 +62,12 @@ OPT(textureSmoothing, bool, false, Config, 3DTextureSmoothing)
 OPT(textureUpscale, int, 1, Config, 3DTextureUpscaling)
 OPT(highColorInterpolation, bool, true, Config, HighResolutionColorInterpolation)
 OPT(multisampling, bool, false, Config, OpenGLMultisampling)
+OPT(command_line_overriding_firmware_language, bool, false, Config, CommandLineOverridingFirmwareLanguage)
+OPT(firmware_language, int, 1, Config, FirmwareLanguage)
 
 /* Audio */
 OPT(audio_enabled, bool, true, Audio, Enabled)
 OPT(audio_sync, int, 0, Audio, Synchronization)
 OPT(audio_interpolation, int, 1, Audio, Interpolation)
+OPT(audio_volume, int, 128, Audio, Volume)
 

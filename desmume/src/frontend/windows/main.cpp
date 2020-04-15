@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2006 Theo Berkau
-	Copyright (C) 2006-2018 DeSmuME team
+	Copyright (C) 2006-2019 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -424,6 +424,13 @@ static int sndcoretype=SNDCORE_DIRECTX;
 static int sndbuffersize=DESMUME_SAMPLE_RATE*8/60;
 int sndvolume=100;
 
+const int possibleMSAA[] = {0, 2, 4, 8, 16, 32};
+const int possibleBPP[] = {15, 18, 24};
+const int possibleTexScale[] = {1, 2, 4};
+
+int maxSamples = 0;
+bool didGetMaxSamples = false;
+
 SoundInterface_struct *SNDCoreList[] = {
 	&SNDDummy,
 	&SNDDIRECTX,
@@ -501,6 +508,11 @@ public:
 		}
 
 		return _pcap_dispatch((pcap_t *)dev, num, (pcap_handler)callback, (u_char *)userdata);
+	}
+	
+	virtual void breakloop(void *dev)
+	{
+		_pcap_breakloop((pcap_t *)dev);
 	}
 };
 
@@ -1678,9 +1690,6 @@ int MenuInit()
 //	DeleteMenu(configMenu,GetSubMenuIndexByHMENU(configMenu,advancedMenu),MF_BYPOSITION);
 //#endif
 
-	if (!gShowConsole)
-		DeleteMenu(toolsMenu, IDM_CONSOLE_ALWAYS_ON_TOP, MF_BYCOMMAND);
-
 	return 1;
 }
 
@@ -1800,6 +1809,8 @@ class WinDriver : public BaseDriver
 
 		CheckMessages();
 
+		if(finished) ExitProcess(0); //I guess.... fixes hangs when exiting while a lua script is running
+
 		if(!romloaded)
 			return ESTEP_DONE;
 
@@ -1843,14 +1854,18 @@ static void RefreshMicSettings()
 	Mic_DeInit_Physical();
 	if(CommonSettings.micMode == TCommonSettings::Sample)
 	{
-		if(!LoadSample(MicSampleName))
+		if(!LoadSamples(MicSampleName))
 		{
 			MessageBox(NULL, "Unable to read the mic sample", "DeSmuME", (MB_OK | MB_ICONEXCLAMATION));
+		}
+		else
+		{
+			driver->AddLine("Mic sample %d selected", MicSampleSelection);
 		}
 	}
 	else
 	{
-		LoadSample(NULL);
+		LoadSamples(nullptr);
 		if(CommonSettings.micMode == TCommonSettings::Physical)
 		{
 			Mic_Init_Physical();
@@ -1867,6 +1882,15 @@ static void SyncGpuBpp()
 		GPU->SetColorFormat(NDSColorFormat_BGR555_Rev);
 	else
 		GPU->SetColorFormat(NDSColorFormat_BGR888_Rev);
+}
+
+static BOOL OpenCoreSystemCP(const char* filename_syscp)
+{
+	wchar_t wgarbage[1024];
+	char garbage[1024];
+	MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filename_syscp, -1, wgarbage, 1024);
+	int q = WideCharToMultiByte(CP_UTF8, 0, wgarbage, -1, garbage, 1024, NULL, NULL);
+	return OpenCore(garbage);
 }
 
 #define RENDERID_NULL_SAVED -1
@@ -2003,11 +2027,9 @@ int _main()
 	CommonSettings.spu_advanced = GetPrivateProfileBool("Sound", "SpuAdvanced", true, IniName);
 	CommonSettings.advanced_timing = GetPrivateProfileBool("Emulation", "AdvancedTiming", true, IniName);
 	CommonSettings.gamehacks.en = GetPrivateProfileBool("Emulation", "GameHacks", true, IniName);
-
-	CommonSettings.GFX3D_Renderer_TextureDeposterize =  GetPrivateProfileBool("3D", "TextureDeposterize ", 0, IniName);
-	CommonSettings.GFX3D_Renderer_TextureSmoothing =  GetPrivateProfileBool("3D", "TextureSmooth ", 0, IniName);
-	gpu_bpp = GetPrivateProfileInt("3D", "GpuBpp ", 18, IniName);
-		
+	CommonSettings.GFX3D_Renderer_TextureDeposterize =  GetPrivateProfileBool("3D", "TextureDeposterize", 0, IniName);
+	CommonSettings.GFX3D_Renderer_TextureSmoothing =  GetPrivateProfileBool("3D", "TextureSmooth", 0, IniName);
+	gpu_bpp = GetValid3DIntSetting("GpuBpp", 18, possibleBPP, 3);
 	lostFocusPause = GetPrivateProfileBool("Focus", "BackgroundPause", false, IniName);
 
 	//Get Ram-Watch values
@@ -2228,8 +2250,7 @@ int _main()
 	Piano.Enabled	= (slot2_device_type == NDS_SLOT2_EASYPIANO)?true:false;
 	Paddle.Enabled	= (slot2_device_type == NDS_SLOT2_PADDLE)?true:false;
 
-	CommonSettings.wifi.mode = (WifiCommInterfaceID)GetPrivateProfileInt("Wifi", "Mode", WifiCommInterfaceID_AdHoc, IniName);
-	CommonSettings.wifi.infraBridgeAdapter = GetPrivateProfileInt("Wifi", "BridgeAdapter", 0, IniName);
+	CommonSettings.WifiBridgeDeviceID = GetPrivateProfileInt("Wifi", "BridgeAdapter", 0, IniName);
 
 	osd = new OSDCLASS(-1);
 
@@ -2240,23 +2261,7 @@ int _main()
 	WinPCapInterface *winpcapInterface = (isPCapSupported) ? new WinPCapInterface : NULL;
 	wifiHandler->SetPCapInterface(winpcapInterface);
 	wifiHandler->SetSocketsSupported(isSocketsSupported);
-
-	// Get the host's IP4 address.
-	char hostname[256];
-	if (gethostname(hostname, 256) != 0)
-		strncpy(hostname, "127.0.0.1", 256);
-
-	hostent *he = gethostbyname(hostname);
-	unsigned long ipaddr;
-	if (he == NULL || he->h_addr_list[0] == NULL)
-		ipaddr = 0x0100007F; // 127.0.0.1
-	else
-		ipaddr = *(unsigned long*)he->h_addr_list[0];
-
-	wifiHandler->SetIP4Address(ipaddr);
-	wifiHandler->SetUniqueMACValue((u32)GetCurrentProcessId());
-	wifiHandler->SetCommInterfaceID(CommonSettings.wifi.mode);
-	wifiHandler->SetBridgeDeviceIndex(CommonSettings.wifi.infraBridgeAdapter);
+	wifiHandler->SetBridgeDeviceIndex(CommonSettings.WifiBridgeDeviceID);
 
 	if (GetPrivateProfileBool("Wifi", "Enabled", false, IniName))
 	{
@@ -2267,10 +2272,9 @@ int _main()
 	}
 	else
 		wifiHandler->SetEmulationLevel(WifiEmulationLevel_Off);
-
-	CommonSettings.GFX3D_Renderer_TextureScalingFactor = (cmdline.texture_upscale != -1) ? cmdline.texture_upscale : GetPrivateProfileInt("3D", "TextureScalingFactor ", 1, IniName);
+	
+	CommonSettings.GFX3D_Renderer_TextureScalingFactor = (cmdline.texture_upscale != -1) ? cmdline.texture_upscale : GetValid3DIntSetting("TextureScalingFactor", 1, possibleTexScale, 3);
 	int newPrescaleHD = (cmdline.gpu_resolution_multiplier != -1) ? cmdline.gpu_resolution_multiplier : GetPrivateProfileInt("3D", "PrescaleHD", 1, IniName);
-
 	video.SetPrescale(newPrescaleHD, 1);
 	GPU->SetCustomFramebufferSize(GPU_FRAMEBUFFER_NATIVE_WIDTH*video.prescaleHD, GPU_FRAMEBUFFER_NATIVE_HEIGHT*video.prescaleHD);
 	SyncGpuBpp();
@@ -2371,8 +2375,12 @@ int _main()
 	CommonSettings.GFX3D_Fog = GetPrivateProfileBool("3D", "EnableFog", 1, IniName);
 	CommonSettings.GFX3D_Texture = GetPrivateProfileBool("3D", "EnableTexture", 1, IniName);
 	CommonSettings.GFX3D_LineHack = GetPrivateProfileBool("3D", "EnableLineHack", 1, IniName);
-	CommonSettings.GFX3D_Renderer_Multisample = GetPrivateProfileBool("3D", "EnableAntiAliasing", 0, IniName);
-	CommonSettings.GFX3D_TXTHack = GetPrivateProfileBool("3D", "EnableTXTHack", 0, IniName); //default is off.
+	CommonSettings.GFX3D_TXTHack = GetPrivateProfileBool("3D", "EnableTXTHack", 0, IniName); // Default is off.
+	CommonSettings.OpenGL_Emulation_ShadowPolygon = GetPrivateProfileBool("3D", "EnableShadowPolygon", 1, IniName);
+	CommonSettings.OpenGL_Emulation_SpecialZeroAlphaBlending = GetPrivateProfileBool("3D", "EnableSpecialZeroAlphaBlending", 1, IniName);
+	CommonSettings.OpenGL_Emulation_NDSDepthCalculation = GetPrivateProfileBool("3D", "EnableNDSDepthCalculation", 1, IniName);
+	CommonSettings.OpenGL_Emulation_DepthLEqualPolygonFacing = GetPrivateProfileBool("3D", "EnableDepthLEqualPolygonFacing", 0, IniName); // Default is off.
+	CommonSettings.GFX3D_Renderer_MultisampleSize = GetValid3DIntSetting("MultisampleSize", 0, possibleMSAA, 6);
 	Change3DCoreWithFallbackAndSave(cur3DCore);
 
 
@@ -2411,19 +2419,50 @@ int _main()
 
 	CommonSettings.UseExtFirmware = GetPrivateProfileBool("Firmware", "UseExtFirmware", false, IniName);
 	CommonSettings.UseExtFirmwareSettings = GetPrivateProfileBool("Firmware", "UseExtFirmwareSettings", false, IniName);
-	GetPrivateProfileString("Firmware", "FirmwareFile", "firmware.bin", CommonSettings.Firmware, 256, IniName);
+	GetPrivateProfileString("Firmware", "FirmwareFile", "firmware.bin", CommonSettings.ExtFirmwarePath, 256, IniName);
 	CommonSettings.BootFromFirmware = GetPrivateProfileBool("Firmware", "BootFromFirmware", false, IniName);
 
 	video.setfilter(GetPrivateProfileInt("Video", "Filter", video.NONE, IniName));
 	FilterUpdate(MainWindow->getHWnd(),false);
-
-	//default the firmware settings, they may get changed later
-	NDS_FillDefaultFirmwareConfigData(&CommonSettings.fw_config);
+	
+	// Generate the unique MAC address.
+	{
+		// Get the host's IP4 address.
+		char hostname[256];
+		if (gethostname(hostname, 256) != 0)
+			strncpy(hostname, "127.0.0.1", 256);
+		
+		hostent *he = gethostbyname(hostname);
+		u32 ipaddr;
+		if (he == NULL || he->h_addr_list[0] == NULL)
+			ipaddr = 0x0100007F; // 127.0.0.1
+		else
+			ipaddr = *(u32 *)he->h_addr_list[0];
+		
+		u32 hash = (u32)GetCurrentProcessId();
+		
+		while ((hash & 0xFF000000) == 0)
+		{
+			hash <<= 1;
+		}
+		
+		hash >>= 1;
+		hash += ipaddr >> 8;
+		hash &= 0x00FFFFFF;
+		
+		CommonSettings.fwConfig.MACAddress[0] = 0x00;
+		CommonSettings.fwConfig.MACAddress[1] = 0x09;
+		CommonSettings.fwConfig.MACAddress[2] = 0xBF;
+		CommonSettings.fwConfig.MACAddress[3] = hash >> 16;
+		CommonSettings.fwConfig.MACAddress[4] = (hash >> 8) & 0xFF;
+		CommonSettings.fwConfig.MACAddress[5] = hash & 0xFF;
+	}
+	
 	// Read the firmware settings from the init file
-	CommonSettings.fw_config.fav_colour = GetPrivateProfileInt("Firmware","favColor", 10, IniName);
-	CommonSettings.fw_config.birth_month = GetPrivateProfileInt("Firmware","bMonth", 7, IniName);
-	CommonSettings.fw_config.birth_day = GetPrivateProfileInt("Firmware","bDay", 15, IniName);
-	CommonSettings.fw_config.language = GetPrivateProfileInt("Firmware","Language", 1, IniName);
+	CommonSettings.fwConfig.favoriteColor = GetPrivateProfileInt("Firmware","favColor", 10, IniName);
+	CommonSettings.fwConfig.birthdayMonth = GetPrivateProfileInt("Firmware","bMonth", 7, IniName);
+	CommonSettings.fwConfig.birthdayDay = GetPrivateProfileInt("Firmware","bDay", 15, IniName);
+	CommonSettings.fwConfig.language = GetPrivateProfileInt("Firmware","Language", 1, IniName);
 
 	{
 		/*
@@ -2433,34 +2472,34 @@ int _main()
 		char temp_str[27];
 		int char_index;
 		GetPrivateProfileString("Firmware","nickName", "yopyop", temp_str, 11, IniName);
-		CommonSettings.fw_config.nickname_len = strlen( temp_str);
+		CommonSettings.fwConfig.nicknameLength = strlen( temp_str);
 
-		if (CommonSettings.fw_config.nickname_len == 0) {
+		if (CommonSettings.fwConfig.nicknameLength == 0) {
 			strcpy( temp_str, "yopyop");
-			CommonSettings.fw_config.nickname_len = strlen( temp_str);
+			CommonSettings.fwConfig.nicknameLength = strlen( temp_str);
 		}
 
-		for ( char_index = 0; char_index < CommonSettings.fw_config.nickname_len; char_index++) {
-			CommonSettings.fw_config.nickname[char_index] = temp_str[char_index];
+		for ( char_index = 0; char_index < CommonSettings.fwConfig.nicknameLength; char_index++) {
+			CommonSettings.fwConfig.nickname[char_index] = temp_str[char_index];
 		}
 
 		GetPrivateProfileString("Firmware","Message", "DeSmuME makes you happy!", temp_str, 27, IniName);
-		CommonSettings.fw_config.message_len = strlen( temp_str);
-		for ( char_index = 0; char_index < CommonSettings.fw_config.message_len; char_index++) {
-			CommonSettings.fw_config.message[char_index] = temp_str[char_index];
+		CommonSettings.fwConfig.messageLength = strlen( temp_str);
+		for ( char_index = 0; char_index < CommonSettings.fwConfig.messageLength; char_index++) {
+			CommonSettings.fwConfig.message[char_index] = temp_str[char_index];
 		}
 	}
 
 	if (cmdline.nds_file != "")
 	{
-		if(OpenCore(cmdline.nds_file.c_str()))
+		if(OpenCoreSystemCP(cmdline.nds_file.c_str()))
 		{
 			romloaded = TRUE;
 		}
 	}
 
 	//not supported; use the GUI
-	//if(cmdline.language != -1) CommonSettings.fw_config.language = cmdline.language;
+	//if(cmdline.language != -1) CommonSettings.fwConfig.language = cmdline.language;
 
 	cmdline.process_movieCommands();
 	
@@ -2611,6 +2650,22 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 	return ret;
 }
 
+// Checks for incorrect values, updates ini and returns a valid value. Requires an array to check.
+int GetValid3DIntSetting(char *settingName, const int defVal, const int arrName[], const int arrSize)
+{
+	const int curVal = GetPrivateProfileInt("3D", settingName, defVal, IniName);
+
+	for (int i = 0; i <= arrSize; i++)
+	{
+		if (curVal == arrName[i])
+		{
+			return curVal;
+		}
+	}
+	// Sets to defaults if ini value is incorrect.
+	WritePrivateProfileInt("3D", settingName, defVal, IniName);
+	return defVal;
+}
 
 void UpdateScreenRects()
 {
@@ -2854,6 +2909,7 @@ void AviRecordTo()
 	//}
 
 	// avi record file browser
+	char outFilename[MAX_PATH] = "";
 	memset(&ofn, 0, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = MainWindow->getHWnd();
@@ -2861,22 +2917,15 @@ void AviRecordTo()
 	ofn.lpstrDefExt = "avi";
 	ofn.lpstrTitle = "Save AVI as";
 
-	char folder[MAX_PATH];
-	ZeroMemory(folder, sizeof(folder));
-	path.getpath(path.AVI_FILES, folder);
+	std::string dir = path.getpath(path.AVI_FILES);
+	ofn.lpstrInitialDir = dir.c_str();
+	path.formatname(outFilename);
+	ofn.lpstrFile = outFilename;
 
-	char file[MAX_PATH];
-	ZeroMemory(file, sizeof(file));
-	path.formatname(file);
-
-	strcat(folder, file);
-	int len = strlen(folder);
-	if(len > MAX_PATH - 4)
-		folder[MAX_PATH - 4] = '\0';
-	
-	strcat(folder, ".avi");
-	ofn.lpstrFile = folder;
-
+	int len = strlen(outFilename);
+	if(len + dir.length() > MAX_PATH - 4)
+		outFilename[MAX_PATH - dir.length() - 4] = '\0';
+	strcat(outFilename, ".avi");
 
 	ofn.nMaxFile = MAX_PATH;
 	ofn.Flags = OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST;
@@ -2890,12 +2939,16 @@ void AviRecordTo()
 			driver->AddLine("AVI recording ended.");
 		}
 
-		bool result = DRV_AviBegin(folder);
+		bool result = DRV_AviBegin(outFilename);
 		if (result)
 		{
 			LOG("AVI recording started.");
 			driver->AddLine("AVI recording started.");
 		}
+
+		dir = Path::GetFileDirectoryPath(outFilename);
+		path.setpath(path.AVI_FILES, dir);
+		WritePrivateProfileString(SECTION, AVIKEY, dir.c_str(), IniName);
 	}
 
 	NDS_UnPause();
@@ -2923,7 +2976,6 @@ void WavRecordTo(int wavmode)
 	NDS_Pause();
 
 	OPENFILENAME ofn;
-	char szChoice[MAX_PATH] = {0};
 
 	////if we are playing a movie, construct the filename from the current movie.
 	////else construct it from the filename.
@@ -2947,20 +2999,34 @@ void WavRecordTo(int wavmode)
 	//}
 
 	// wav record file browser
+	char outFilename[MAX_PATH] = "";
 	memset(&ofn, 0, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = MainWindow->getHWnd();
 	ofn.lpstrFilter = "WAV Files (*.wav)\0*.wav\0\0";
-	ofn.lpstrFile = szChoice;
 	ofn.lpstrDefExt = "wav";
 	ofn.lpstrTitle = "Save WAV as";
+
+	std::string dir = path.getpath(path.AVI_FILES);
+	ofn.lpstrInitialDir = dir.c_str();
+	path.formatname(outFilename);
+	ofn.lpstrFile = outFilename;
+
+	int len = strlen(outFilename);
+	if (len + dir.length() > MAX_PATH - 4)
+		outFilename[MAX_PATH - dir.length() - 4] = '\0';
+	strcat(outFilename, ".wav");
 
 	ofn.nMaxFile = MAX_PATH;
 	ofn.Flags = OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST;
 
 	if(GetSaveFileName(&ofn))
 	{
-		WAV_Begin(szChoice, (WAVMode)wavmode);
+		WAV_Begin(outFilename, (WAVMode)wavmode);
+
+		dir = Path::GetFileDirectoryPath(outFilename);
+		path.setpath(path.AVI_FILES, dir);
+		WritePrivateProfileString(SECTION, AVIKEY, dir.c_str(), IniName);
 	}
 
 	NDS_UnPause();
@@ -3044,9 +3110,9 @@ LRESULT OpenFile()
 	HWND hwnd = MainWindow->getHWnd();
 
 	int filterSize = 0, i = 0;
-	OPENFILENAME ofn;
-	char filename[MAX_PATH] = "",
-		fileFilter[512]="";
+	OPENFILENAMEW ofn;
+	wchar_t filename[MAX_PATH] = L"",
+		fileFilter[512]=L"";
 	NDS_Pause(); //Stop emulation while opening new rom
 
 	ZeroMemory(&ofn, sizeof(ofn));
@@ -3054,7 +3120,7 @@ LRESULT OpenFile()
 	ofn.hwndOwner = hwnd;
 
 	ofn.lpstrFilter = 
-		"All Usable Files (*.nds, *.ds.gba, *.srl, *.zip, *.7z, *.rar, *.gz)\0*.nds;*.ds.gba;*.srl;*.zip;*.7z;*.rar;*.gz\0"
+		L"All Usable Files (*.nds, *.ds.gba, *.srl, *.zip, *.7z, *.rar, *.gz)\0*.nds;*.ds.gba;*.srl;*.zip;*.7z;*.rar;*.gz\0"
 		"NDS ROM file (*.nds,*.srl)\0*.nds;*.srl\0"
 		"NDS/GBA ROM File (*.ds.gba)\0*.ds.gba\0"
 		"Zipped NDS ROM file (*.zip)\0*.zip\0"
@@ -3068,15 +3134,12 @@ LRESULT OpenFile()
 	ofn.nFilterIndex = 1;
 	ofn.lpstrFile =  filename;
 	ofn.nMaxFile = MAX_PATH;
-	ofn.lpstrDefExt = "nds";
+	ofn.lpstrDefExt = L"nds";
 	ofn.Flags = OFN_NOCHANGEDIR | OFN_HIDEREADONLY | OFN_FILEMUSTEXIST;
+	std::wstring dir = mbstowcs(path.getpath(path.ROMS));
+	ofn.lpstrInitialDir = dir.c_str();
 
-	char buffer[MAX_PATH];
-	ZeroMemory(buffer, sizeof(buffer));
-	path.getpath(path.ROMS, buffer);
-	ofn.lpstrInitialDir = buffer;
-
-	if (GetOpenFileName(&ofn) == NULL)
+	if (GetOpenFileNameW(&ofn) == NULL)
 	{
 		NDS_UnPause();
 		return 0;
@@ -3085,18 +3148,13 @@ LRESULT OpenFile()
 	{
 		if(path.savelastromvisit)
 		{
-			char *lchr, buffer[MAX_PATH];
-			ZeroMemory(buffer, sizeof(buffer));
-
-			lchr = strrchr(filename, '\\');
-			strncpy(buffer, filename, strlen(filename) - strlen(lchr));
-			
-			path.setpath(path.ROMS, buffer);
-			WritePathSettings();
+			std::string dir = Path::GetFileDirectoryPath(wcstombs(filename));
+			path.setpath(path.ROMS, dir);
+			WritePrivateProfileString(SECTION, ROMKEY, dir.c_str(), IniName);
 		}
 	}
 
-	if(!OpenCore(filename))
+	if(!OpenCore(wcstombs((std::wstring)filename).c_str()))
 		return 0;
 
 //	if(!GetOpenFileName(&ofn))
@@ -3500,6 +3558,12 @@ void SaveWindowPos(HWND hwnd)
 	WritePrivateProfileInt("Video", "WindowPosY", WndY/*MainWindowRect.top*/, IniName);
 }
 
+static void ShowToolWindow(HWND hwnd)
+{
+	ShowWindow(hwnd,SW_NORMAL);
+	SetForegroundWindow(hwnd);
+}
+
 //========================================================================================
 LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 { 
@@ -3753,6 +3817,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 
 			// Tools
 			MainWindow->checkMenu(IDM_CONSOLE_ALWAYS_ON_TOP, gConsoleTopmost);
+			MainWindow->checkMenu(IDM_CONSOLE_SHOWHIDE, gShowConsole);
+			MainWindow->enableMenu(IDM_CONSOLE_ALWAYS_ON_TOP, gShowConsole);
 
 			UpdateHotkeyAssignments();	//Add current hotkey mappings to menu item names
 
@@ -4249,7 +4315,7 @@ DOKEYDOWN:
 					//				DialogsOpen++;
 				}
 				else
-					SetForegroundWindow(RamWatchHWnd);
+					ShowToolWindow(RamWatchHWnd);
 				Load_Watches(true, fileDropped.c_str());
 			}
 			
@@ -4257,7 +4323,7 @@ DOKEYDOWN:
 			//Else load it as a ROM
 			//-------------------------------------------------------
 
-			else if(OpenCore(filename))
+			else if(OpenCoreSystemCP(filename))
 			{
 				romloaded = TRUE;
 			}
@@ -4442,7 +4508,7 @@ DOKEYDOWN:
 			{
 				unsigned int index = wParam - IDC_LUASCRIPT_RESERVE_START;
 				if(LuaScriptHWnds.size() > index)
-					SetForegroundWindow(LuaScriptHWnds[index]);
+					ShowToolWindow(LuaScriptHWnds[index]);
 
 				return 0;
 			}
@@ -4660,17 +4726,18 @@ DOKEYDOWN:
 				ofn.nMaxFile = MAX_PATH;
 				ofn.lpstrDefExt = "dst";
 				ofn.Flags = OFN_HIDEREADONLY | OFN_FILEMUSTEXIST;
-
-				char buffer[MAX_PATH];
-				ZeroMemory(buffer, sizeof(buffer));
-				path.getpath(path.STATES, buffer);
-				ofn.lpstrInitialDir = buffer;
+				std::string dir = path.getpath(path.STATES);
+				ofn.lpstrInitialDir = dir.c_str();
 
 				if(!GetOpenFileName(&ofn))
 				{
 					NDS_UnPause();
 					return 0;
 				}
+
+				dir = Path::GetFileDirectoryPath(SavName);
+				path.setpath(path.STATES, dir);
+				WritePrivateProfileString(SECTION, STATEKEY, dir.c_str(), IniName);
 
 				savestate_load(SavName);
 				UpdateToolWindows();
@@ -4690,17 +4757,19 @@ DOKEYDOWN:
 				ofn.nMaxFile = MAX_PATH;
 				ofn.lpstrDefExt = "dst";
 				ofn.Flags = OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST;
-
-				char buffer[MAX_PATH];
-				ZeroMemory(buffer, sizeof(buffer));
-				path.getpath(path.STATES, buffer);
-				ofn.lpstrInitialDir = buffer;
+				std::string dir = path.getpath(path.STATES);
+				ofn.lpstrInitialDir = dir.c_str();
 
 				if(GetSaveFileName(&ofn))
 				{
 					savestate_save(SavName);
 					LoadSaveStateInfo();
 				}
+
+				dir = Path::GetFileDirectoryPath(SavName);
+				path.setpath(path.STATES, dir);
+				WritePrivateProfileString(SECTION, STATEKEY, dir.c_str(), IniName);
+
 				if(unpause) NDS_UnPause();
 				return 0;
 			}
@@ -4741,27 +4810,8 @@ DOKEYDOWN:
 			}
 		case IDM_EXPORTBACKUPMEMORY:
 			{
-				OPENFILENAME ofn;
 				NDS_Pause();
-				ZeroMemory(&ofn, sizeof(ofn));
-				ofn.lStructSize = sizeof(ofn);
-				ofn.hwndOwner = hwnd;
-				ofn.lpstrFilter = "Raw Save format (*.sav)\0*.sav\0No$GBA Save format (*.sav)\0*.sav\0\0";
-				ofn.nFilterIndex = 0;
-				ofn.lpstrFile =  ImportSavName;
-				ofn.nMaxFile = MAX_PATH;
-				ofn.lpstrDefExt = "sav";
-				ofn.Flags = OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
-
-				if(!GetSaveFileName(&ofn))
-				{
-					NDS_UnPause();
-					return 0;
-				}
-
-				if (ofn.nFilterIndex == 2) strcat(ImportSavName, "*");
-
-				if (!MMU_new.backupDevice.exportData(ImportSavName))
+				if (!exportSave(hwnd, hAppInst))
 					MessageBox(hwnd,"Save was not successfully exported","Error",MB_OK);
 				NDS_UnPause();
 				return 0;
@@ -4817,6 +4867,11 @@ DOKEYDOWN:
 			RunConfig(CONFIGSCREEN_HOTKEY);
 			return 0;
 		case IDM_FIRMSETTINGS:
+			if (AreMovieEmulationSettingsActive())
+			{
+				MessageBox(hwnd, "The current settings have been set by a movie. Reset or unload the current game if you want to restore your saved settings.\n\n"
+					"If you make changes here, the new settings will overwrite your currently saved settings.", "Movie Settings Active", MB_OK);
+			}
 			RunConfig(CONFIGSCREEN_FIRMWARE);
 			return 0;
 		case IDM_SOUNDSETTINGS:
@@ -4826,6 +4881,11 @@ DOKEYDOWN:
 			RunConfig(CONFIGSCREEN_WIFI);
 			return 0;
 		case IDM_EMULATIONSETTINGS:
+			if (AreMovieEmulationSettingsActive())
+			{
+				MessageBox(hwnd, "The current settings have been set by a movie. Reset or unload the current game if you want to restore your saved settings.\n\n"
+					"If you make changes here (whether you reset now or not), the new settings will overwrite your currently saved settings.", "Movie Settings Active", MB_OK);
+			}
 			RunConfig(CONFIGSCREEN_EMULATION);
 			return 0;
 		case IDM_MICROPHONESETTINGS:
@@ -5051,7 +5111,7 @@ DOKEYDOWN:
 				RamSearchHWnd = CreateDialog(hAppInst, MAKEINTRESOURCE(IDD_RAMSEARCH), hwnd, (DLGPROC) RamSearchProc);
 			}
 			else
-				SetForegroundWindow(RamSearchHWnd);
+				ShowToolWindow(RamSearchHWnd);
 			break;
 
 		case ID_RAM_WATCH:
@@ -5061,7 +5121,7 @@ DOKEYDOWN:
 				//				DialogsOpen++;
 			}
 			else
-				SetForegroundWindow(RamWatchHWnd);
+				ShowToolWindow(RamWatchHWnd);
 			return 0;
 
 		case IDC_BACKGROUNDPAUSE:
@@ -5432,6 +5492,22 @@ DOKEYDOWN:
 			}
 			return 0;
 
+		case IDM_CONSOLE_SHOWHIDE:
+		{
+			gShowConsole = !gShowConsole;
+			WritePrivateProfileBool("Console", "Show", gShowConsole, IniName);
+			if(gShowConsole) 
+			{
+				OpenConsole();			// Init debug console
+				ConsoleAlwaysTop(gConsoleTopmost);
+			}
+			else
+			{
+				CloseConsole();
+			}
+			return 0;
+		}
+
 		case IDM_SHOWTOOLBAR:
 			{
 				u32 style = GetStyle();
@@ -5659,68 +5735,125 @@ LRESULT CALLBACK GFX3DSettingsDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 	{
 	case WM_INITDIALOG:
 		{
-			int i;
+			const char MSAADescriptions[6][9] = {"Disabled", "2x", "4x", "8x", "16x", "32x"};
 
-			CheckDlgButton(hw,IDC_INTERPOLATECOLOR,CommonSettings.GFX3D_HighResolutionInterpolateColor);
-			CheckDlgButton(hw,IDC_3DSETTINGS_EDGEMARK,CommonSettings.GFX3D_EdgeMark);
-			CheckDlgButton(hw,IDC_3DSETTINGS_FOG,CommonSettings.GFX3D_Fog);
-			CheckDlgButton(hw,IDC_3DSETTINGS_TEXTURE,CommonSettings.GFX3D_Texture);
-			CheckDlgButton(hw,IDC_3DSETTINGS_LINEHACK, CommonSettings.GFX3D_LineHack);
-			CheckDlgButton(hw,IDC_3DSETTINGS_ANTIALIASING, CommonSettings.GFX3D_Renderer_Multisample);
-			CheckDlgButton(hw,IDC_TXTHACK, CommonSettings.GFX3D_TXTHack);
+			if (!didGetMaxSamples)
+			{
+				if (cur3DCore != 0 && cur3DCore != 2) //Get max device samples from the current renderer only if it's OpenGL.
+				{
+					maxSamples = CurrentRenderer->GetDeviceInfo().maxSamples;
+					didGetMaxSamples = true;
+				}
+				else
+				{
+					bool isTempContextCreated = windows_opengl_init(); //Create a context just to get max device samples.
+					if (isTempContextCreated) //Creating it here because it's only needed in this window.
+					{
+						GLint maxSamplesOGL = 0;
+#if defined(GL_MAX_SAMPLES)
+						glGetIntegerv(GL_MAX_SAMPLES, &maxSamplesOGL);
+#elif defined(GL_MAX_SAMPLES_EXT)
+						glGetIntegerv(GL_MAX_SAMPLES_EXT, &maxSamplesOGL);
+#endif
+						maxSamples = maxSamplesOGL;
+						didGetMaxSamples = true;
+					}
+				}
+			}
 
-			CheckDlgButton(hw,IDC_TEXSCALE_1, CommonSettings.GFX3D_Renderer_TextureScalingFactor == 1);
-			CheckDlgButton(hw,IDC_TEXSCALE_2, CommonSettings.GFX3D_Renderer_TextureScalingFactor == 2);
-			CheckDlgButton(hw,IDC_TEXSCALE_4, CommonSettings.GFX3D_Renderer_TextureScalingFactor == 4);
-
-			CheckDlgButton(hw, IDC_GPU_24BPP, gpu_bpp == 24);
-			CheckDlgButton(hw, IDC_GPU_18BPP, gpu_bpp == 18);
-			CheckDlgButton(hw, IDC_GPU_15BPP, gpu_bpp == 15);
-
-			CheckDlgButton(hw,IDC_TEX_DEPOSTERIZE, CommonSettings.GFX3D_Renderer_TextureDeposterize);
-			CheckDlgButton(hw,IDC_TEX_SMOOTH, CommonSettings.GFX3D_Renderer_TextureSmoothing);
+			CheckDlgButton(hw, IDC_INTERPOLATECOLOR, CommonSettings.GFX3D_HighResolutionInterpolateColor);
+			CheckDlgButton(hw, IDC_3DSETTINGS_LINEHACK, CommonSettings.GFX3D_LineHack);
+			CheckDlgButton(hw, IDC_TXTHACK, CommonSettings.GFX3D_TXTHack);
+			CheckDlgButton(hw, IDC_TEX_DEPOSTERIZE, CommonSettings.GFX3D_Renderer_TextureDeposterize);
+			CheckDlgButton(hw, IDC_3DSETTINGS_EDGEMARK, CommonSettings.GFX3D_EdgeMark);
+			CheckDlgButton(hw, IDC_3DSETTINGS_FOG, CommonSettings.GFX3D_Fog);
+			CheckDlgButton(hw, IDC_3DSETTINGS_TEXTURE, CommonSettings.GFX3D_Texture);
+			CheckDlgButton(hw, IDC_TEX_SMOOTH, CommonSettings.GFX3D_Renderer_TextureSmoothing);
+			CheckDlgButton(hw, IDC_SHADOW_POLYGONS, CommonSettings.OpenGL_Emulation_ShadowPolygon);
+			CheckDlgButton(hw, IDC_S_0_ALPHA_BLEND, CommonSettings.OpenGL_Emulation_SpecialZeroAlphaBlending);
+			CheckDlgButton(hw, IDC_NDS_DEPTH_CALC, CommonSettings.OpenGL_Emulation_NDSDepthCalculation);
+			CheckDlgButton(hw, IDC_DEPTH_L_EQUAL_PF, CommonSettings.OpenGL_Emulation_DepthLEqualPolygonFacing);
 
 			SendDlgItemMessage(hw, IDC_NUD_PRESCALEHD, UDM_SETRANGE, 0, MAKELPARAM(16, 1));
 			SendDlgItemMessage(hw, IDC_NUD_PRESCALEHD, UDM_SETPOS, 0, video.prescaleHD);
 
-			for(i = 0; core3DList[i] != NULL; i++)
+			// Generate the Color Depth pop-up menu
+			ComboBox_AddString(GetDlgItem(hw, IDC_GPU_COLOR_DEPTH), "15 bit");
+			ComboBox_AddString(GetDlgItem(hw, IDC_GPU_COLOR_DEPTH), "18 bit");
+			ComboBox_AddString(GetDlgItem(hw, IDC_GPU_COLOR_DEPTH), "24 bit");
+			ComboBox_SetCurSel(GetDlgItem(hw, IDC_GPU_COLOR_DEPTH), 1);
+			// Generate the Texture Scaling pop-up menu
+			ComboBox_AddString(GetDlgItem(hw, IDC_TEXSCALE), "1x");
+			ComboBox_AddString(GetDlgItem(hw, IDC_TEXSCALE), "2x");
+			ComboBox_AddString(GetDlgItem(hw, IDC_TEXSCALE), "4x");
+			ComboBox_SetCurSel(GetDlgItem(hw, IDC_TEXSCALE), 0);
+
+			for (int i = 0; i < 3; i++)
+			{
+				if (gpu_bpp == possibleBPP[i])
+				{
+					ComboBox_SetCurSel(GetDlgItem(hw, IDC_GPU_COLOR_DEPTH), i);
+				}
+				if (CommonSettings.GFX3D_Renderer_TextureScalingFactor == possibleTexScale[i])
+				{
+					ComboBox_SetCurSel(GetDlgItem(hw, IDC_TEXSCALE), i);
+				}
+			}
+
+			if (CommonSettings.GFX3D_Renderer_MultisampleSize > maxSamples) 
+			{
+				CommonSettings.GFX3D_Renderer_MultisampleSize = maxSamples;
+				WritePrivateProfileInt("3D", "MultisampleSize", maxSamples, IniName);
+			}
+
+			// Generate the MSAA pop-up menu
+			ComboBox_AddString(GetDlgItem(hw, IDC_MULTISAMPLE_SIZE), MSAADescriptions[0]);
+			ComboBox_SetCurSel(GetDlgItem(hw, IDC_MULTISAMPLE_SIZE), 0);
+			for (int i = 1, z = 2; z <= maxSamples; i++, z*=2)
+			{
+				ComboBox_AddString(GetDlgItem(hw, IDC_MULTISAMPLE_SIZE), MSAADescriptions[i]);
+				if (z == CommonSettings.GFX3D_Renderer_MultisampleSize) 
+				{
+					ComboBox_SetCurSel(GetDlgItem(hw, IDC_MULTISAMPLE_SIZE), i);
+				}
+			}
+
+			// Generate the 3D Rendering Engine pop-up menu
+			for (int i = 0; core3DList[i] != NULL; i++)
 			{
 				ComboBox_AddString(GetDlgItem(hw, IDC_3DCORE), core3DList[i]->name);
 			}
 			ComboBox_SetCurSel(GetDlgItem(hw, IDC_3DCORE), cur3DCore);
 		}
 		return TRUE;
-
 	case WM_COMMAND:
 		{
 			switch(LOWORD(wp))
 			{
 			case IDOK:
 				{
-					CommonSettings.GFX3D_HighResolutionInterpolateColor = IsDlgCheckboxChecked(hw,IDC_INTERPOLATECOLOR);
-					CommonSettings.GFX3D_EdgeMark = IsDlgCheckboxChecked(hw,IDC_3DSETTINGS_EDGEMARK);
-					CommonSettings.GFX3D_Fog = IsDlgCheckboxChecked(hw,IDC_3DSETTINGS_FOG);
-					CommonSettings.GFX3D_Texture = IsDlgCheckboxChecked(hw,IDC_3DSETTINGS_TEXTURE);
-					CommonSettings.GFX3D_LineHack = IsDlgCheckboxChecked(hw,IDC_3DSETTINGS_LINEHACK);
-					CommonSettings.GFX3D_Renderer_Multisample = IsDlgCheckboxChecked(hw,IDC_3DSETTINGS_ANTIALIASING);
-					CommonSettings.GFX3D_TXTHack = IsDlgCheckboxChecked(hw,IDC_TXTHACK);
-
+					CommonSettings.GFX3D_HighResolutionInterpolateColor = IsDlgCheckboxChecked(hw, IDC_INTERPOLATECOLOR);
+					CommonSettings.GFX3D_LineHack = IsDlgCheckboxChecked(hw, IDC_3DSETTINGS_LINEHACK);
+					CommonSettings.GFX3D_TXTHack = IsDlgCheckboxChecked(hw, IDC_TXTHACK);
+					gpu_bpp = possibleBPP[SendDlgItemMessage(hw, IDC_GPU_COLOR_DEPTH, CB_GETCURSEL, 0, 0)];
+					CommonSettings.GFX3D_Renderer_TextureScalingFactor = possibleTexScale[SendDlgItemMessage(hw, IDC_TEXSCALE, CB_GETCURSEL, 0, 0)];
+					CommonSettings.GFX3D_Renderer_TextureDeposterize = IsDlgCheckboxChecked(hw, IDC_TEX_DEPOSTERIZE);
+					CommonSettings.GFX3D_EdgeMark = IsDlgCheckboxChecked(hw, IDC_3DSETTINGS_EDGEMARK);
+					CommonSettings.GFX3D_Fog = IsDlgCheckboxChecked(hw, IDC_3DSETTINGS_FOG);
+					CommonSettings.GFX3D_Texture = IsDlgCheckboxChecked(hw, IDC_3DSETTINGS_TEXTURE);
+					CommonSettings.GFX3D_Renderer_MultisampleSize = possibleMSAA[SendDlgItemMessage(hw, IDC_MULTISAMPLE_SIZE, CB_GETCURSEL, 0, 0)];
+					CommonSettings.GFX3D_Renderer_TextureSmoothing = IsDlgCheckboxChecked(hw, IDC_TEX_SMOOTH);
+					CommonSettings.OpenGL_Emulation_ShadowPolygon = IsDlgCheckboxChecked(hw, IDC_SHADOW_POLYGONS);
+					CommonSettings.OpenGL_Emulation_SpecialZeroAlphaBlending = IsDlgCheckboxChecked(hw, IDC_S_0_ALPHA_BLEND);
+					CommonSettings.OpenGL_Emulation_NDSDepthCalculation = IsDlgCheckboxChecked(hw, IDC_NDS_DEPTH_CALC);
+					CommonSettings.OpenGL_Emulation_DepthLEqualPolygonFacing = IsDlgCheckboxChecked(hw, IDC_DEPTH_L_EQUAL_PF);
+					
 					int newPrescaleHD = video.prescaleHD;
 					LRESULT scaleResult = SendDlgItemMessage(hw, IDC_NUD_PRESCALEHD, UDM_GETPOS, 0, 0);
 					if (HIWORD(scaleResult) == 0)
 					{
 						newPrescaleHD = LOWORD(scaleResult);
 					}
-
-					if(IsDlgCheckboxChecked(hw,IDC_TEXSCALE_1)) CommonSettings.GFX3D_Renderer_TextureScalingFactor = 1;
-					else if(IsDlgCheckboxChecked(hw,IDC_TEXSCALE_2)) CommonSettings.GFX3D_Renderer_TextureScalingFactor = 2;
-					else if(IsDlgCheckboxChecked(hw,IDC_TEXSCALE_4)) CommonSettings.GFX3D_Renderer_TextureScalingFactor = 4;
-					if(IsDlgCheckboxChecked(hw, IDC_GPU_15BPP)) gpu_bpp = 15;
-					else if(IsDlgCheckboxChecked(hw, IDC_GPU_18BPP)) gpu_bpp = 18;
-					else if(IsDlgCheckboxChecked(hw, IDC_GPU_24BPP)) gpu_bpp = 24;
-
-					CommonSettings.GFX3D_Renderer_TextureDeposterize = IsDlgCheckboxChecked(hw,IDC_TEX_DEPOSTERIZE);
-					CommonSettings.GFX3D_Renderer_TextureSmoothing = IsDlgCheckboxChecked(hw,IDC_TEX_SMOOTH);
 
 					{
 						Lock lock(win_backbuffer_sync);
@@ -5741,24 +5874,27 @@ LRESULT CALLBACK GFX3DSettingsDlgProc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 					}
 
 					WritePrivateProfileBool("3D", "HighResolutionInterpolateColor", CommonSettings.GFX3D_HighResolutionInterpolateColor, IniName);
+					WritePrivateProfileBool("3D", "EnableTXTHack", CommonSettings.GFX3D_TXTHack, IniName);
+					WritePrivateProfileBool("3D", "EnableLineHack", CommonSettings.GFX3D_LineHack, IniName);
+					WritePrivateProfileInt ("3D", "PrescaleHD", video.prescaleHD, IniName);
+					WritePrivateProfileInt ("3D", "GpuBpp", gpu_bpp, IniName);
+					WritePrivateProfileInt ("3D", "TextureScalingFactor", CommonSettings.GFX3D_Renderer_TextureScalingFactor, IniName);
+					WritePrivateProfileBool("3D", "TextureDeposterize", CommonSettings.GFX3D_Renderer_TextureDeposterize, IniName);
 					WritePrivateProfileBool("3D", "EnableEdgeMark", CommonSettings.GFX3D_EdgeMark, IniName);
 					WritePrivateProfileBool("3D", "EnableFog", CommonSettings.GFX3D_Fog, IniName);
 					WritePrivateProfileBool("3D", "EnableTexture", CommonSettings.GFX3D_Texture, IniName);
-					WritePrivateProfileInt ("3D", "EnableLineHack", CommonSettings.GFX3D_LineHack, IniName);
-					WritePrivateProfileInt ("3D", "EnableAntiAliasing", CommonSettings.GFX3D_Renderer_Multisample, IniName);
-					WritePrivateProfileInt ("3D", "EnableTXTHack", CommonSettings.GFX3D_TXTHack, IniName);
-					WritePrivateProfileInt ("3D", "PrescaleHD", video.prescaleHD, IniName);
-					WritePrivateProfileInt ("3D", "TextureScalingFactor", CommonSettings.GFX3D_Renderer_TextureScalingFactor, IniName);
-					WritePrivateProfileBool("3D", "TextureDeposterize", CommonSettings.GFX3D_Renderer_TextureDeposterize, IniName);
+					WritePrivateProfileInt ("3D", "MultisampleSize", CommonSettings.GFX3D_Renderer_MultisampleSize, IniName);
 					WritePrivateProfileBool("3D", "TextureSmooth", CommonSettings.GFX3D_Renderer_TextureSmoothing, IniName);
-					WritePrivateProfileInt ("3D", "GpuBpp", gpu_bpp, IniName);
+					WritePrivateProfileBool("3D", "EnableShadowPolygon", CommonSettings.OpenGL_Emulation_ShadowPolygon, IniName);
+					WritePrivateProfileBool("3D", "EnableSpecialZeroAlphaBlending", CommonSettings.OpenGL_Emulation_SpecialZeroAlphaBlending, IniName);
+					WritePrivateProfileBool("3D", "EnableNDSDepthCalculation", CommonSettings.OpenGL_Emulation_NDSDepthCalculation, IniName);
+					WritePrivateProfileBool("3D", "EnableDepthLEqualPolygonFacing", CommonSettings.OpenGL_Emulation_DepthLEqualPolygonFacing, IniName);
 				}
 			case IDCANCEL:
 				{
 					EndDialog(hw, TRUE);
 				}
 				return TRUE;
-
 			case IDC_DEFAULT:
 				{
 					Change3DCoreWithFallbackAndSave(GPU3D_DEFAULT);
@@ -5820,7 +5956,7 @@ LRESULT CALLBACK EmulationSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, L
 			}
 
 			CheckDlgButton(hDlg, IDC_USEEXTFIRMWARE, ((CommonSettings.UseExtFirmware == true) ? BST_CHECKED : BST_UNCHECKED));
-			SetDlgItemText(hDlg, IDC_FIRMWARE, CommonSettings.Firmware);
+			SetDlgItemText(hDlg, IDC_FIRMWARE, CommonSettings.ExtFirmwarePath);
 			CheckDlgButton(hDlg, IDC_FIRMWAREBOOT, ((CommonSettings.BootFromFirmware == true) ? BST_CHECKED : BST_UNCHECKED));
 			CheckDlgButton(hDlg, IDC_FIRMWAREEXTUSER, ((CommonSettings.UseExtFirmwareSettings == true) ? BST_CHECKED : BST_UNCHECKED));
 
@@ -5874,7 +6010,7 @@ LRESULT CALLBACK EmulationSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, L
 					if(romloaded)
 						val = MessageBox(hDlg, "The current ROM needs to be reset to apply changes.\nReset now ?", "DeSmuME", (MB_YESNO | MB_ICONQUESTION));
 
-					
+					UnloadMovieEmulationSettings();
 
 					CommonSettings.UseExtBIOS = IsDlgCheckboxChecked(hDlg, IDC_USEEXTBIOS);
 					cur = GetDlgItem(hDlg, IDC_ARM9BIOS);
@@ -5886,7 +6022,7 @@ LRESULT CALLBACK EmulationSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, L
 
 					CommonSettings.UseExtFirmware = IsDlgCheckboxChecked(hDlg, IDC_USEEXTFIRMWARE);
 					cur = GetDlgItem(hDlg, IDC_FIRMWARE);
-					GetWindowText(cur, CommonSettings.Firmware, 256);
+					GetWindowText(cur, CommonSettings.ExtFirmwarePath, 256);
 					CommonSettings.BootFromFirmware = IsDlgCheckboxChecked(hDlg, IDC_FIRMWAREBOOT);
 					CommonSettings.UseExtFirmwareSettings = IsDlgCheckboxChecked(hDlg, IDC_FIRMWAREEXTUSER);
 
@@ -5914,7 +6050,7 @@ LRESULT CALLBACK EmulationSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, L
 					WritePrivateProfileInt("BIOS", "PatchSWI3", ((CommonSettings.PatchSWI3 == true) ? 1 : 0), IniName);
 
 					WritePrivateProfileInt("Firmware", "UseExtFirmware", ((CommonSettings.UseExtFirmware == true) ? 1 : 0), IniName);
-					WritePrivateProfileString("Firmware", "FirmwareFile", CommonSettings.Firmware, IniName);
+					WritePrivateProfileString("Firmware", "FirmwareFile", CommonSettings.ExtFirmwarePath, IniName);
 					WritePrivateProfileInt("Firmware", "BootFromFirmware", ((CommonSettings.BootFromFirmware == true) ? 1 : 0), IniName);
 					WritePrivateProfileInt("Firmware", "UseExtFirmwareSettings", ((CommonSettings.UseExtFirmwareSettings == true) ? 1 : 0), IniName);
 #ifdef HAVE_JIT
@@ -5986,14 +6122,15 @@ LRESULT CALLBACK EmulationSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, L
 					ofn.nMaxFile = 256;
 					ofn.lpstrDefExt = "bin";
 					ofn.Flags = OFN_NOCHANGEDIR | OFN_HIDEREADONLY | OFN_FILEMUSTEXIST;
-
-					char buffer[MAX_PATH];
-					ZeroMemory(buffer, sizeof(buffer));
-					path.getpath(path.FIRMWARE, buffer);
-					ofn.lpstrInitialDir = buffer;
+					std::string dir = path.getpath(path.FIRMWARE);
+					ofn.lpstrInitialDir = dir.c_str();
 
 					if(GetOpenFileName(&ofn))
 					{
+						std::string dir = Path::GetFileDirectoryPath(fileName);
+						path.setpath(path.FIRMWARE, dir);
+						WritePrivateProfileString(SECTION, FIRMWAREKEY, dir.c_str(), IniName);
+
 						HWND cur;
 
 						switch(LOWORD(wParam))
@@ -6105,14 +6242,15 @@ LRESULT CALLBACK MicrophoneSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, 
 					ofn.nMaxFile = 256;
 					ofn.lpstrDefExt = "wav";
 					ofn.Flags = OFN_NOCHANGEDIR | OFN_HIDEREADONLY | OFN_FILEMUSTEXIST;
-
-					char buffer[MAX_PATH];
-					ZeroMemory(buffer, sizeof(buffer));
-					path.getpath(path.SOUNDS, buffer);
-					ofn.lpstrInitialDir = buffer;
+					std::string dir = path.getpath(path.SOUNDS);
+					ofn.lpstrInitialDir = dir.c_str();
 
 					if(GetOpenFileName(&ofn))
 					{
+						std::string dir = Path::GetFileDirectoryPath(fileName);
+						path.setpath(path.SOUNDS, dir);
+						WritePrivateProfileString(SECTION, SOUNDKEY, dir.c_str(), IniName);
+
 						HWND cur;
 
 						switch(LOWORD(wParam))
@@ -6134,7 +6272,6 @@ LRESULT CALLBACK MicrophoneSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, 
 
 LRESULT CALLBACK WifiSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	const bool isSocketsSupported = wifiHandler->IsSocketsSupported();
 	const bool isPCapSupported = wifiHandler->IsPCapSupported();
 	const WifiEmulationLevel emulationLevel = wifiHandler->GetSelectedEmulationLevel();
 
@@ -6159,18 +6296,13 @@ LRESULT CALLBACK WifiSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM
 			EnableWindow(GetDlgItem(hDlg, IDC_WIFI_ENABLED), FALSE);
 			EnableWindow(GetDlgItem(hDlg, IDC_WIFI_COMPAT), FALSE);
 #endif
-			if (isSocketsSupported && isPCapSupported)
-				CheckRadioButton(hDlg, IDC_WIFIMODE0, IDC_WIFIMODE1, IDC_WIFIMODE0 + CommonSettings.wifi.mode);
-			else if(isSocketsSupported)
-				CheckRadioButton(hDlg, IDC_WIFIMODE0, IDC_WIFIMODE1, IDC_WIFIMODE0);
-			else
-				CheckRadioButton(hDlg, IDC_WIFIMODE0, IDC_WIFIMODE1, IDC_WIFIMODE1);
 
 			HWND deviceMenu = GetDlgItem(hDlg, IDC_BRIDGEADAPTER);
 			int menuItemCount = ComboBox_GetCount(deviceMenu);
-			int deviceCount = -1;
 			std::vector<std::string> deviceStringList;
-
+			int curSel = 0;
+			BOOL enableWin = FALSE;
+			
 			for (int i = 0; i < menuItemCount; i++)
 			{
 				ComboBox_DeleteString(deviceMenu, 0);
@@ -6178,38 +6310,33 @@ LRESULT CALLBACK WifiSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM
 
 			if (isPCapSupported)
 			{
-				deviceCount = wifiHandler->GetBridgeDeviceList(&deviceStringList);
-			}
-			else
-			{
-				SetDlgItemText(hDlg, IDC_WIFIMODE1, "Infrastructure (winpcap not loaded)");
-			}
-			
-			if (deviceCount < 0)
-			{
-				ComboBox_AddString(deviceMenu, "Error: Cannot find any devices.");
-				ComboBox_SetCurSel(deviceMenu, 0);
-				EnableWindow(deviceMenu, FALSE);
-			}
-			else if (deviceCount == 0)
-			{
-				ComboBox_AddString(deviceMenu, "No devices found.");
-				ComboBox_SetCurSel(deviceMenu, 0);
-				EnableWindow(deviceMenu, FALSE);
-			}
-			else
-			{
-				for (size_t i = 0; i < deviceCount; i++)
+				int deviceCount = wifiHandler->GetBridgeDeviceList(&deviceStringList);
+
+				if (deviceCount < 0)
 				{
-					ComboBox_AddString(deviceMenu, deviceStringList[i].c_str());
+					ComboBox_AddString(deviceMenu, "Error: Searching for a device failed.");
 				}
-
-				ComboBox_SetCurSel(deviceMenu, CommonSettings.wifi.infraBridgeAdapter);
-				EnableWindow(deviceMenu, TRUE);
+				else if (deviceCount == 0)
+				{
+					ComboBox_AddString(deviceMenu, "No devices were found.");
+				}
+				else
+				{
+					for (size_t i = 0; i < deviceCount; i++)
+					{
+						ComboBox_AddString(deviceMenu, deviceStringList[i].c_str());
+					}
+					curSel = CommonSettings.WifiBridgeDeviceID;
+					enableWin = TRUE;
+				}
 			}
-
-			if (!isSocketsSupported)
-				EnableWindow(GetDlgItem(hDlg, IDC_WIFIMODE0), FALSE);
+			else
+			{
+				ComboBox_AddString(deviceMenu, "Error: Could not load WinPcap.");
+			}
+			ComboBox_SetCurSel(deviceMenu, curSel);
+			EnableWindow(deviceMenu, enableWin);
+			
 		}
 		return TRUE;
 
@@ -6242,17 +6369,10 @@ LRESULT CALLBACK WifiSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM
 					wifiHandler->SetEmulationLevel(WifiEmulationLevel_Off);
 #endif
 
-					if (IsDlgButtonChecked(hDlg, IDC_WIFIMODE0))
-						CommonSettings.wifi.mode = WifiCommInterfaceID_AdHoc;
-					else
-						CommonSettings.wifi.mode = WifiCommInterfaceID_Infrastructure;
-					WritePrivateProfileInt("Wifi", "Mode", CommonSettings.wifi.mode, IniName);
-					wifiHandler->SetCommInterfaceID(CommonSettings.wifi.mode);
-
 					cur = GetDlgItem(hDlg, IDC_BRIDGEADAPTER);
-					CommonSettings.wifi.infraBridgeAdapter = ComboBox_GetCurSel(cur);
-					wifiHandler->SetBridgeDeviceIndex(CommonSettings.wifi.infraBridgeAdapter);
-					WritePrivateProfileInt("Wifi", "BridgeAdapter", CommonSettings.wifi.infraBridgeAdapter, IniName);
+					CommonSettings.WifiBridgeDeviceID = ComboBox_GetCurSel(cur);
+					wifiHandler->SetBridgeDeviceIndex(CommonSettings.WifiBridgeDeviceID);
+					WritePrivateProfileInt("Wifi", "BridgeAdapter", CommonSettings.WifiBridgeDeviceID, IniName);
 
 					if(val == IDYES)
 					{

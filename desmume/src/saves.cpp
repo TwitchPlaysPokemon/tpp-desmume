@@ -166,7 +166,7 @@ SFORMAT SF_MEM[]={
 	{ "ITCM", 1, sizeof(MMU.ARM9_ITCM),   MMU.ARM9_ITCM},
 	{ "DTCM", 1, sizeof(MMU.ARM9_DTCM),   MMU.ARM9_DTCM},
 
-	 //for legacy purposes, WRAX is a separate variable. shouldnt be a problem.
+	//for legacy purposes, WRAX is a separate variable. shouldnt be a problem.
 	{ "WRAM", 1, 0x400000, MMU.MAIN_MEM},
 	{ "WRAX", 1, 0x400000, MMU.MAIN_MEM+0x400000},
 
@@ -301,79 +301,78 @@ SFORMAT SF_MOVIE[]={
 	{ 0 }
 };
 
-// TODO: integrate the new wifi state variables once everything is settled
 SFORMAT SF_WIFI[]={
-	{ "W000", 4, 1, &wifiMac.powerOn},
-	{ "W010", 4, 1, &wifiMac.powerOnPending},
+	{ "W000", 4, 1, &legacyWifiSF.powerOn},
+	{ "W010", 4, 1, &legacyWifiSF.powerOnPending},
 
-	{ "W020", 2, 1, &wifiMac.rfStatus},
-	{ "W030", 2, 1, &wifiMac.rfPins},
+	{ "W020", 2, 1, &legacyWifiSF.rfStatus},
+	{ "W030", 2, 1, &legacyWifiSF.rfPins},
 
-	{ "W040", 2, 1, &wifiMac.IE},
-	{ "W050", 2, 1, &wifiMac.IF},
+	{ "W040", 2, 1, &legacyWifiSF.IE},
+	{ "W050", 2, 1, &legacyWifiSF.IF},
 
-	{ "W060", 2, 1, &wifiMac.macMode},
-	{ "W070", 2, 1, &wifiMac.wepMode},
-	{ "W080", 4, 1, &wifiMac.WEP_enable},
+	{ "W060", 2, 1, &legacyWifiSF.macMode},
+	{ "W070", 2, 1, &legacyWifiSF.wepMode},
+	{ "W080", 4, 1, &legacyWifiSF.WEP_enable},
 
-	{ "W100", 2, 1, &wifiMac.TXCnt},
-	{ "W120", 2, 1, &wifiMac.TXStat},
+	{ "W100", 2, 1, &legacyWifiSF.TXCnt},
+	{ "W120", 2, 1, &legacyWifiSF.TXStat},
 
-	{ "W200", 2, 1, &wifiMac.RXCnt},
-	{ "W210", 2, 1, &wifiMac.RXCheckCounter},
+	{ "W200", 2, 1, &legacyWifiSF.RXCnt},
+	{ "W210", 2, 1, &legacyWifiSF.RXCheckCounter},
 
-	{ "W220", 1, 6, &wifiMac.mac.bytes},
-	{ "W230", 1, 6, &wifiMac.bss.bytes},
+	{ "W220", 1, 6, &legacyWifiSF.macAddr[0]},
+	{ "W230", 1, 6, &legacyWifiSF.bssid[0]},
 
-	{ "W240", 2, 1, &wifiMac.aid},
-	{ "W250", 2, 1, &wifiMac.pid},
-	{ "W260", 2, 1, &wifiMac.retryLimit},
+	{ "W240", 2, 1, &legacyWifiSF.aid},
+	{ "W250", 2, 1, &legacyWifiSF.pid},
+	{ "W260", 2, 1, &legacyWifiSF.retryLimit},
 
-	{ "W270", 4, 1, &wifiMac.crystalEnabled},
-	{ "W280", 8, 1, &wifiMac.usec},
-	{ "W290", 4, 1, &wifiMac.usecEnable},
-	{ "W300", 8, 1, &wifiMac.ucmp},
-	{ "W310", 4, 1, &wifiMac.ucmpEnable},
-	{ "W320", 2, 1, &wifiMac.eCount},
-	{ "W330", 4, 1, &wifiMac.eCountEnable},
+	{ "W270", 4, 1, &legacyWifiSF.crystalEnabled},
+	{ "W280", 8, 1, &legacyWifiSF.usec},
+	{ "W290", 4, 1, &legacyWifiSF.usecEnable},
+	{ "W300", 8, 1, &legacyWifiSF.ucmp},
+	{ "W310", 4, 1, &legacyWifiSF.ucmpEnable},
+	{ "W320", 2, 1, &legacyWifiSF.eCount},
+	{ "W330", 4, 1, &legacyWifiSF.eCountEnable},
 
-	{ "WR00", 4, 1, &wifiMac.RF.CFG1.val},
-	{ "WR01", 4, 1, &wifiMac.RF.IFPLL1.val},
-	{ "WR02", 4, 1, &wifiMac.RF.IFPLL2.val},
-	{ "WR03", 4, 1, &wifiMac.RF.IFPLL3.val},
-	{ "WR04", 4, 1, &wifiMac.RF.RFPLL1.val},
-	{ "WR05", 4, 1, &wifiMac.RF.RFPLL2.val},
-	{ "WR06", 4, 1, &wifiMac.RF.RFPLL3.val},
-	{ "WR07", 4, 1, &wifiMac.RF.RFPLL4.val},
-	{ "WR08", 4, 1, &wifiMac.RF.CAL1.val},
-	{ "WR09", 4, 1, &wifiMac.RF.TXRX1.val},
-	{ "WR10", 4, 1, &wifiMac.RF.PCNT1.val},
-	{ "WR11", 4, 1, &wifiMac.RF.PCNT2.val},
-	{ "WR12", 4, 1, &wifiMac.RF.VCOT1.val},
+	{ "WR00", 4, 1, &legacyWifiSF.rf_cfg1},
+	{ "WR01", 4, 1, &legacyWifiSF.rf_ifpll1},
+	{ "WR02", 4, 1, &legacyWifiSF.rf_ifpll2},
+	{ "WR03", 4, 1, &legacyWifiSF.rf_ifpll3},
+	{ "WR04", 4, 1, &legacyWifiSF.rf_rfpll1},
+	{ "WR05", 4, 1, &legacyWifiSF.rf_rfpll2},
+	{ "WR06", 4, 1, &legacyWifiSF.rf_rfpll3},
+	{ "WR07", 4, 1, &legacyWifiSF.rf_rfpll4},
+	{ "WR08", 4, 1, &legacyWifiSF.rf_cal1},
+	{ "WR09", 4, 1, &legacyWifiSF.rf_txrx1},
+	{ "WR10", 4, 1, &legacyWifiSF.rf_pcnt1},
+	{ "WR11", 4, 1, &legacyWifiSF.rf_pcnt2},
+	{ "WR12", 4, 1, &legacyWifiSF.rf_vcot1},
 
-	{ "W340", 1, 105, &wifiMac.BB.data[0]},
+	{ "W340", 1, 105, &legacyWifiSF.bb_data[0]},
 
-	{ "W350", 2, 1, &wifiMac.rfIOCnt.val},
-	{ "W360", 2, 1, &wifiMac.rfIOStatus.val},
-	{ "W370", 4, 1, &wifiMac.rfIOData.val},
-	{ "W380", 2, 1, &wifiMac.bbIOCnt.val},
+	{ "W350", 2, 1, &legacyWifiSF.rfIOCnt},
+	{ "W360", 2, 1, &legacyWifiSF.rfIOStatus},
+	{ "W370", 4, 1, &legacyWifiSF.rfIOData},
+	{ "W380", 2, 1, &legacyWifiSF.bbIOCnt},
 
-	{ "W400", 2, 0x1000, &wifiMac.RAM[0]},
-	{ "W410", 2, 1, &wifiMac.RXRangeBegin},
-	{ "W420", 2, 1, &wifiMac.RXRangeEnd},
-	{ "W430", 2, 1, &wifiMac.RXWriteCursor},
-	{ "W460", 2, 1, &wifiMac.RXReadCursor},
-	{ "W470", 2, 1, &wifiMac.RXUnits},
-	{ "W480", 2, 1, &wifiMac.RXBufCount},
-	{ "W490", 2, 1, &wifiMac.CircBufReadAddress},
-	{ "W500", 2, 1, &wifiMac.CircBufWriteAddress},
-	{ "W510", 2, 1, &wifiMac.CircBufRdEnd},
-	{ "W520", 2, 1, &wifiMac.CircBufRdSkip},
-	{ "W530", 2, 1, &wifiMac.CircBufWrEnd},
-	{ "W540", 2, 1, &wifiMac.CircBufWrSkip},
+	{ "W400", 2, 0x1000, &legacyWifiSF.wifiRAM[0]},
+	{ "W410", 2, 1, &legacyWifiSF.rxRangeBegin},
+	{ "W420", 2, 1, &legacyWifiSF.rxRangeEnd},
+	{ "W430", 2, 1, &legacyWifiSF.rxWriteCursor},
+	{ "W460", 2, 1, &legacyWifiSF.rxReadCursor},
+	{ "W470", 2, 1, &legacyWifiSF.rxUnits},
+	{ "W480", 2, 1, &legacyWifiSF.rxBufCount},
+	{ "W490", 2, 1, &legacyWifiSF.circBufReadAddress},
+	{ "W500", 2, 1, &legacyWifiSF.circBufWriteAddress},
+	{ "W510", 2, 1, &legacyWifiSF.circBufReadEnd},
+	{ "W520", 2, 1, &legacyWifiSF.circBufReadSkip},
+	{ "W530", 2, 1, &legacyWifiSF.circBufWriteEnd},
+	{ "W540", 2, 1, &legacyWifiSF.circBufWriteSkip},
 
-	{ "W580", 2, 0x800, &wifiMac.IOPorts[0]},
-	{ "W590", 2, 1, &wifiMac.randomSeed},
+	{ "W580", 2, 0x800, &legacyWifiSF.wifiIOPorts[0]},
+	{ "W590", 2, 1, &legacyWifiSF.randomSeed},
 
 	{ 0 }
 };
@@ -414,17 +413,17 @@ static bool s_slot1_loadstate(EMUFILE &is, int size)
 	u32 version = is.read_u32LE();
 
 	/* version 0: */
-   u8 slotID = is.read_u32LE();
-   slot1Type = NDS_SLOT1_RETAIL_AUTO;
-   if (version >= 1)
-      slot1_getTypeByID(slotID, slot1Type);
+	u8 slotID = is.read_u32LE();
+	slot1Type = NDS_SLOT1_RETAIL_AUTO;
+	if (version >= 1)
+		slot1_getTypeByID(slotID, slot1Type);
 
-   slot1_Change(slot1Type);
+	slot1_Change(slot1Type);
 
-   EMUFILE_MEMORY temp;
-   is.read_MemoryStream(temp);
-   temp.fseek(0,SEEK_SET);
-   slot1_Loadstate(temp);
+	EMUFILE_MEMORY temp;
+	is.read_MemoryStream(temp);
+	temp.fseek(0, SEEK_SET);
+	slot1_Loadstate(temp);
 
 	return true;
 }
@@ -447,16 +446,16 @@ static bool s_slot2_loadstate(EMUFILE &is, int size)
 	u32 version = is.read_u32LE();
 
 	/* version 0: */
-   slot2Type = NDS_SLOT2_AUTO;
-   u8 slotID = is.read_u32LE();
-   if (version == 0)
-      slot2_getTypeByID(slotID, slot2Type);
-   slot2_Change(slot2Type);
+	slot2Type = NDS_SLOT2_AUTO;
+	u8 slotID = is.read_u32LE();
+	if (version == 0)
+		slot2_getTypeByID(slotID, slot2Type);
+	slot2_Change(slot2Type);
 
-   EMUFILE_MEMORY temp;
-   is.read_MemoryStream(temp);
-   temp.fseek(0,SEEK_SET);
-   slot2_Loadstate(temp);
+	EMUFILE_MEMORY temp;
+	is.read_MemoryStream(temp);
+	temp.fseek(0, SEEK_SET);
+	slot2_Loadstate(temp);
 
 	return true;
 }
@@ -505,7 +504,7 @@ static void mmu_savestate(EMUFILE &os)
 
 	//version 8:
 	os.write_32LE(MMU.fw.size);
-	os.fwrite(MMU.fw.data,MMU.fw.size);
+	os.fwrite(MMU.fw.data._raw, MMU.fw.size);
 }
 
 static bool mmu_loadstate(EMUFILE &is, int size)
@@ -595,11 +594,10 @@ static bool mmu_loadstate(EMUFILE &is, int size)
 	if (version < 8) return ok;
 
 	//version 8:
-	delete[] MMU.fw.data;
+	memset(MMU.fw.data._raw, 0, sizeof(NDSFirmwareData));
 	MMU.fw.size = is.read_u32LE();
-	MMU.fw.data = new u8[size];
-	is.fread(MMU.fw.data,MMU.fw.size);
-
+	is.fread(MMU.fw.data._raw, MMU.fw.size);
+	
 	return ok;
 }
 
@@ -646,56 +644,56 @@ static bool cp15_loadstate(EMUFILE &is, int size)
 /* Format time and convert to string */
 static char * format_time(time_t cal_time)
 {
-  struct tm *time_struct;
-  static char str[64];
+	struct tm *time_struct;
+	static char str[64];
 
-  time_struct=localtime(&cal_time);
-  strftime(str, sizeof str, "%d-%b-%Y %H:%M:%S", time_struct);
+	time_struct = localtime(&cal_time);
+	strftime(str, sizeof str, "%d-%b-%Y %H:%M:%S", time_struct);
 
-  return(str);
+	return(str);
 }
 
 void clear_savestates()
 {
-  u8 i;
-  for( i = 0; i < NB_STATES; i++ )
-    savestates[i].exists = FALSE;
+	u8 i;
+	for (i = 0; i < NB_STATES; i++)
+		savestates[i].exists = FALSE;
 }
 
 // Scan for existing savestates and update struct
 void scan_savestates()
 {
-  struct stat sbuf;
-  char filename[MAX_PATH+1];
+	struct stat sbuf;
+	char filename[MAX_PATH + 1];
 
-  clear_savestates();
+	clear_savestates();
 
-  for(int i = 0; i < NB_STATES; i++ )
-    {
-     path.getpathnoext(path.STATES, filename);
-	  
-	  if (strlen(filename) + strlen(".dst") + strlen("-2147483648") /* = biggest string for i */ >MAX_PATH) return ;
-      sprintf(filename+strlen(filename), ".ds%d", i);
-      if( stat(filename,&sbuf) == -1 ) continue;
-      savestates[i].exists = TRUE;
-      strncpy(savestates[i].date, format_time(sbuf.st_mtime),40);
-	  savestates[i].date[40-1] = '\0';
-    }
+	for (int i = 0; i < NB_STATES; i++)
+	{
+		path.getpathnoext(path.STATE_SLOTS, filename);
 
-  return ;
+		if (strlen(filename) + strlen(".dst") + strlen("-2147483648") /* = biggest string for i */ > MAX_PATH) return;
+		sprintf(filename + strlen(filename), ".ds%d", i);
+		if (stat(filename, &sbuf) == -1) continue;
+		savestates[i].exists = TRUE;
+		strncpy(savestates[i].date, format_time(sbuf.st_mtime), 40);
+		savestates[i].date[40 - 1] = '\0';
+	}
+
+	return;
 }
 
 void savestate_slot(int num)
 {
-   struct stat sbuf;
-   char filename[MAX_PATH+1];
+	struct stat sbuf;
+	char filename[MAX_PATH + 1];
 
 	lastSaveState = num;		//Set last savestate used
 
-    path.getpathnoext(path.STATES, filename);
+	path.getpathnoext(path.STATE_SLOTS, filename);
 
-   if (strlen(filename) + strlen(".dsx") + strlen("-2147483648") /* = biggest string for num */ >MAX_PATH) return ;
-   sprintf(filename+strlen(filename), ".ds%d", num);
+	if (strlen(filename) + strlen(".dsx") + strlen("-2147483648") /* = biggest string for num */ > MAX_PATH) return;
+	sprintf(filename + strlen(filename), ".ds%d", num);
 
    if (savestate_save(filename))
    {
@@ -709,37 +707,37 @@ void savestate_slot(int num)
 	   return;
    }
 
-   if (num >= 0 && num < NB_STATES)
-   {
-	   if (stat(filename,&sbuf) != -1)
-	   {
-		   savestates[num].exists = TRUE;
-		   strncpy(savestates[num].date, format_time(sbuf.st_mtime),40);
-		   savestates[num].date[40-1] = '\0';
-	   }
-   }
+	if (num >= 0 && num < NB_STATES)
+	{
+		if (stat(filename, &sbuf) != -1)
+		{
+			savestates[num].exists = TRUE;
+			strncpy(savestates[num].date, format_time(sbuf.st_mtime), 40);
+			savestates[num].date[40 - 1] = '\0';
+		}
+	}
 }
 
 void loadstate_slot(int num)
 {
-   char filename[MAX_PATH];
+	char filename[MAX_PATH];
 
-   lastSaveState = num;		//Set last savestate used
+	lastSaveState = num;		//Set last savestate used
 
-    path.getpathnoext(path.STATES, filename);
+	path.getpathnoext(path.STATE_SLOTS, filename);
 
-   if (strlen(filename) + strlen(".dsx") + strlen("-2147483648") /* = biggest string for num */ >MAX_PATH) return ;
-   sprintf(filename+strlen(filename), ".ds%d", num);
-   if (savestate_load(filename))
-   {
-	   driver->SetLineColor(255, 255, 255);
-	   driver->AddLine("Loaded from %i slot", num);
-   }
-   else
-   {
-	   driver->SetLineColor(255, 0, 0);
-	   driver->AddLine("Error loading %i slot", num);
-   }
+	if (strlen(filename) + strlen(".dsx") + strlen("-2147483648") /* = biggest string for num */ > MAX_PATH) return;
+	sprintf(filename + strlen(filename), ".ds%d", num);
+	if (savestate_load(filename))
+	{
+		driver->SetLineColor(255, 255, 255);
+		driver->AddLine("Loaded from %i slot", num);
+	}
+	else
+	{
+		driver->SetLineColor(255, 0, 0);
+		driver->AddLine("Error loading %i slot", num);
+	}
 }
 
 
@@ -1043,12 +1041,9 @@ bool savestate_save (const char *file_name)
 {
 	EMUFILE_MEMORY ms;
 	size_t elems_written;
-#ifdef HAVE_LIBZ
-	if (!savestate_save(ms, Z_DEFAULT_COMPRESSION))
-#else
-	if (!savestate_save(ms, 0))
-#endif
+	if (!savestate_save(ms))
 		return false;
+
 	FILE* file = fopen(file_name,"wb");
 	if(file)
 	{
@@ -1058,6 +1053,11 @@ bool savestate_save (const char *file_name)
 	} else return false;
 }
 
+static void wifi_savestate(EMUFILE &os)
+{
+	wifiHandler->SaveState(os);
+}
+
 static void writechunks(EMUFILE &os)
 {
 
@@ -1065,6 +1065,8 @@ static void writechunks(EMUFILE &os)
 	svn_rev = 0;
 
 	save_time = tm.get_Ticks();
+	
+	gfx3d_PrepareSaveStateBufferWrite();
 
 	savestate_WriteChunk(os,1,SF_ARM9);
 	savestate_WriteChunk(os,2,SF_ARM7);
@@ -1081,7 +1083,7 @@ static void writechunks(EMUFILE &os)
 	savestate_WriteChunk(os,91,gfx3d_savestate);
 	savestate_WriteChunk(os,100,SF_MOVIE);
 	savestate_WriteChunk(os,101,mov_savestate);
-	savestate_WriteChunk(os,110,SF_WIFI);
+	savestate_WriteChunk(os,111,&wifi_savestate);
 	savestate_WriteChunk(os,120,SF_RTC);
 	savestate_WriteChunk(os,130,SF_NDS_INFO);
 	savestate_WriteChunk(os,140,s_slot1_savestate);
@@ -1098,6 +1100,7 @@ static bool ReadStateChunks(EMUFILE &is, s32 totalsize)
 {
 	bool ret = true;
 	bool haveInfo = false;
+	bool chunkError = false;
 	
 	s64 save_time = 0;
 	u32 romsize = 0;
@@ -1125,6 +1128,7 @@ static bool ReadStateChunks(EMUFILE &is, s32 totalsize)
 		if (!is.read_32LE(t))  { ret=false; break; }
 		if (t == 0xFFFFFFFF) break;
 		if (!is.read_32LE(size))  { ret=false; break; }
+		u32 endPos = is.ftell() + size;
 		
 		switch(t)
 		{
@@ -1143,7 +1147,11 @@ static bool ReadStateChunks(EMUFILE &is, s32 totalsize)
 			case 91: if(!gfx3d_loadstate(is,size)) ret=false; break;
 			case 100: if(!ReadStateChunk(is,SF_MOVIE, size)) ret=false; break;
 			case 101: if(!mov_loadstate(is, size)) ret=false; break;
-			case 110: if(!ReadStateChunk(is,SF_WIFI,size)) ret=false; break;
+				
+			case 111:
+				if(!wifiHandler->LoadState(is,size)) ret=false; break;
+				break;
+
 			case 120: if(!ReadStateChunk(is,SF_RTC,size)) ret=false; break;
 			case 130: if(!ReadStateChunk(is,SF_INFO,size)) ret=false; else haveInfo=true; break;
 			case 140: if(!s_slot1_loadstate(is, size)) ret=false; break;
@@ -1159,10 +1167,27 @@ static bool ReadStateChunks(EMUFILE &is, s32 totalsize)
 			default:
 				return false;
 		}
+		
+		if (is.ftell() != endPos)
+		{
+			// Should we just go ahead and return false?
+			chunkError = true;
+			is.fseek(endPos, SEEK_SET);
+		}
+		
 		if(!ret)
 			return false;
 	}
-
+	
+	if (chunkError)
+	{
+		msgbox->warn("There was an error loading the savestate. Your game session is probably corrupt now.");
+	}
+	else
+	{
+		gfx3d_FinishLoadStateBufferRead();
+	}
+	
 	if (haveInfo)
 	{
 

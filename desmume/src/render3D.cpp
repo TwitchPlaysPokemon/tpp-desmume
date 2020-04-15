@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2006-2007 shash
-	Copyright (C) 2008-2018 DeSmuME team
+	Copyright (C) 2008-2019 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -220,6 +220,7 @@ Render3D::Render3D()
 	_renderNeedsFinish = false;
 	_renderNeedsFlushMain = false;
 	_renderNeedsFlush16 = false;
+	_isPoweredOn = false;
 	
 	_textureUpscaleBuffer = NULL;
 	
@@ -242,6 +243,15 @@ Render3D::Render3D()
 	_textureDeposterizeSrcSurface.Width = _textureDeposterizeDstSurface.Width = 1;
 	_textureDeposterizeSrcSurface.Height = _textureDeposterizeDstSurface.Height = 1;
 	_textureDeposterizeSrcSurface.Pitch = _textureDeposterizeDstSurface.Pitch = 1;
+	
+	for (size_t i = 0; i < POLYLIST_SIZE; i++)
+	{
+		_textureList[i] = NULL;
+	}
+	
+	memset(this->clearImageColor16Buffer, 0, sizeof(this->clearImageColor16Buffer));
+	memset(this->clearImageDepthBuffer, 0, sizeof(this->clearImageDepthBuffer));
+	memset(this->clearImageFogBuffer, 0, sizeof(this->clearImageFogBuffer));
 	
 	Reset();
 }
@@ -389,6 +399,21 @@ Render3DTexture* Render3D::GetTextureByPolygonRenderIndex(size_t polyRenderIndex
 	return this->_textureList[polyRenderIndex];
 }
 
+ClipperMode Render3D::GetPreferredPolygonClippingMode() const
+{
+	return ClipperMode_DetermineClipOnly;
+}
+
+const CPoly& Render3D::GetClippedPolyByIndex(size_t index) const
+{
+	return this->_clippedPolyList[index];
+}
+
+size_t Render3D::GetClippedPolyCount() const
+{
+	return this->_clippedPolyCount;
+}
+
 Render3DError Render3D::ApplyRenderingSettings(const GFX3D_State &renderState)
 {
 	this->_enableEdgeMark = (CommonSettings.GFX3D_EdgeMark) ? renderState.enableEdgeMarking : false;
@@ -420,22 +445,17 @@ Render3DError Render3D::BeginRender(const GFX3D &engine)
 	return RENDER3DERROR_NOERR;
 }
 
-Render3DError Render3D::RenderGeometry(const GFX3D_State &renderState, const POLYLIST *polyList, const INDEXLIST *indexList)
+Render3DError Render3D::RenderGeometry()
 {
 	return RENDER3DERROR_NOERR;
 }
 
-Render3DError Render3D::RenderEdgeMarking(const u16 *colorTable, const bool useAntialias)
+Render3DError Render3D::PostprocessFramebuffer()
 {
 	return RENDER3DERROR_NOERR;
 }
 
-Render3DError Render3D::RenderFog(const u8 *densityTable, const u32 color, const u32 offset, const u8 shift, const bool alphaOnly)
-{
-	return RENDER3DERROR_NOERR;
-}
-
-Render3DError Render3D::EndRender(const u64 frameCount)
+Render3DError Render3D::EndRender()
 {
 	return RENDER3DERROR_NOERR;
 }
@@ -483,30 +503,75 @@ Render3DError Render3D::FlushFramebuffer(const FragmentColor *__restrict srcFram
 	return RENDER3DERROR_NOERR;
 }
 
-Render3DError Render3D::UpdateToonTable(const u16 *toonTableBuffer)
+template <bool ISCOLORBLANK, bool ISDEPTHBLANK>
+void Render3D::_ClearImageScrolledLoop(const u8 xScroll, const u8 yScroll, const u16 *__restrict inColor16, const u16 *__restrict inDepth16,
+									   u16 *__restrict outColor16, u32 *__restrict outDepth24, u8 *__restrict outFog)
 {
-	return RENDER3DERROR_NOERR;
+	if (ISCOLORBLANK && ISDEPTHBLANK)
+	{
+		memset(outColor16, 0, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * sizeof(u16));
+		memset(outDepth24, 0, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * sizeof(u32));
+		memset(outFog, 0, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * sizeof(u8));
+	}
+	else
+	{
+		if (ISCOLORBLANK)
+		{
+			// Hint to when the clear color image pointer is pointing to blank memory.
+			// In this case, just do a simple zero fill for speed.
+			//
+			// Test cases:
+			// - Sonic Chronicles: The Dark Brotherhood
+			// - The Chronicles of Narnia: The Lion, the Witch and the Wardrobe
+			memset(outColor16, 0, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * sizeof(u16));
+		}
+		
+		if (ISDEPTHBLANK)
+		{
+			memset(outDepth24, 0, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * sizeof(u32));
+			memset(outFog, 0, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * sizeof(u8));
+		}
+		
+		for (size_t dstIndex = 0, iy = 0; iy < GPU_FRAMEBUFFER_NATIVE_HEIGHT; iy++)
+		{
+			const size_t y = ((iy + yScroll) & 0xFF) << 8;
+			
+			for (size_t ix = 0; ix < GPU_FRAMEBUFFER_NATIVE_WIDTH; dstIndex++, ix++)
+			{
+				const size_t x = (ix + xScroll) & 0xFF;
+				const size_t srcIndex = y | x;
+				
+				// Clear image color buffer in RGBA5551 format.
+				//
+				// Test cases:
+				// - Harry Potter and the Order of Phoenix
+				// - Blazer Drive
+				if (!ISCOLORBLANK)
+				{
+					outColor16[dstIndex] = inColor16[srcIndex];
+				}
+				
+				// Clear image depth buffer, where the first 15 bits are converted to
+				// 24-bit depth, and the remaining MSB is the fog flag.
+				//
+				// Test cases:
+				// - Harry Potter and the Order of Phoenix
+				// - Blazer Drive
+				// - Sonic Chronicles: The Dark Brotherhood
+				// - The Chronicles of Narnia: The Lion, the Witch and the Wardrobe
+				if (!ISDEPTHBLANK)
+				{
+					outDepth24[dstIndex] = DS_DEPTH15TO24(inDepth16[srcIndex]);
+					outFog[dstIndex] = BIT15(inDepth16[srcIndex]);
+				}
+			}
+		}
+	}
 }
 
 Render3DError Render3D::ClearFramebuffer(const GFX3D_State &renderState)
 {
 	Render3DError error = RENDER3DERROR_NOERR;
-	
-	const u32 clearColorSwapped = LE_TO_LOCAL_32(renderState.clearColor);
-	FragmentColor clearColor6665;
-	clearColor6665.color = COLOR555TO6665(clearColorSwapped & 0x7FFF, (clearColorSwapped >> 16) & 0x1F);
-	
-	FragmentAttributes clearFragment;
-	clearFragment.opaquePolyID = (clearColorSwapped >> 24) & 0x3F;
-	//special value for uninitialized translucent polyid. without this, fires in spiderman2 dont display
-	//I am not sure whether it is right, though. previously this was cleared to 0, as a guess,
-	//but in spiderman2 some fires with polyid 0 try to render on top of the background
-	clearFragment.translucentPolyID = kUnsetTranslucentPolyID;
-	clearFragment.depth = renderState.clearDepth;
-	clearFragment.stencil = 0;
-	clearFragment.isTranslucentPoly = 0;
-	clearFragment.polyFacing = PolyFacing_Unwritten;
-	clearFragment.isFogged = BIT15(clearColorSwapped);
 	
 	if (renderState.enableClearImage)
 	{
@@ -525,50 +590,50 @@ Render3DError Render3D::ClearFramebuffer(const GFX3D_State &renderState)
 				this->clearImageColor16Buffer[i] = clearColorBuffer[i];
 				this->clearImageDepthBuffer[i] = DS_DEPTH15TO24(clearDepthBuffer[i]);
 				this->clearImageFogBuffer[i] = BIT15(clearDepthBuffer[i]);
-				this->clearImagePolyIDBuffer[i] = clearFragment.opaquePolyID;
 			}
 		}
 		else
 		{
-			for (size_t dstIndex = 0, iy = 0; iy < GPU_FRAMEBUFFER_NATIVE_HEIGHT; iy++)
+			const bool isClearColorBlank = (clearColorBuffer >= (u16 *)MMU.blank_memory);
+			const bool isClearDepthBlank = (clearDepthBuffer >= (u16 *)MMU.blank_memory);
+			
+			if (!isClearColorBlank && !isClearDepthBlank)
 			{
-				const size_t y = ((iy + yScroll) & 0xFF) << 8;
-				
-				for (size_t ix = 0; ix < GPU_FRAMEBUFFER_NATIVE_WIDTH; dstIndex++, ix++)
-				{
-					const size_t x = (ix + xScroll) & 0xFF;
-					const size_t srcIndex = y | x;
-					
-					//this is tested by harry potter and the order of the phoenix.
-					//TODO (optimization) dont do this if we are mapped to blank memory (such as in sonic chronicles)
-					//(or use a special zero fill in the bulk clearing above)
-					this->clearImageColor16Buffer[dstIndex] = clearColorBuffer[srcIndex];
-					
-					//this is tested quite well in the sonic chronicles main map mode
-					//where depth values are used for trees etc you can walk behind
-					this->clearImageDepthBuffer[dstIndex] = DS_DEPTH15TO24(clearDepthBuffer[srcIndex]);
-					
-					this->clearImageFogBuffer[dstIndex] = BIT15(clearDepthBuffer[srcIndex]);
-					this->clearImagePolyIDBuffer[dstIndex] = clearFragment.opaquePolyID;
-				}
+				this->_ClearImageScrolledLoop<false, false>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
+			}
+			else if (isClearColorBlank)
+			{
+				this->_ClearImageScrolledLoop< true, false>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
+			}
+			else if (isClearDepthBlank)
+			{
+				this->_ClearImageScrolledLoop<false,  true>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
+			}
+			else
+			{
+				this->_ClearImageScrolledLoop< true,  true>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
 			}
 		}
 		
-		error = this->ClearUsingImage(this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer, this->clearImagePolyIDBuffer);
+		error = this->ClearUsingImage(this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer, this->_clearAttributes.opaquePolyID);
 		if (error != RENDER3DERROR_NOERR)
 		{
-			error = this->ClearUsingValues(clearColor6665, clearFragment);
+			error = this->ClearUsingValues(this->_clearColor6665, this->_clearAttributes);
 		}
 	}
 	else
 	{
-		error = this->ClearUsingValues(clearColor6665, clearFragment);
+		error = this->ClearUsingValues(this->_clearColor6665, this->_clearAttributes);
 	}
 	
 	return error;
 }
 
-Render3DError Render3D::ClearUsingImage(const u16 *__restrict colorBuffer, const u32 *__restrict depthBuffer, const u8 *__restrict fogBuffer, const u8 *__restrict polyIDBuffer)
+Render3DError Render3D::ClearUsingImage(const u16 *__restrict colorBuffer, const u32 *__restrict depthBuffer, const u8 *__restrict fogBuffer, const u8 opaquePolyID)
 {
 	return RENDER3DERROR_NOERR;
 }
@@ -595,16 +660,29 @@ Render3DError Render3D::Reset()
 		memset(this->_framebufferColor, 0, this->_framebufferColorSizeBytes);
 	}
 	
-	memset(this->clearImageColor16Buffer, 0, sizeof(this->clearImageColor16Buffer));
-	memset(this->clearImageDepthBuffer, 0, sizeof(this->clearImageDepthBuffer));
-	memset(this->clearImagePolyIDBuffer, 0, sizeof(this->clearImagePolyIDBuffer));
-	memset(this->clearImageFogBuffer, 0, sizeof(this->clearImageFogBuffer));
+	this->_clearColor6665.color = 0;
+	memset(&this->_clearAttributes, 0, sizeof(FragmentAttributes));
 	
 	this->_renderNeedsFinish = false;
 	this->_renderNeedsFlushMain = false;
 	this->_renderNeedsFlush16 = false;
+	this->_isPoweredOn = false;
 	
 	texCache.Reset();
+	
+	return RENDER3DERROR_NOERR;
+}
+
+Render3DError Render3D::RenderPowerOff()
+{
+	if (!this->_isPoweredOn)
+	{
+		return RENDER3DERROR_NOERR;
+	}
+	
+	this->_isPoweredOn = false;
+	memset(GPU->GetEngineMain()->Get3DFramebufferMain(), 0, this->_framebufferColorSizeBytes);
+	memset(GPU->GetEngineMain()->Get3DFramebuffer16(), 0, this->_framebufferPixCount * sizeof(u16));
 	
 	return RENDER3DERROR_NOERR;
 }
@@ -612,31 +690,51 @@ Render3DError Render3D::Reset()
 Render3DError Render3D::Render(const GFX3D &engine)
 {
 	Render3DError error = RENDER3DERROR_NOERR;
+	this->_isPoweredOn = true;
+	
+	const u32 clearColorSwapped = LE_TO_LOCAL_32(engine.renderState.clearColor);
+	this->_clearColor6665.color = COLOR555TO6665(clearColorSwapped & 0x7FFF, (clearColorSwapped >> 16) & 0x1F);
+	
+	this->_clearAttributes.opaquePolyID = (clearColorSwapped >> 24) & 0x3F;
+	//special value for uninitialized translucent polyid. without this, fires in spiderman2 dont display
+	//I am not sure whether it is right, though. previously this was cleared to 0, as a guess,
+	//but in spiderman2 some fires with polyid 0 try to render on top of the background
+	this->_clearAttributes.translucentPolyID = kUnsetTranslucentPolyID;
+	this->_clearAttributes.depth = engine.renderState.clearDepth;
+	this->_clearAttributes.stencil = 0;
+	this->_clearAttributes.isTranslucentPoly = 0;
+	this->_clearAttributes.polyFacing = PolyFacing_Unwritten;
+	this->_clearAttributes.isFogged = BIT15(clearColorSwapped);
 	
 	error = this->BeginRender(engine);
 	if (error != RENDER3DERROR_NOERR)
 	{
+		this->EndRender();
 		return error;
 	}
 	
-	this->UpdateToonTable(engine.renderState.u16ToonTable);
-	this->ClearFramebuffer(engine.renderState);
-	
-	this->RenderGeometry(engine.renderState, engine.polylist, &engine.indexlist);
-	
-	if (this->_enableEdgeMark)
+	error = this->ClearFramebuffer(engine.renderState);
+	if (error != RENDER3DERROR_NOERR)
 	{
-		this->RenderEdgeMarking(engine.renderState.edgeMarkColorTable, engine.renderState.enableAntialiasing);
+		this->EndRender();
+		return error;
 	}
 	
-	if (this->_enableFog)
+	error = this->RenderGeometry();
+	if (error != RENDER3DERROR_NOERR)
 	{
-		this->RenderFog(engine.renderState.fogDensityTable, engine.renderState.fogColor, engine.renderState.fogOffset, engine.renderState.fogShift, engine.renderState.enableFogAlphaOnly);
+		this->EndRender();
+		return error;
 	}
-
-	this->EndRender(engine.render3DFrameCount);
 	
-	return error;
+	error = this->PostprocessFramebuffer();
+	if (error != RENDER3DERROR_NOERR)
+	{
+		this->EndRender();
+		return error;
+	}
+	
+	return this->EndRender();
 }
 
 Render3DError Render3D::RenderFinish()
@@ -675,30 +773,15 @@ Render3DError Render3D_SIMD<SIMDBYTES>::SetFramebufferSize(size_t w, size_t h)
 	return error;
 }
 
-#if defined(ENABLE_AVX2) || defined(ENABLE_SSE2)
+#if defined(ENABLE_AVX) || defined(ENABLE_SSE2)
 
-#if defined(ENABLE_AVX2)
-Render3DError Render3D_AVX2::ClearFramebuffer(const GFX3D_State &renderState)
+#if defined(ENABLE_AVX)
+Render3DError Render3D_AVX::ClearFramebuffer(const GFX3D_State &renderState)
 #elif defined(ENABLE_SSE2)
 Render3DError Render3D_SSE2::ClearFramebuffer(const GFX3D_State &renderState)
 #endif
 {
 	Render3DError error = RENDER3DERROR_NOERR;
-	
-	FragmentColor clearColor6665;
-	clearColor6665.color = COLOR555TO6665(renderState.clearColor & 0x7FFF, (renderState.clearColor >> 16) & 0x1F);
-	
-	FragmentAttributes clearFragment;
-	clearFragment.opaquePolyID = (renderState.clearColor >> 24) & 0x3F;
-	//special value for uninitialized translucent polyid. without this, fires in spiderman2 dont display
-	//I am not sure whether it is right, though. previously this was cleared to 0, as a guess,
-	//but in spiderman2 some fires with polyid 0 try to render on top of the background
-	clearFragment.translucentPolyID = kUnsetTranslucentPolyID;
-	clearFragment.depth = renderState.clearDepth;
-	clearFragment.stencil = 0;
-	clearFragment.isTranslucentPoly = 0;
-	clearFragment.polyFacing = PolyFacing_Unwritten;
-	clearFragment.isFogged = BIT15(renderState.clearColor);
 	
 	if (renderState.enableClearImage)
 	{
@@ -710,11 +793,53 @@ Render3DError Render3D_SSE2::ClearFramebuffer(const GFX3D_State &renderState)
 		const u8 xScroll = scrollBits & 0xFF;
 		const u8 yScroll = (scrollBits >> 8) & 0xFF;
 		
-		const __m128i opaquePolyID_vec128 = _mm_set1_epi8(clearFragment.opaquePolyID);
+#ifdef ENABLE_AVX2
+		const __m256i calcDepthConstants = _mm256_set1_epi32(0x01FF0200);
+#else
 		const __m128i calcDepthConstants = _mm_set1_epi32(0x01FF0200);
-		
+#endif
 		if (xScroll == 0 && yScroll == 0)
 		{
+#ifdef ENABLE_AVX2
+			for (size_t i = 0; i < GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT; i += 32)
+			{
+				// Copy the colors to the color buffer.
+				_mm256_store_si256( (__m256i *)(this->clearImageColor16Buffer + i +  0), _mm256_load_si256((__m256i *)(clearColorBuffer + i +  0)) );
+				_mm256_store_si256( (__m256i *)(this->clearImageColor16Buffer + i + 16), _mm256_load_si256((__m256i *)(clearColorBuffer + i + 16)) );
+				
+				// Write the depth values to the depth buffer using the following formula from GBATEK.
+				// 15-bit to 24-bit depth formula from http://problemkaputt.de/gbatek.htm#ds3drearplane
+				//    D24 = (D15 * 0x0200) + (((D15 + 1) >> 15) * 0x01FF);
+				//
+				// For now, let's forget GBATEK (which could be wrong) and try using a simpified formula:
+				//    D24 = (D15 * 0x0200) + 0x01FF;
+				const __m256i clearDepthLo = _mm256_load_si256((__m256i *)(clearDepthBuffer + i +  0));
+				const __m256i clearDepthHi = _mm256_load_si256((__m256i *)(clearDepthBuffer + i + 16));
+				
+				const __m256i clearDepthValueLo = _mm256_permute4x64_epi64( _mm256_and_si256(clearDepthLo, _mm256_set1_epi16(0x7FFF)), 0xD8 );
+				const __m256i clearDepthValueHi = _mm256_permute4x64_epi64( _mm256_and_si256(clearDepthHi, _mm256_set1_epi16(0x7FFF)), 0xD8 );
+				
+				__m256i calcDepth0 = _mm256_unpacklo_epi16(clearDepthValueLo, _mm256_set1_epi16(1));
+				__m256i calcDepth1 = _mm256_unpackhi_epi16(clearDepthValueLo, _mm256_set1_epi16(1));
+				__m256i calcDepth2 = _mm256_unpacklo_epi16(clearDepthValueHi, _mm256_set1_epi16(1));
+				__m256i calcDepth3 = _mm256_unpackhi_epi16(clearDepthValueHi, _mm256_set1_epi16(1));
+				
+				calcDepth0 = _mm256_madd_epi16(calcDepth0, calcDepthConstants);
+				calcDepth1 = _mm256_madd_epi16(calcDepth1, calcDepthConstants);
+				calcDepth2 = _mm256_madd_epi16(calcDepth2, calcDepthConstants);
+				calcDepth3 = _mm256_madd_epi16(calcDepth3, calcDepthConstants);
+				
+				_mm256_store_si256((__m256i *)(this->clearImageDepthBuffer + i +  0), calcDepth0);
+				_mm256_store_si256((__m256i *)(this->clearImageDepthBuffer + i +  8), calcDepth1);
+				_mm256_store_si256((__m256i *)(this->clearImageDepthBuffer + i + 16), calcDepth2);
+				_mm256_store_si256((__m256i *)(this->clearImageDepthBuffer + i + 24), calcDepth3);
+				
+				// Write the fog flags to the fog flag buffer.
+				const __m256i clearFogLo = _mm256_srli_epi16(clearDepthLo, 15);
+				const __m256i clearFogHi = _mm256_srli_epi16(clearDepthHi, 15);
+				_mm256_store_si256( (__m256i *)(this->clearImageFogBuffer + i), _mm256_permute4x64_epi64(_mm256_packus_epi16(clearFogLo, clearFogHi), 0xD8) );
+			}
+#else
 			for (size_t i = 0; i < GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT; i += 16)
 			{
 				// Copy the colors to the color buffer.
@@ -724,18 +849,19 @@ Render3DError Render3D_SSE2::ClearFramebuffer(const GFX3D_State &renderState)
 				// Write the depth values to the depth buffer using the following formula from GBATEK.
 				// 15-bit to 24-bit depth formula from http://problemkaputt.de/gbatek.htm#ds3drearplane
 				//    D24 = (D15 * 0x0200) + (((D15 + 1) >> 15) * 0x01FF);
+				//
+				// For now, let's forget GBATEK (which could be wrong) and try using a simpified formula:
+				//    D24 = (D15 * 0x0200) + 0x01FF;
 				const __m128i clearDepthLo = _mm_load_si128((__m128i *)(clearDepthBuffer + i + 0));
 				const __m128i clearDepthHi = _mm_load_si128((__m128i *)(clearDepthBuffer + i + 8));
 				
 				const __m128i clearDepthValueLo = _mm_and_si128(clearDepthLo, _mm_set1_epi16(0x7FFF));
 				const __m128i clearDepthValueHi = _mm_and_si128(clearDepthHi, _mm_set1_epi16(0x7FFF));
-				const __m128i highestDepthBitLo = _mm_srli_epi16( _mm_adds_epu16(clearDepthValueLo, _mm_set1_epi16(1)), 15);
-				const __m128i highestDepthBitHi = _mm_srli_epi16( _mm_adds_epu16(clearDepthValueHi, _mm_set1_epi16(1)), 15);
 				
-				__m128i calcDepth0 = _mm_unpacklo_epi16(clearDepthValueLo, highestDepthBitLo);
-				__m128i calcDepth1 = _mm_unpackhi_epi16(clearDepthValueLo, highestDepthBitLo);
-				__m128i calcDepth2 = _mm_unpacklo_epi16(clearDepthValueHi, highestDepthBitHi);
-				__m128i calcDepth3 = _mm_unpackhi_epi16(clearDepthValueHi, highestDepthBitHi);
+				__m128i calcDepth0 = _mm_unpacklo_epi16(clearDepthValueLo, _mm_set1_epi16(1));
+				__m128i calcDepth1 = _mm_unpackhi_epi16(clearDepthValueLo, _mm_set1_epi16(1));
+				__m128i calcDepth2 = _mm_unpacklo_epi16(clearDepthValueHi, _mm_set1_epi16(1));
+				__m128i calcDepth3 = _mm_unpackhi_epi16(clearDepthValueHi, _mm_set1_epi16(1));
 				
 				calcDepth0 = _mm_madd_epi16(calcDepth0, calcDepthConstants);
 				calcDepth1 = _mm_madd_epi16(calcDepth1, calcDepthConstants);
@@ -751,14 +877,17 @@ Render3DError Render3D_SSE2::ClearFramebuffer(const GFX3D_State &renderState)
 				const __m128i clearFogLo = _mm_srli_epi16(clearDepthLo, 15);
 				const __m128i clearFogHi = _mm_srli_epi16(clearDepthHi, 15);
 				_mm_store_si128((__m128i *)(this->clearImageFogBuffer + i), _mm_packs_epi16(clearFogLo, clearFogHi));
-				
-				// The one is easy. Just set the values in the polygon ID buffer.
-				_mm_store_si128((__m128i *)(this->clearImagePolyIDBuffer + i), opaquePolyID_vec128);
 			}
+#endif
 		}
 		else
 		{
-			const size_t shiftCount = xScroll & 0x07;
+			// FIXME: Fix SSE2 support for scrolled clear images.
+			// The depth-related code below doesn't actually work, and I don't know why
+			// this is, so just use the scalar version for now.
+			// - rogerman, 2018/09/19
+			/*
+			 const size_t shiftCount = xScroll & 0x07;
 			
 			for (size_t dstIndex = 0, iy = 0; iy < GPU_FRAMEBUFFER_NATIVE_HEIGHT; iy++)
 			{
@@ -847,27 +976,49 @@ Render3DError Render3D_SSE2::ClearFramebuffer(const GFX3D_State &renderState)
 					_mm_store_si128((__m128i *)(this->clearImageDepthBuffer + dstIndex + 0), calcDepth0);
 					_mm_store_si128((__m128i *)(this->clearImageDepthBuffer + dstIndex + 4), calcDepth1);
 					_mm_storel_epi64((__m128i *)(this->clearImageFogBuffer + dstIndex), _mm_packs_epi16(clearFog, _mm_setzero_si128()));
-					_mm_storel_epi64((__m128i *)(this->clearImagePolyIDBuffer + dstIndex), opaquePolyID_vec128);
 				}
+			}
+			*/
+			const bool isClearColorBlank = (clearColorBuffer >= (u16 *)MMU.blank_memory);
+			const bool isClearDepthBlank = (clearDepthBuffer >= (u16 *)MMU.blank_memory);
+			
+			if (!isClearColorBlank && !isClearDepthBlank)
+			{
+				this->_ClearImageScrolledLoop<false, false>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
+			}
+			else if (isClearColorBlank)
+			{
+				this->_ClearImageScrolledLoop< true, false>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
+			}
+			else if (isClearDepthBlank)
+			{
+				this->_ClearImageScrolledLoop<false,  true>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
+			}
+			else
+			{
+				this->_ClearImageScrolledLoop< true,  true>(xScroll, yScroll, clearColorBuffer, clearDepthBuffer,
+															this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer);
 			}
 		}
 		
-		error = this->ClearUsingImage(this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer, this->clearImagePolyIDBuffer);
+		error = this->ClearUsingImage(this->clearImageColor16Buffer, this->clearImageDepthBuffer, this->clearImageFogBuffer, this->_clearAttributes.opaquePolyID);
 		if (error != RENDER3DERROR_NOERR)
 		{
-			error = this->ClearUsingValues(clearColor6665, clearFragment);
+			error = this->ClearUsingValues(this->_clearColor6665, this->_clearAttributes);
 		}
 	}
 	else
 	{
-		error = this->ClearUsingValues(clearColor6665, clearFragment);
+		error = this->ClearUsingValues(this->_clearColor6665, this->_clearAttributes);
 	}
 	
 	return error;
 }
 
-#endif // defined(ENABLE_AVX2) || defined(ENABLE_SSE2)
+#endif // defined(ENABLE_AVX) || defined(ENABLE_SSE2)
 
-template Render3D_SIMD<0>::Render3D_SIMD();
 template Render3D_SIMD<16>::Render3D_SIMD();
 template Render3D_SIMD<32>::Render3D_SIMD();

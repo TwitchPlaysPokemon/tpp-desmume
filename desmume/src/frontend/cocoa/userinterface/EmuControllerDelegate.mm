@@ -22,6 +22,7 @@
 #import "Slot2WindowDelegate.h"
 #import "MacAVCaptureTool.h"
 #import "MacScreenshotCaptureTool.h"
+#import "preferencesWindowDelegate.h"
 
 #import "cocoa_globals.h"
 #import "cocoa_cheat.h"
@@ -46,6 +47,7 @@
 @synthesize cheatWindowDelegate;
 @synthesize screenshotCaptureToolDelegate;
 @synthesize avCaptureToolDelegate;
+@synthesize prefWindowDelegate;
 @synthesize firmwarePanelController;
 @synthesize romInfoPanelController;
 @synthesize cdsCoreController;
@@ -70,6 +72,8 @@
 @synthesize ndsErrorSheet;
 @synthesize ndsErrorStatusTextField;
 @synthesize exportRomSavePanelAccessoryView;
+
+@synthesize openglMSAAPopUpButton;
 
 @synthesize iconExecute;
 @synthesize iconPause;
@@ -235,6 +239,7 @@
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 	[cdsCore setCdsFirmware:theFirmware];
+	[cdsCore updateFirmwareMACAddressString];
 	[firmwarePanelController setContent:theFirmware];
 	
 	[cdsFirmware release];
@@ -810,7 +815,8 @@
 	[[(NSControl *)sender window] makeFirstResponder:nil];
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
-	[[cdsCore cdsFirmware] update];
+	[[cdsCore cdsFirmware] applySettings];
+	[cdsCore updateFirmwareMACAddressString];
 }
 
 - (IBAction) changeHardwareMicGain:(id)sender
@@ -927,6 +933,12 @@
 	[cdsCore setMasterExecute:NO];
 }
 
+- (IBAction) generateFirmwareMACAddress:(id)sender
+{
+	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
+	[cdsCore generateFirmwareMACAddress];
+}
+
 - (IBAction) writeDefaults3DRenderingSettings:(id)sender
 {
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
@@ -941,7 +953,7 @@
 	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] render3DTextures] forKey:@"Render3D_Textures"];
 	[[NSUserDefaults standardUserDefaults] setInteger:[[cdsCore cdsGPU] render3DThreads] forKey:@"Render3D_Threads"];
 	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] render3DLineHack] forKey:@"Render3D_LineHack"];
-	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] render3DMultisample] forKey:@"Render3D_Multisample"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[[cdsCore cdsGPU] render3DMultisampleSize] forKey:@"Render3D_MultisampleSize"];
 	[[NSUserDefaults standardUserDefaults] setInteger:[[cdsCore cdsGPU] render3DTextureScalingFactor] forKey:@"Render3D_TextureScalingFactor"];
 	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] render3DTextureDeposterize] forKey:@"Render3D_TextureDeposterize"];
 	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] render3DTextureSmoothing] forKey:@"Render3D_TextureSmoothing"];
@@ -949,16 +961,24 @@
 	[[NSUserDefaults standardUserDefaults] setInteger:[[cdsCore cdsGPU] gpuScale] forKey:@"Render3D_ScalingFactor"];
 	[[NSUserDefaults standardUserDefaults] setInteger:[[cdsCore cdsGPU] gpuColorFormat] forKey:@"Render3D_ColorFormat"];
 	
+	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] openGLEmulateShadowPolygon] forKey:@"Render3D_OpenGL_EmulateShadowPolygon"];
+	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] openGLEmulateSpecialZeroAlphaBlending] forKey:@"Render3D_OpenGL_EmulateSpecialZeroAlphaBlending"];
+	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] openGLEmulateNDSDepthCalculation] forKey:@"Render3D_OpenGL_EmulateNDSDepthCalculation"];
+	[[NSUserDefaults standardUserDefaults] setBool:[[cdsCore cdsGPU] openGLEmulateDepthLEqualPolygonFacing] forKey:@"Render3D_OpenGL_EmulateDepthLEqualPolygonFacing"];
+	
 	[[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 - (IBAction) writeDefaultsEmulationSettings:(id)sender
 {
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
-	NSDictionary *firmwareDict = [(CocoaDSFirmware *)[firmwarePanelController content] dataDictionary];
+	CocoaDSFirmware *writeFirmware = (CocoaDSFirmware *)[firmwarePanelController content];
 	
 	// Force end of editing of any text fields.
 	[[(NSControl *)sender window] makeFirstResponder:nil];
+	
+	// Saving the user defaults also applies the current firmware settings.
+	[writeFirmware applySettings];
 	
 	[[NSUserDefaults standardUserDefaults] setBool:[cdsCore emuFlagAdvancedBusLevelTiming] forKey:@"Emulation_AdvancedBusLevelTiming"];
 	[[NSUserDefaults standardUserDefaults] setBool:[cdsCore emuFlagRigorousTiming] forKey:@"Emulation_RigorousTiming"];
@@ -973,11 +993,75 @@
 	[[NSUserDefaults standardUserDefaults] setBool:[cdsCore emuFlagEmulateEnsata] forKey:@"Emulation_EmulateEnsata"];
 	[[NSUserDefaults standardUserDefaults] setBool:[cdsCore emuFlagDebugConsole] forKey:@"Emulation_UseDebugConsole"];
 	
-	[[NSUserDefaults standardUserDefaults] setObject:[firmwareDict valueForKey:@"Nickname"] forKey:@"FirmwareConfig_Nickname"];
-	[[NSUserDefaults standardUserDefaults] setObject:[firmwareDict valueForKey:@"Message"] forKey:@"FirmwareConfig_Message"];
-	[[NSUserDefaults standardUserDefaults] setObject:[firmwareDict valueForKey:@"FavoriteColor"] forKey:@"FirmwareConfig_FavoriteColor"];
-	[[NSUserDefaults standardUserDefaults] setObject:[firmwareDict valueForKey:@"Birthday"] forKey:@"FirmwareConfig_Birthday"];
-	[[NSUserDefaults standardUserDefaults] setObject:[firmwareDict valueForKey:@"Language"] forKey:@"FirmwareConfig_Language"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware firmwareMACAddressValue] forKey:@"FirmwareConfig_FirmwareMACAddress"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware customMACAddressValue] forKey:@"FirmwareConfig_CustomMACAddress"];
+	
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP1_1] forKey:@"FirmwareConfig_IPv4Address_AP1_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP1_2] forKey:@"FirmwareConfig_IPv4Address_AP1_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP1_3] forKey:@"FirmwareConfig_IPv4Address_AP1_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP1_4] forKey:@"FirmwareConfig_IPv4Address_AP1_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP1_1] forKey:@"FirmwareConfig_IPv4Gateway_AP1_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP1_2] forKey:@"FirmwareConfig_IPv4Gateway_AP1_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP1_3] forKey:@"FirmwareConfig_IPv4Gateway_AP1_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP1_4] forKey:@"FirmwareConfig_IPv4Gateway_AP1_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP1_1] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP1_2] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP1_3] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP1_4] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP1_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP1_1] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP1_2] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP1_3] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP1_4] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP1_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware subnetMask_AP1] forKey:@"FirmwareConfig_SubnetMask_AP1"];
+	
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP2_1] forKey:@"FirmwareConfig_IPv4Address_AP2_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP2_2] forKey:@"FirmwareConfig_IPv4Address_AP2_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP2_3] forKey:@"FirmwareConfig_IPv4Address_AP2_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP2_4] forKey:@"FirmwareConfig_IPv4Address_AP2_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP2_1] forKey:@"FirmwareConfig_IPv4Gateway_AP2_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP2_2] forKey:@"FirmwareConfig_IPv4Gateway_AP2_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP2_3] forKey:@"FirmwareConfig_IPv4Gateway_AP2_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP2_4] forKey:@"FirmwareConfig_IPv4Gateway_AP2_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP2_1] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP2_2] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP2_3] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP2_4] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP2_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP2_1] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP2_2] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP2_3] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP2_4] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP2_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware subnetMask_AP2] forKey:@"FirmwareConfig_SubnetMask_AP2"];
+	
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP3_1] forKey:@"FirmwareConfig_IPv4Address_AP3_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP3_2] forKey:@"FirmwareConfig_IPv4Address_AP3_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP3_3] forKey:@"FirmwareConfig_IPv4Address_AP3_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Address_AP3_4] forKey:@"FirmwareConfig_IPv4Address_AP3_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP3_1] forKey:@"FirmwareConfig_IPv4Gateway_AP3_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP3_2] forKey:@"FirmwareConfig_IPv4Gateway_AP3_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP3_3] forKey:@"FirmwareConfig_IPv4Gateway_AP3_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4Gateway_AP3_4] forKey:@"FirmwareConfig_IPv4Gateway_AP3_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP3_1] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP3_2] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP3_3] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4PrimaryDNS_AP3_4] forKey:@"FirmwareConfig_IPv4PrimaryDNS_AP3_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP3_1] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_1"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP3_2] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_2"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP3_3] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_3"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware ipv4SecondaryDNS_AP3_4] forKey:@"FirmwareConfig_IPv4SecondaryDNS_AP3_4"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware subnetMask_AP3] forKey:@"FirmwareConfig_SubnetMask_AP3"];
+	
+	//[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware consoleType] forKey:@"FirmwareConfig_ConsoleType"];
+	[[NSUserDefaults standardUserDefaults] setObject:[writeFirmware nickname] forKey:@"FirmwareConfig_Nickname"];
+	[[NSUserDefaults standardUserDefaults] setObject:[writeFirmware message] forKey:@"FirmwareConfig_Message"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware favoriteColor] forKey:@"FirmwareConfig_FavoriteColor"];
+	[[NSUserDefaults standardUserDefaults] setObject:[writeFirmware birthday] forKey:@"FirmwareConfig_Birthday"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware language] forKey:@"FirmwareConfig_Language"];
+	//[[NSUserDefaults standardUserDefaults] setInteger:[writeFirmware backlightLevel] forKey:@"FirmwareConfig_BacklightLevel"];
+	
+	[prefWindowDelegate updateFirmwareMACAddressString:nil];
+	[prefWindowDelegate updateSubnetMaskString_AP1:nil];
+	[prefWindowDelegate updateSubnetMaskString_AP2:nil];
+	[prefWindowDelegate updateSubnetMaskString_AP3:nil];
 	
 	[[NSUserDefaults standardUserDefaults] synchronize];
 }
@@ -1630,7 +1714,11 @@
 	[self pauseCore];
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
-	[cdsCore execControl]->SetWifiIP4Address([CocoaDSUtil hostIP4AddressAsUInt32]);
+	if (![cdsCore emuFlagUseExternalBios] || ![cdsCore emuFlagUseExternalFirmware])
+	{
+		[[cdsCore cdsFirmware] updateFirmwareConfigSessionValues];
+	}
+	
 	[cdsCore execControl]->ApplySettingsOnReset();
 	[cdsCore updateSlot1DeviceStatus];
 	[self writeDefaultsSlot1Settings:nil];
@@ -1782,8 +1870,7 @@
 		[[windowController window] displayIfNeeded];
 	}
 	
-	[cdsCore execControl]->SetWifiIP4Address([CocoaDSUtil hostIP4AddressAsUInt32]);
-	[cdsCore execControl]->ApplySettingsOnReset();
+	[cdsCore updateCurrentSessionMACAddressString:YES];
 	[cdsCore setMasterExecute:YES];
 	
 	// After the ROM loading is complete, send an execute message to the Cocoa DS per
@@ -1832,6 +1919,11 @@
 	}
 	
 	// Unload the ROM.
+	if (![cdsCore emuFlagUseExternalBios] || ![cdsCore emuFlagUseExternalFirmware])
+	{
+		[[cdsCore cdsFirmware] writeUserDefaultWFCUserID];
+	}
+	
 	[[self currentRom] release];
 	[self setCurrentRom:nil];
 	
@@ -1867,6 +1959,7 @@
 	}
 	
 	[cdsCore setSlot1StatusText:NSSTRING_STATUS_EMULATION_NOT_RUNNING];
+	[cdsCore updateCurrentSessionMACAddressString:NO];
 	[[cdsCore cdsController] reset];
 	
 	result = YES;
@@ -2218,8 +2311,41 @@
 	[slot2WindowDelegate setAutoSelectedDeviceText:[[slot2WindowDelegate deviceManager] autoSelectedDeviceName]];
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
+	[cdsCore updateCurrentSessionMACAddressString:NO];
 	[screenshotCaptureToolDelegate setSharedData:[[cdsCore cdsGPU] sharedData]];
 	[avCaptureToolDelegate setSharedData:[[cdsCore cdsGPU] sharedData]];
+	[self fillOpenGLMSAAMenu];
+}
+
+- (void) fillOpenGLMSAAMenu
+{
+	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
+	NSUInteger maxSamples = [[cdsCore cdsGPU] openglDeviceMaxMultisamples];
+	size_t itemCount = 0;
+	
+	while (maxSamples > 1)
+	{
+		itemCount++;
+		maxSamples >>= 1;
+	}
+	
+	if (itemCount <= 0)
+	{
+		return;
+	}
+	
+	int itemValue = 2;
+	
+	for (size_t i = 0; i < itemCount; i++, itemValue<<=1)
+	{
+		NSString *itemTitle = [NSString stringWithFormat:@"%d", itemValue];
+		[openglMSAAPopUpButton addItemWithTitle:itemTitle];
+		
+		NSMenuItem *menuItem = [openglMSAAPopUpButton itemAtIndex:i+1];
+		[menuItem setTag:itemValue];
+	}
+	
+	[openglMSAAPopUpButton selectItemAtIndex:0];
 }
 
 - (void) readUserDefaults
@@ -2260,13 +2386,19 @@
 	[[cdsCore cdsGPU] setRender3DFog:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_Fog"]];
 	[[cdsCore cdsGPU] setRender3DTextures:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_Textures"]];
 	[[cdsCore cdsGPU] setRender3DLineHack:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_LineHack"]];
-	[[cdsCore cdsGPU] setRender3DMultisample:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_Multisample"]];
+	[[cdsCore cdsGPU] setRender3DMultisampleSize:[[NSUserDefaults standardUserDefaults] integerForKey:@"Render3D_MultisampleSize"]];
 	[[cdsCore cdsGPU] setRender3DTextureScalingFactor:(NSUInteger)[[NSUserDefaults standardUserDefaults] integerForKey:@"Render3D_TextureScalingFactor"]];
 	[[cdsCore cdsGPU] setRender3DTextureDeposterize:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_TextureDeposterize"]];
 	[[cdsCore cdsGPU] setRender3DTextureSmoothing:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_TextureSmoothing"]];
 	[[cdsCore cdsGPU] setRender3DFragmentSamplingHack:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_FragmentSamplingHack"]];
 	[[cdsCore cdsGPU] setGpuScale:(NSUInteger)[[NSUserDefaults standardUserDefaults] integerForKey:@"Render3D_ScalingFactor"]];
 	[[cdsCore cdsGPU] setGpuColorFormat:(NSUInteger)[[NSUserDefaults standardUserDefaults] integerForKey:@"Render3D_ColorFormat"]];
+	
+	[[cdsCore cdsGPU] setOpenGLEmulateShadowPolygon:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_OpenGL_EmulateShadowPolygon"]];
+	[[cdsCore cdsGPU] setOpenGLEmulateSpecialZeroAlphaBlending:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_OpenGL_EmulateSpecialZeroAlphaBlending"]];
+	[[cdsCore cdsGPU] setOpenGLEmulateNDSDepthCalculation:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_OpenGL_EmulateNDSDepthCalculation"]];
+	[[cdsCore cdsGPU] setOpenGLEmulateDepthLEqualPolygonFacing:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_OpenGL_EmulateDepthLEqualPolygonFacing"]];
+	
 	[[[cdsCore cdsGPU] sharedData] fetchSynchronousAtIndex:0];
 	
 	// Set the stylus options per user preferences.

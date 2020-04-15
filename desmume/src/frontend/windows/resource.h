@@ -153,6 +153,10 @@
 #define IDD_PATHSETTINGS                366
 #define IDC_ASSOCIATE                   367
 #define IDC_CLOSE_LUA_SCRIPTS           368
+#define IDC_SRAMIMPORTPATHEDIT          369
+#define IDC_BROWSESRAMIMPORT            370
+#define IDC_STATESLOTPATHEDIT           371
+#define IDC_BROWSESTATESLOTS            372
 #define IDC_DES_BOX                     402
 #define IDC_R0                          403
 #define IDC_R1                          404
@@ -273,6 +277,7 @@
 #define IDC_BUTTON_BROWSESRAM           980
 #define IDC_C_WATCH_UP                  980
 #define IDD_EDITWATCH                   980
+#define IDC_START_FROM_POWER_ON         981
 #define IDC_C_WATCH_DOWN                981
 #define RAMMENU_FILE_AUTOLOAD           982
 #define RAMMENU_FILE_SAVEWINDOW         983
@@ -319,10 +324,8 @@
 #define IDC_GGREEN                      1005
 #define IDC_ROTATE270                   1006
 #define IDC_GRED                        1006
-#define IDC_WIFIMODE0                   1006
 #define IDC_ARM7BIOSBROWSE              1007
 #define IDC_GYELLOW                     1007
-#define IDC_WIFIMODE1                   1007
 #define IDC_MEMVIEWBOX                  1008
 #define IDC_GBLUE                       1008
 #define IDC_ADHOC_SERVER                1008
@@ -462,23 +465,16 @@
 #define IDC_TEXT_PRESCALEHD             1062
 #define IDC_STATIC_S3                   1063
 #define IDC_STATIC_S4                   1064
-#define IDC_TEX_DEPOSTERIZE             1064
 #define IDC_EVALUE                      1065
-#define IDC_TEX_DEPOSTERIZE2            1065
-#define IDC_TEX_SMOOTH                  1065
 #define IDC_WIFI_ENABLED                1065
 #define IDC_STATIC_RANGE                1066
-#define IDC_TEXSCALE_1                  1066
 #define IDC_WIFI_COMPAT                 1066
-#define IDC_TEXSCALE_2                  1067
+#define IDC_TEXSCALE                    1067
 #define IDC_BADD                        1068
 #define IDC_LIST                        1069
-#define IDC_TEXSCALE_4                  1070
+#define IDC_TEX_DEPOSTERIZE             1070
 #define IDC_SNUMBER                     1071
-#define IDC_GPU_24BPP                   1071
-#define IDC_GPU_18BPP                   1072
-#define IDC_GPU_18BPP2                  1073
-#define IDC_GPU_15BPP                   1073
+#define IDC_TEX_SMOOTH                  1072
 #define IDC_CHECK1                      1074
 #define IDC_CHECK2                      1075
 #define IDC_CAP0_SRC                    1075
@@ -503,6 +499,12 @@
 #define IDC_S4X                         1091
 #define IDC_S8X                         1092
 #define IDC_S16X                        1093
+#define IDC_MULTISAMPLE_SIZE            1094
+#define IDC_GPU_COLOR_DEPTH             1095
+#define IDC_SHADOW_POLYGONS             1096
+#define IDC_S_0_ALPHA_BLEND             1097
+#define IDC_NDS_DEPTH_CALC              1098
+#define IDC_DEPTH_L_EQUAL_PF            1099
 #define IDM_FIRMSETTINGS                1100
 #define IDD_FIRMSETTINGS                1101
 #define IDC_EDIT1                       1102
@@ -983,6 +985,12 @@
 #define IDM_FS_MENU                     40150
 #define IDM_FS_WINDOW                   40151
 #define IDM_FS_HIDE_CURSOR              40152
+#define ID_TOOLS_SHOWCONSOLE            40153
+#define ID_TOOLS_CONSOLE                40154
+#define ID_CONSOLE_ALWAYSONTOP          40155
+#define ID_CONSOLE_SHOWCONSOLE          40156
+#define IDM_CONSOLE_SHOW                40157
+#define IDM_CONSOLE_SHOWHIDE            40158
 #define ID_LABEL_HK3b                   44670
 #define ID_LABEL_HK3c                   44671
 #define ID_LABEL_HK3d                   44672
@@ -1030,6 +1038,9 @@
 #define IDC_KILLSTYLUS                  50039
 #define IDC_KILLSTYLUSTOP               50039
 #define IDC_KILLSTYLUSOFF               50040
+#define ID_LABEL_S_0_ALPHA_BLEND        50186
+#define ID_LABEL_NDS_DEPTH_CALC         50187
+#define ID_LABEL_DEPTH_L_EQUAL_PF       50188
 #define IDC_LUASCRIPT_RESERVE_START     58000
 #define IDC_LUASCRIPT_RESERVE_END       58099
 #define IDD_LUARECENT_RESERVE_START     58100
@@ -1087,9 +1098,11 @@
 #define IDC_AUTOLOADLUA                 64001
 #define IDC_TXTHACK                     64002
 #define ID_LABEL_TXTHACK1               64003
-#define IDC_3DSETTINGS_ANTIALIASING     64004
-#define IDC_3DSETTINGS_ANTIALIASING1    64005
-#define ID_LABEL_TXTHACK2               64005
+#define ID_LABEL_TXTHACK2               64004
+#define ID_LABEL_MSAA_SAMPLES           64005
+#define ID_LABEL_GPU_COLOR_DEPTH        64006
+#define ID_LABEL_TEXTURE_SCALING        64007
+#define ID_LABEL_SHADOW_POLYGONS        64009
 
 // Next default values for new objects
 // 
@@ -1097,7 +1110,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        128
-#define _APS_NEXT_COMMAND_VALUE         40153
+#define _APS_NEXT_COMMAND_VALUE         40159
 #define _APS_NEXT_CONTROL_VALUE         1066
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

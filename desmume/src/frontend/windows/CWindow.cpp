@@ -29,6 +29,9 @@
 #include "IORegView.h"
 #include "windriver.h"
 
+
+extern bool fsWindow;
+
 //-----------------------------------------------------------------------------
 //   The Toolkit - Helpers
 //-----------------------------------------------------------------------------
@@ -590,6 +593,11 @@ DWORD WINCLASS::checkMenu(UINT idd, bool check)
 	return CheckMenuItem(hmenu, idd, MF_BYCOMMAND | (check?MF_CHECKED:MF_UNCHECKED));
 }
 
+void WINCLASS::enableMenu(UINT idd, bool enable)
+{
+	EnableMenuItem(hmenu, idd, MF_BYCOMMAND | (enable ? (MF_ENABLED) : MF_GRAYED));
+}
+
 HWND WINCLASS::getHWnd()
 {
 	return hwnd;
@@ -655,7 +663,8 @@ void WINCLASS::sizingMsg(WPARAM wParam, LPARAM lParam, LONG keepRatio)
 	int frameHeight = frameInfo.bottom-frameInfo.top + tbheight;
 
 	if((keepRatio & FULLSCREEN))
-		frameWidth = frameHeight = 0;
+		if(fsWindow)
+			frameWidth = frameHeight = 0;
 
 	// Calculate the minimum size in pixels
 	_minWidth = adjr.right-adjr.left;

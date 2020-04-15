@@ -84,6 +84,9 @@ volatile bool execute = true;
 @synthesize frameStatus;
 @synthesize executionSpeedStatus;
 @synthesize errorStatus;
+@synthesize extFirmwareMACAddressString;
+@synthesize firmwareMACAddressSelectionString;
+@synthesize currentSessionMACAddressString;
 
 @dynamic arm9ImageURL;
 @dynamic arm7ImageURL;
@@ -121,16 +124,12 @@ volatile bool execute = true;
 	ClientInputHandler *inputHandler = [cdsController inputHandler];
 	inputHandler->SetClientExecutionController(execControl);
 	execControl->SetClientInputHandler(inputHandler);
-	
-	slot1StatusText = NSSTRING_STATUS_EMULATION_NOT_RUNNING;
+	execControl->SetWifiEmulationMode(WifiEmulationLevel_Off);
 	
 	spinlockMasterExecute = OS_SPINLOCK_INIT;
 	spinlockCdsController = OS_SPINLOCK_INIT;
 	
 	threadParam.cdsCore = self;
-	
-	wifiHandler->SetUniqueMACValue((uint32_t)[[NSProcessInfo processInfo] processIdentifier]);
-	wifiHandler->SetEmulationLevel(WifiEmulationLevel_Off);
 	
 	pthread_rwlock_init(&threadParam.rwlockOutputList, NULL);
 	pthread_mutex_init(&threadParam.mutexThreadExecute, NULL);
@@ -173,6 +172,10 @@ volatile bool execute = true;
 	frameStatus = @"---";
 	executionSpeedStatus = @"1.00x";
 	errorStatus = @"";
+	slot1StatusText = NSSTRING_STATUS_EMULATION_NOT_RUNNING;
+	extFirmwareMACAddressString = @"Invalid MAC!";
+	firmwareMACAddressSelectionString = @"Firmware  00:09:BF:FF:FF:FF";
+	currentSessionMACAddressString = NSSTRING_STATUS_NO_ROM_LOADED;
 	
 	return self;
 }
@@ -190,6 +193,9 @@ volatile bool execute = true;
 	[self setCdsGPU:nil];
 	[self setCdsOutputList:nil];
 	[self setErrorStatus:nil];
+	[self setExtFirmwareMACAddressString:nil];
+	[self setFirmwareMACAddressSelectionString:nil];
+	[self setCurrentSessionMACAddressString:nil];
 	
 	pthread_cancel(coreThread);
 	pthread_join(coreThread, NULL);
@@ -442,6 +448,7 @@ volatile bool execute = true;
 - (void) setEmuFlagUseExternalBios:(BOOL)enable
 {
 	execControl->SetEnableExternalBIOS((enable) ? true : false);
+	[self updateFirmwareMACAddressString];
 }
 
 - (BOOL) emuFlagUseExternalBios
@@ -475,6 +482,25 @@ volatile bool execute = true;
 - (void) setEmuFlagUseExternalFirmware:(BOOL)enable
 {
 	execControl->SetEnableExternalFirmware((enable) ? true : false);
+	
+	if (enable)
+	{
+		uint8_t MACAddr[6] = {0x00, 0x09, 0xBF, 0xFF, 0xFF, 0xFF};
+		const char *extFirmwareFileName = execControl->GetFirmwareImagePath();
+		bool isFirmwareFileRead = NDS_ReadFirmwareDataFromFile(extFirmwareFileName, NULL, NULL, NULL, MACAddr);
+		
+		if (isFirmwareFileRead)
+		{
+			NSString *macAddressString = [NSString stringWithFormat:@"%02X:%02X:%02X:%02X:%02X:%02X", MACAddr[0], MACAddr[1], MACAddr[2], MACAddr[3], MACAddr[4], MACAddr[5]];
+			[self setExtFirmwareMACAddressString:macAddressString];
+		}
+		else
+		{
+			[self setExtFirmwareMACAddressString:@"Invalid MAC!"];
+		}
+	}
+	
+	[self updateFirmwareMACAddressString];
 }
 
 - (BOOL) emuFlagUseExternalFirmware
@@ -716,9 +742,42 @@ volatile bool execute = true;
 	return [NSURL fileURLWithPath:[NSString stringWithCString:filePath encoding:NSUTF8StringEncoding]];
 }
 
+- (void) updateFirmwareMACAddressString
+{
+	if ([self emuFlagUseExternalBios] && [self emuFlagUseExternalFirmware])
+	{
+		[self setFirmwareMACAddressSelectionString:[NSString stringWithFormat:@"Ext. Firmware  %@", [self extFirmwareMACAddressString]]];
+	}
+	else
+	{
+		[self setFirmwareMACAddressSelectionString:[NSString stringWithFormat:@"Firmware  %@", [[self cdsFirmware] firmwareMACAddressString]]];
+	}
+}
+
+- (void) updateCurrentSessionMACAddressString:(BOOL)isRomLoaded
+{
+	if (isRomLoaded)
+	{
+		const uint8_t *MACAddress = execControl->GetCurrentSessionMACAddress();
+		NSString *MACAddressString = [NSString stringWithFormat:@"%02X:%02X:%02X:%02X:%02X:%02X",
+									  MACAddress[0], MACAddress[1], MACAddress[2], MACAddress[3], MACAddress[4], MACAddress[5]];
+		[self setCurrentSessionMACAddressString:MACAddressString];
+	}
+	else
+	{
+		[self setCurrentSessionMACAddressString:NSSTRING_STATUS_NO_ROM_LOADED];
+	}
+}
+
 - (pthread_rwlock_t *) rwlockCoreExecute
 {
 	return &threadParam.rwlockCoreExecute;
+}
+
+- (void) generateFirmwareMACAddress
+{
+	[[self cdsFirmware] generateRandomFirmwareMACAddress];
+	[self updateFirmwareMACAddressString];
 }
 
 - (BOOL) isSlot1Ejected
@@ -796,13 +855,19 @@ volatile bool execute = true;
 {
 	[self setCoreState:ExecutionBehavior_Pause];
 	
+	if (![self emuFlagUseExternalBios] || ![self emuFlagUseExternalFirmware])
+	{
+		[[self cdsFirmware] writeUserDefaultWFCUserID];
+		[[self cdsFirmware] updateFirmwareConfigSessionValues];
+	}
+	
 	pthread_mutex_lock(&threadParam.mutexThreadExecute);
-	execControl->SetWifiIP4Address([CocoaDSUtil hostIP4AddressAsUInt32]);
 	execControl->ApplySettingsOnReset();
 	NDS_Reset();
 	pthread_mutex_unlock(&threadParam.mutexThreadExecute);
 	
 	[self updateSlot1DeviceStatus];
+	[self updateCurrentSessionMACAddressString:YES];
 	[self setMasterExecute:YES];
 	[self restoreCoreState];
 	[[self cdsController] reset];
@@ -929,7 +994,7 @@ volatile bool execute = true;
 								dateSecond,
 								dateMillisecond);
 	
-	FCEUI_SaveMovie(fileName, L"Test Author", 0, sramPath, rtcDate);
+	FCEUI_SaveMovie(fileName, L"Test Author", START_BLANK, sramPath, rtcDate);
 	
 	return YES;
 }

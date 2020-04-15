@@ -25,7 +25,9 @@
 #else
 
 template<bool SWAP_RB> void ColorspaceConvert555To8888_SSE2(const v128u16 &srcColor, const v128u16 &srcAlphaBits, v128u32 &dstLo, v128u32 &dstHi);
+template<bool SWAP_RB> void ColorspaceConvert555XTo888X_SSE2(const v128u16 &srcColor, v128u32 &dstLo, v128u32 &dstHi);
 template<bool SWAP_RB> void ColorspaceConvert555To6665_SSE2(const v128u16 &srcColor, const v128u16 &srcAlphaBits, v128u32 &dstLo, v128u32 &dstHi);
+template<bool SWAP_RB> void ColorspaceConvert555XTo666X_SSE2(const v128u16 &srcColor, v128u32 &dstLo, v128u32 &dstHi);
 template<bool SWAP_RB> void ColorspaceConvert555To8888Opaque_SSE2(const v128u16 &srcColor, v128u32 &dstLo, v128u32 &dstHi);
 template<bool SWAP_RB> void ColorspaceConvert555To6665Opaque_SSE2(const v128u16 &srcColor, v128u32 &dstLo, v128u32 &dstHi);
 template<bool SWAP_RB> v128u32 ColorspaceConvert8888To6665_SSE2(const v128u32 &src);

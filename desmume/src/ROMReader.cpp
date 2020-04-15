@@ -25,6 +25,8 @@
 #include <zzip/zzip.h>
 #endif
 
+#include "utils/xstring.h"
+
 #ifdef WIN32
 #define stat(...) _stat(__VA_ARGS__)
 #define S_IFMT _S_IFMT
@@ -85,8 +87,13 @@ void* STDROMReaderInit(const char* filename)
  	if ((sb.st_mode & S_IFMT) != S_IFREG)
 		return 0;
 #endif
-
+	
+#ifdef WIN32
+	FILE* inf = _wfopen(mbstowcs((std::string)filename).c_str(),L"rb");
+#else
 	FILE* inf = fopen(filename, "rb");
+#endif
+	
 	if(!inf) return NULL;
 
 	STDROMReaderData* ret = new STDROMReaderData();
@@ -231,12 +238,13 @@ void * ZIPROMReaderInit(const char * filename)
 	ZZIP_DIRENT * dirent = zzip_readdir(dir);
 	if (dir != NULL)
 	{
-		char tmp1[1024];
+		char *tmp1;
 		char tmp2[1024];
-		memset(tmp1,0,sizeof(tmp1));
+
 		memset(tmp2,0,sizeof(tmp2));
-		strncpy(tmp1, filename, strlen(filename) - 4);
+		tmp1 = strndup(filename, strlen(filename) - 4);
 		sprintf(tmp2, "%s/%s", tmp1, dirent->d_name);
+		free(tmp1);
 		return zzip_fopen(tmp2, "rb");
 	}
 	return NULL;

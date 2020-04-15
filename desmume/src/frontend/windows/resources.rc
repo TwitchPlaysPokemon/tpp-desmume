@@ -57,47 +57,54 @@ BEGIN
     LTEXT           "Static",IDC_MROM,67,103,100,8
 END
 
-IDD_PATHSETTINGS DIALOGEX 0, 0, 252, 294
+IDD_PATHSETTINGS DIALOGEX 0, 0, 252, 325
 STYLE DS_SETFONT | DS_MODALFRAME | DS_3DLOOK | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Path Settings"
 FONT 8, "Ms Shell Dlg 2", 0, 0, 0x0
 BEGIN
+    GROUPBOX        "Roms",IDC_STATIC,0,0,247,39
     EDITTEXT        IDC_ROMPATHEDIT,6,11,221,14,ES_AUTOHSCROLL
     PUSHBUTTON      "...",IDC_BROWSEROMS,230,11,13,14
     CONTROL         "Automatically use last visited folder",IDC_USELASTVISIT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,27,129,10
     CONTROL         "Associate nds Files",IDC_ASSOCIATE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,132,27,80,10
-    EDITTEXT        IDC_SAVERAMPATHEDIT,5,51,221,14,ES_AUTOHSCROLL
+    GROUPBOX        "SaveRam",IDC_STATIC,0,42,248,44
+    LTEXT           "Auto save",IDC_STATIC,5,54,35,14
+    EDITTEXT        IDC_SAVERAMPATHEDIT,42,51,184,14,ES_AUTOHSCROLL
     PUSHBUTTON      "...",IDC_BROWSESRAM,229,51,13,14
-    EDITTEXT        IDC_STATEPATHEDIT,5,81,221,14,ES_AUTOHSCROLL
-    PUSHBUTTON      "...",IDC_BROWSESTATES,229,81,13,14
-    EDITTEXT        IDC_SCREENSHOTPATHEDIT,5,112,221,14,ES_AUTOHSCROLL
-    PUSHBUTTON      "...",IDC_BROWSESCREENSHOTS,229,112,13,14
-    RADIOBUTTON     "PNG",IDC_PNG,36,131,29,10
-    RADIOBUTTON     "BMP",IDC_BMP,65,131,29,10
-    EDITTEXT        IDC_FORMATEDIT,124,128,118,14,ES_AUTOHSCROLL
-    EDITTEXT        IDC_AVIPATHEDIT,5,158,221,14,ES_AUTOHSCROLL
-    PUSHBUTTON      "...",IDC_BROWSEAVI,229,158,13,14
-    EDITTEXT        IDC_CHEATPATHEDIT,5,189,221,14,ES_AUTOHSCROLL
-    PUSHBUTTON      "...",IDC_BROWSECHEATS,229,189,13,14
-    CONTROL         "CHEAT.DAT",IDC_R4TYPE1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,160,206,54,10
-    CONTROL         "USRCHEAT.DAT",IDC_R4TYPE2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,160,218,67,10
-    EDITTEXT        IDC_LUAPATHEDIT,5,243,221,14,ES_AUTOHSCROLL
-    PUSHBUTTON      "...",IDC_BROWSELUA,229,243,13,14
-    CONTROL         "Auto-load Lua scripts with ROM",IDC_AUTOLOADLUA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,259,219,8
-    PUSHBUTTON      "Defaults",IDC_PATHDEFAULTS,3,274,50,14
-    DEFPUSHBUTTON   "OK",IDOK,148,274,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,198,274,50,14
-    LTEXT           "Format:",IDC_FORMATSTATIC,95,131,26,8
-    LTEXT           "Save As:",IDC_SAVEAS,6,131,30,8
-    GROUPBOX        "Screenshots",IDC_STATIC,0,103,248,44
-    GROUPBOX        "States",IDC_STATIC,0,71,248,30
-    GROUPBOX        "Roms",IDC_STATIC,1,0,247,39
-    GROUPBOX        "SaveRam",IDC_STATIC,0,42,248,27
-    GROUPBOX        "AviFiles",IDC_STATIC,0,149,247,27
-    GROUPBOX        "Cheats",IDC_STATIC,0,180,247,50
-    GROUPBOX        "Lua",IDC_STATIC,0,233,247,38
-    LTEXT           "R4 cheats database file name",IDC_STATIC,56,206,100,17
+    LTEXT           "Im/export",IDC_STATIC,5,70,35,14
+    EDITTEXT        IDC_SRAMIMPORTPATHEDIT,42,67,184,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSESRAMIMPORT,229,67,13,14
+    GROUPBOX        "States",IDC_STATIC,0,87,248,46
+    EDITTEXT        IDC_STATEPATHEDIT,5,97,221,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSESTATES,229,97,13,14
+    LTEXT           "Slots",IDC_STATIC,5,116,15,14
+    EDITTEXT        IDC_STATESLOTPATHEDIT,24,113,202,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSESTATESLOTS,229,113,13,14
+    GROUPBOX        "Screenshots",IDC_STATIC,0,135,248,44
+    EDITTEXT        IDC_SCREENSHOTPATHEDIT,5,144,221,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSESCREENSHOTS,229,144,13,14
+    LTEXT           "Save As:",IDC_SAVEAS,6,163,30,8
+    RADIOBUTTON     "PNG",IDC_PNG,36,163,29,10
+    RADIOBUTTON     "BMP",IDC_BMP,65,163,29,10
+    LTEXT           "Format:",IDC_FORMATSTATIC,95,163,26,8
+    EDITTEXT        IDC_FORMATEDIT,124,160,118,14,ES_AUTOHSCROLL
+    GROUPBOX        "AviFiles",IDC_STATIC,0,181,247,28
+    EDITTEXT        IDC_AVIPATHEDIT,5,189,221,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSEAVI,229,189,13,14
+    GROUPBOX        "Cheats",IDC_STATIC,0,212,247,50
+    EDITTEXT        IDC_CHEATPATHEDIT,5,221,221,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSECHEATS,229,221,13,14
+    LTEXT           "R4 cheats database file name",IDC_STATIC,56,238,100,17
+    CONTROL         "CHEAT.DAT",IDC_R4TYPE1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,160,238,54,10
+    CONTROL         "USRCHEAT.DAT",IDC_R4TYPE2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,160,250,67,10
+    GROUPBOX        "Lua",IDC_STATIC,0,265,247,38
+    EDITTEXT        IDC_LUAPATHEDIT,5,275,221,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSELUA,229,275,13,14
+    CONTROL         "Auto-load Lua scripts with ROM",IDC_AUTOLOADLUA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,291,219,8
+    PUSHBUTTON      "Defaults",IDC_PATHDEFAULTS,3,306,50,14
+    DEFPUSHBUTTON   "OK",IDOK,148,306,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,198,306,50,14
 END
 
 IDD_ARCHIVEFILECHOOSER DIALOGEX 0, 0, 182, 113
@@ -110,42 +117,52 @@ BEGIN
     PUSHBUTTON      "&Cancel",IDCANCEL,127,94,50,16
 END
 
-IDD_3DSETTINGS DIALOGEX 0, 0, 315, 206
+IDD_3DSETTINGS DIALOGEX 0, 0, 329, 273
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "3D settings"
-FONT 8, "MS Sans Serif", 0, 0, 0x0
+CAPTION "3D Settings"
+FONT 8, "MS Sans Serif", 400, 0, 0x0
 BEGIN
-    COMBOBOX        IDC_3DCORE,15,23,153,138,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    CONTROL         "Unrealistically High-Precision Color Interpolation",IDC_INTERPOLATECOLOR,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,62,165,10
-    CONTROL         "Enable Edge Marking",IDC_3DSETTINGS_EDGEMARK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,119,84,10
-    CONTROL         "Enable Fog",IDC_3DSETTINGS_FOG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,130,52,10
-    CONTROL         "Enable Textures",IDC_3DSETTINGS_TEXTURE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,140,67,10
-    CONTROL         "Enable Multisample Antialiasing",IDC_3DSETTINGS_ANTIALIASING,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,157,114,10
-    EDITTEXT        IDC_TEXT_PRESCALEHD,262,16,20,14,ES_AUTOHSCROLL
-    CONTROL         "",IDC_NUD_PRESCALEHD,"msctls_updown32",UDS_SETBUDDYINT | UDS_AUTOBUDDY | UDS_ARROWKEYS,281,16,11,14
-    PUSHBUTTON      "Default",IDC_DEFAULT,136,185,50,14
-    DEFPUSHBUTTON   "OK",IDOK,201,185,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,257,185,50,14
-    GROUPBOX        "Renderer:",IDC_STATIC,7,7,174,39
-    GROUPBOX        "SoftRasterizer Options",IDC_STATIC,7,50,176,91
-    LTEXT           "Fixes some graphical bugs involving lines, but causes some other bugs. Not many games use lines.",ID_LABEL_ZELDA_SHADOW_DEPTH_HACK2,15,112,160,24
-    CONTROL         "Enable Line Hack",IDC_3DSETTINGS_LINEHACK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,102,73,10
-    LTEXT           "Fixes text bugs in some games.(e.g. Etrian Odyssey)",ID_LABEL_TXTHACK1,15,83,165,11
-    CONTROL         "Enable TXT Hack",IDC_TXTHACK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,73,73,10
-    GROUPBOX        "OpenGL Renderer Options",IDC_STATIC,7,145,176,34
-    GROUPBOX        "General Options",IDC_STATIC,189,6,118,175
-    LTEXT           "GPU Scaling Factor",IDC_STATIC,195,19,64,8
-    CONTROL         "Texture Scaling 1x",IDC_TEXSCALE_1,"Button",BS_AUTORADIOBUTTON,195,81,77,10
-    CONTROL         "Texture Scaling 2x",IDC_TEXSCALE_2,"Button",BS_AUTORADIOBUTTON,195,91,79,10
-    CONTROL         "Texture Scaling 4x",IDC_TEXSCALE_4,"Button",BS_AUTORADIOBUTTON,195,102,72,10
-    CONTROL         "Deposterize Textures",IDC_TEX_DEPOSTERIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,70,79,10
-    CONTROL         "Smooth Textures",IDC_TEX_SMOOTH,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,167,75,10
-    LTEXT           "You may need to toggle off && on by scene.",ID_LABEL_TXTHACK2,16,91,165,11
-    CONTROL         "GPU Color Depth 24 bit",IDC_GPU_24BPP,"Button",BS_AUTORADIOBUTTON,195,33,98,10
-    CONTROL         "GPU Color Depth 18 bit",IDC_GPU_18BPP,"Button",BS_AUTORADIOBUTTON,195,43,98,10
-    CONTROL         "GPU Color Depth 15 bit",IDC_GPU_15BPP,"Button",BS_AUTORADIOBUTTON,195,53,98,10
+    COMBOBOX        IDC_3DCORE,14,20,115,138,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "High-Precision Color Interpolation",IDC_INTERPOLATECOLOR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,56,124,10
+    CONTROL         "Enable Edge Marking",IDC_3DSETTINGS_EDGEMARK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,203,90,84,10
+    CONTROL         "Enable Fog",IDC_3DSETTINGS_FOG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,203,101,52,10
+    CONTROL         "Enable Textures",IDC_3DSETTINGS_TEXTURE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,203,112,67,10
+    LTEXT           "Multisample Antialiasing",ID_LABEL_MSAA_SAMPLES,12,145,78,8
+    EDITTEXT        IDC_TEXT_PRESCALEHD,273,17,31,14,ES_AUTOHSCROLL
+    CONTROL         "",IDC_NUD_PRESCALEHD,"msctls_updown32",UDS_SETBUDDYINT | UDS_AUTOBUDDY | UDS_ARROWKEYS,303,17,12,14
+    PUSHBUTTON      "Default",IDC_DEFAULT,135,19,50,15
+    DEFPUSHBUTTON   "OK",IDOK,211,252,50,15
+    PUSHBUTTON      "Cancel",IDCANCEL,273,252,50,15
+    GROUPBOX        "3D Rendering Engine",IDC_STATIC,7,7,184,34
+    GROUPBOX        "SoftRasterizer Options",IDC_STATIC,7,44,184,83
+    LTEXT           "Fixes some graphical bugs involving lines, but causes some other bugs. Not many games use lines.",ID_LABEL_ZELDA_SHADOW_DEPTH_HACK2,12,106,170,18
+    CONTROL         "Enable Line Hack",IDC_3DSETTINGS_LINEHACK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,96,73,10
+    LTEXT           "Fixes text bugs in some games.(e.g. Etrian Odyssey)",ID_LABEL_TXTHACK1,12,77,171,8
+    LTEXT           "May need to be toggled on/off per scene.",ID_LABEL_TXTHACK2,12,86,167,8
+    CONTROL         "Enable TXT Hack",IDC_TXTHACK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,67,73,10
+    GROUPBOX        "OpenGL Options",IDC_STATIC,7,131,315,116
+    GROUPBOX        "General Options",IDC_STATIC,198,7,124,120
+    LTEXT           "GPU Scaling Factor",IDC_STATIC,203,20,64,8
+    CONTROL         "Deposterize Textures",IDC_TEX_DEPOSTERIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,203,79,79,10
+    CONTROL         "Smooth Textures",IDC_TEX_SMOOTH,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,172,145,75,10
+    COMBOBOX        IDC_MULTISAMPLE_SIZE,92,143,62,138,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_GPU_COLOR_DEPTH,273,39,42,138,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "GPU Color Depth",ID_LABEL_GPU_COLOR_DEPTH,203,41,60,8
+    LTEXT           "Texture Scaling",ID_LABEL_TEXTURE_SCALING,203,61,54,8
+    COMBOBOX        IDC_TEXSCALE,273,59,42,138,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Enable Shadow Polygons",IDC_SHADOW_POLYGONS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,17,173,137,10
+    CONTROL         "Enable Special Zero Alpha Blending",IDC_S_0_ALPHA_BLEND,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,172,173,137,10
+    CONTROL         "Enable NDS-Style Depth Calculation",IDC_NDS_DEPTH_CALC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,17,203,137,10
+    CONTROL         "Enable Depth L-Equal Polygon Facing",IDC_DEPTH_L_EQUAL_PF,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,172,203,137,10
+    LTEXT           "Disabling this option may cause some shadows to disappear.",ID_LABEL_SHADOW_POLYGONS,17,183,137,16
+    LTEXT           "Disabling this option may cause certain polygons to render incorrectly or disappear completely.",ID_LABEL_NDS_DEPTH_CALC,17,213,137,24
+    LTEXT           "Disabling this option may cause some colors to look darker than normal.",ID_LABEL_S_0_ALPHA_BLEND,172,183,137,16
+    LTEXT           "Disabling this option may cause some fragments to disappear. Disabled by default due to performance impact.",ID_LABEL_DEPTH_L_EQUAL_PF,172,213,137,24
+    GROUPBOX        "Rendering Accuracy Options",IDC_STATIC,12,161,305,81,BS_CENTER
 END
 
 IDD_ABOUT_BOX DIALOGEX 0, 0, 268, 198
@@ -793,6 +810,7 @@ END
 
 IDD_MEM_VIEW DIALOGEX 0, 0, 444, 239
 STYLE DS_SETFONT | DS_CENTER | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Memory Viewer"
 FONT 8, "MS Sans Serif", 0, 0, 0x0
 BEGIN
     CONTROL         "1",IDC_MEMVIEWBOX,"MemView_ViewBox",WS_VSCROLL | WS_TABSTOP,6,39,432,178
@@ -827,7 +845,7 @@ BEGIN
     LTEXT           "Sample:",IDC_STATIC,15,83,110,8
     EDITTEXT        IDC_MICSAMPLE,15,93,190,14,ES_AUTOHSCROLL
     PUSHBUTTON      "...",IDC_MICSAMPLEBROWSE,210,94,20,14
-    CONTROL         "Use Microphone Sample",IDC_USEMICSAMPLE,"Button",BS_AUTORADIOBUTTON,18,70,93,10
+    CONTROL         "Use Microphone Samples",IDC_USEMICSAMPLE,"Button",BS_AUTORADIOBUTTON,18,70,93,10
     CONTROL         "Use rand() whitenoise (NOT suitable for TAS)",IDC_USEMICRAND,
                     "Button",BS_AUTORADIOBUTTON,18,56,157,10
     CONTROL         "Use internal noise sample",IDC_USENOISE,"Button",BS_AUTORADIOBUTTON,18,43,96,10
@@ -963,27 +981,28 @@ BEGIN
     PUSHBUTTON      "Separator",IDC_C_WATCH_SEPARATE,225,136,36,14
 END
 
-IDD_RECORDMOVIE DIALOGEX 0, 0, 301, 124
+IDD_RECORDMOVIE DIALOGEX 0, 0, 301, 118
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Record movie"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,177,106,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,231,106,50,14
-    GROUPBOX        "",65501,11,9,269,64
-    LTEXT           "File:",IDC_STATIC,31,22,14,8
-    EDITTEXT        IDC_EDIT_FILENAME,49,20,189,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "...",IDC_BUTTON_BROWSEFILE,249,20,18,14
-    LTEXT           "Author:",IDC_STATIC,21,38,25,8
-    EDITTEXT        IDC_EDIT_AUTHOR,49,36,189,14,ES_AUTOHSCROLL
-    LTEXT           "Date:",IDC_STATIC,28,56,18,8
-    CONTROL         "",IDC_DTP_DATE,"SysDateTimePick32",DTS_RIGHTALIGN | DTS_LONGDATEFORMAT | WS_TABSTOP,49,54,123,12
-    CONTROL         "",IDC_DTP_TIME,"SysDateTimePick32",DTS_RIGHTALIGN | DTS_UPDOWN | WS_TABSTOP | 0x8,176,54,62,12
-    GROUPBOX        "",IDC_STATIC,11,73,269,29
-    LTEXT           "SRAM:",IDC_STATIC,19,85,25,8
-    EDITTEXT        IDC_EDIT_SRAMFILENAME,48,83,189,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "...",IDC_BUTTON_BROWSESRAM,248,83,18,14
-    CONTROL         "Start from SRAM",IDC_START_FROM_SRAM,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,108,93,10
+    DEFPUSHBUTTON   "OK",IDOK,177,99,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,231,99,50,14
+    GROUPBOX        "",65501,11,2,269,64
+    LTEXT           "File:",IDC_STATIC,31,15,14,8
+    EDITTEXT        IDC_EDIT_FILENAME,49,13,189,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSEFILE,249,13,18,14
+    LTEXT           "Author:",IDC_STATIC,21,31,25,8
+    EDITTEXT        IDC_EDIT_AUTHOR,49,29,189,14,ES_AUTOHSCROLL
+    LTEXT           "Date:",IDC_STATIC,28,49,18,8
+    CONTROL         "",IDC_DTP_DATE,"SysDateTimePick32",DTS_RIGHTALIGN | DTS_LONGDATEFORMAT | WS_TABSTOP,49,47,123,12
+    CONTROL         "",IDC_DTP_TIME,"SysDateTimePick32",DTS_RIGHTALIGN | DTS_UPDOWN | WS_TABSTOP | 0x8,176,47,62,12
+    GROUPBOX        "",IDC_STATIC,11,66,269,29
+    LTEXT           "SRAM:",IDC_STATIC,19,78,25,8
+    EDITTEXT        IDC_EDIT_SRAMFILENAME,48,76,189,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSESRAM,248,76,18,14
+    CONTROL         "Start from SRAM",IDC_START_FROM_SRAM,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,101,73,10
+    CONTROL         "Start from power on",IDC_START_FROM_POWER_ON,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,85,101,81,10
 END
 
 IDD_REPLAY_METADATA DIALOGEX 0, 0, 325, 250
@@ -1001,7 +1020,7 @@ CAPTION "Sound Settings"
 FONT 8, "MS Sans Serif", 0, 0, 0x1
 BEGIN
     GROUPBOX        "Synchronization Mode",IDC_STATIC,13,8,173,80
-    CONTROL         "Dual SPU Synch/Asynch (traditional)",IDC_SYNCHMODE_DUAL,
+    CONTROL         "Dual SPU Synch/Async (traditional)",IDC_SYNCHMODE_DUAL,
                     "Button",BS_AUTORADIOBUTTON | WS_GROUP,22,18,132,10
     CONTROL         "Synchronous (sometimes needed for streams)",IDC_SYNCHMODE_SYNCH,
                     "Button",BS_AUTORADIOBUTTON,21,28,158,10
@@ -1236,21 +1255,18 @@ BEGIN
     LTEXT           "frames",IDC_STATIC,428,167,16,8
 END
 
-IDD_WIFISETTINGS DIALOGEX 0, 0, 331, 158
+IDD_WIFISETTINGS DIALOGEX 0, 0, 331, 114
 STYLE DS_SETFONT | DS_CENTER | WS_CAPTION | WS_SYSMENU
 CAPTION "Wifi settings"
 FONT 8, "Ms Shell Dlg", 0, 0, 0x0
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,222,136,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,276,136,50,14
-    GROUPBOX        "Infrastructure settings",IDC_STATIC,6,76,319,54
-    LTEXT           "Bridge network adapter:",IDC_STATIC,12,94,306,8
-    COMBOBOX        IDC_BRIDGEADAPTER,12,106,306,45,CBS_DROPDOWNLIST | CBS_HASSTRINGS
-    GROUPBOX        "Wifi mode",IDC_STATIC,6,22,318,48
-    CONTROL         "Ad-hoc",IDC_WIFIMODE0,"Button",BS_AUTORADIOBUTTON,12,40,306,10
-    CONTROL         "Infrastructure",IDC_WIFIMODE1,"Button",BS_AUTORADIOBUTTON,12,52,306,10
-    CONTROL         "Enable WiFi Emulation",IDC_WIFI_ENABLED,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,6,150,10
-    CONTROL         "Compatibility Mode",IDC_WIFI_COMPAT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,170,6,150,10
+    DEFPUSHBUTTON   "OK",IDOK,220,93,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,275,93,50,14
+    GROUPBOX        "Infrastructure settings",IDC_STATIC,6,33,319,55
+    LTEXT           "Bridge network adapter:",IDC_STATIC,12,52,306,8
+    COMBOBOX        IDC_BRIDGEADAPTER,12,68,306,45,CBS_DROPDOWNLIST | CBS_HASSTRINGS
+    CONTROL         "Enable Wifi Emulation",IDC_WIFI_ENABLED,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,13,84,10
+    CONTROL         "Compatibility Mode",IDC_WIFI_COMPAT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,127,13,84,10
 END
 
 IDD_INPUTCONFIG DIALOGEX 0, 0, 339, 148
@@ -1414,7 +1430,7 @@ IDD_SLOT1_R4 DIALOGEX 7, 64, 302, 89
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD | WS_VISIBLE | WS_SYSMENU
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "Directory to scan:",IDC_R4_FOLDER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,9,22,35,10
+    CONTROL         "Directory to scan:",IDC_R4_FOLDER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,9,22,71,10
     CONTROL         "use path of the loaded ROM (not the same as ""ROM path"" in path configuration)",IDC_R4_ROM,
                     "Button",BS_AUTORADIOBUTTON,9,53,272,10
     PUSHBUTTON      "Browse...",IDC_BROWSE,245,33,50,14
@@ -1751,7 +1767,6 @@ BEGIN
         MENUITEM "View &Sound State",           IDM_SOUND_VIEW
         MENUITEM "View Nitro&FS",               ID_TOOLS_VIEWFSNITRO
         MENUITEM SEPARATOR
-        MENUITEM "&Console Always On Top",      IDM_CONSOLE_ALWAYS_ON_TOP
         POPUP "&Cheats"
         BEGIN
             MENUITEM "&List",                       IDM_CHEATS_LIST, INACTIVE
@@ -1777,6 +1792,11 @@ BEGIN
             MENUITEM "Sub BG 2",                    IDM_SBG2, CHECKED
             MENUITEM "Sub BG 3",                    IDM_SBG3, CHECKED
             MENUITEM "Sub OBJ",                     IDM_SOBJ, CHECKED
+        END
+        POPUP "Console"
+        BEGIN
+            MENUITEM "Enabled",                     IDM_CONSOLE_SHOWHIDE
+            MENUITEM "Always On Top",               IDM_CONSOLE_ALWAYS_ON_TOP
         END
         MENUITEM SEPARATOR
         POPUP "Lua Scripting"
@@ -1864,6 +1884,7 @@ BEGIN
 
     IDD_3DSETTINGS, DIALOG
     BEGIN
+        RIGHTMARGIN, 328
     END
 
     IDD_CHEAT_ADD, DIALOG
@@ -1904,7 +1925,7 @@ BEGIN
 
     IDD_RECORDMOVIE, DIALOG
     BEGIN
-        BOTTOMMARGIN, 113
+        BOTTOMMARGIN, 107
     END
 
     IDD_SOUNDSETTINGS, DIALOG
@@ -1922,7 +1943,7 @@ BEGIN
 
     IDD_WIFISETTINGS, DIALOG
     BEGIN
-        BOTTOMMARGIN, 156
+        BOTTOMMARGIN, 112
     END
 
     IDD_INPUTCONFIG, DIALOG
@@ -2120,6 +2141,10 @@ BEGIN
     IDM_FILE_STOPAVI        "Stop AVI"
     IDM_FILE_STOPWAV        "Stop WAV"
     IDM_FILE_RECORDAVI      "Record AVI"
+END
+
+STRINGTABLE
+BEGIN
     IDM_FILE_RECORDWAV      "Record WAV"
 END
 
@@ -2133,23 +2158,58 @@ BEGIN
     ID_LABEL_HK1            "Open ROM"
     ID_LABEL_HK2            "Reset"
     ID_LABEL_HK3            "Pause"
-    ID_LABEL_HK3b           "CPU mode"
-    ID_LABEL_HK3c           "Increase JIT block size"
-    ID_LABEL_HK3d           "Decrease JIT block size"
     ID_LABEL_HK4            "Frame Advance"
     ID_LABEL_HK5            "Fast Forward"
     ID_LABEL_HK6            "Fast Forward Toggle"
     ID_LABEL_HK7            "Increase Speed"
     ID_LABEL_HK8            "Decrease Speed"
-    ID_LABEL_HK8b           "Limit Framerate Toggle"
     ID_LABEL_HK9            "Microphone"
     ID_LABEL_HK10           "Auto-Hold"
     ID_LABEL_HK11           "Auto-Hold Clear"
     ID_LABEL_HK12           "Toggle Rasterizer"
     ID_LABEL_HK13           "Save Screenshot as"
-    ID_LABEL_HK13b          "Quick Screenshot"
     ID_LABEL_HK14           "Record WAV"
     ID_LABEL_HK15           "Record AVI"
+END
+
+STRINGTABLE
+BEGIN
+    ID_LABEL_HK3b           "CPU mode"
+    ID_LABEL_HK3c           "Increase JIT block size"
+END
+
+STRINGTABLE
+BEGIN
+    ID_LABEL_HK3d           "Decrease JIT block size"
+END
+
+STRINGTABLE
+BEGIN
+    ID_LABEL_HK8b           "Limit Framerate Toggle"
+END
+
+STRINGTABLE
+BEGIN
+    ID_LABEL_HK48           "Turbo A"
+    ID_LABEL_HK49           "Turbo Y"
+    ID_LABEL_HK50           "Turbo X"
+    ID_LABEL_HK51           "Turbo R"
+    ID_LABEL_HK52           "Turbo L"
+    ID_LABEL_HK53           "Reload ROM"
+    ID_LABEL_HK13b          "Quick Screenshot"
+    ID_LABEL_HK54           "Search Cheats"
+    ID_LABEL_HK55           "Increase Pressure"
+    ID_LABEL_HK56           "Decrease Pressure"
+    ID_LABEL_HK57           "Rotation 0"
+    ID_LABEL_HK58           "Rotation 90"
+    ID_LABEL_HK59           "Rotation 180"
+    ID_LABEL_HK60           "Rotation 270"
+    ID_LABEL_HK61           "Toggle Stylus Jitter"
+    ID_LABEL_HK62           "Toggle Cursor"
+END
+
+STRINGTABLE
+BEGIN
     ID_LABEL_HK16           "Toggle Frame Display"
     ID_LABEL_HK17           "Toggle FPS Display"
     ID_LABEL_HK18           "Toggle Input Display"
@@ -2166,6 +2226,10 @@ BEGIN
     ID_LABEL_HK29           "Stylus Auto-Hold"
     ID_LABEL_HK30           "LCDs layout mode"
     ID_LABEL_HK31           "LCDs swap"
+END
+
+STRINGTABLE
+BEGIN
     ID_LABEL_HK32           "Increase Volume"
     ID_LABEL_HK33           "Decrease Volume"
     ID_LABEL_HK34           "Save to Slot "
@@ -2182,21 +2246,10 @@ BEGIN
     ID_LABEL_HK45           "Turbo Select"
     ID_LABEL_HK46           "Turbo Start"
     ID_LABEL_HK47           "Turbo B"
-    ID_LABEL_HK48           "Turbo A"
-    ID_LABEL_HK49           "Turbo Y"
-    ID_LABEL_HK50           "Turbo X"
-    ID_LABEL_HK51           "Turbo R"
-    ID_LABEL_HK52           "Turbo L"
-    ID_LABEL_HK53           "Reload ROM"
-    ID_LABEL_HK54           "Search Cheats"
-    ID_LABEL_HK55           "Increase Pressure"
-    ID_LABEL_HK56           "Decrease Pressure"
-    ID_LABEL_HK57           "Rotation 0"
-    ID_LABEL_HK58           "Rotation 90"
-    ID_LABEL_HK59           "Rotation 180"
-    ID_LABEL_HK60           "Rotation 270"
-    ID_LABEL_HK61           "Toggle Stylus Jitter"
-    ID_LABEL_HK62           "Toggle Cursor"
+END
+
+STRINGTABLE
+BEGIN
     ID_LABEL_HK63           "List Cheats"
     ID_LABEL_HK64           "Toggle Cheats"
     ID_LABEL_HK65           "Toggle Main GPU"

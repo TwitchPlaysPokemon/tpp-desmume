@@ -61,6 +61,9 @@ typedef struct
 	NSString *frameStatus;
 	NSString *executionSpeedStatus;
 	NSString *errorStatus;
+	NSString *extFirmwareMACAddressString;
+	NSString *firmwareMACAddressSelectionString;
+	NSString *currentSessionMACAddressString;
 	
 	OSSpinLock spinlockCdsController;
 	OSSpinLock spinlockMasterExecute;
@@ -115,7 +118,15 @@ typedef struct
 @property (copy) NSURL *firmwareImageURL;
 @property (copy) NSURL *slot1R4URL;
 
+@property (retain) NSString *extFirmwareMACAddressString;
+@property (retain) NSString *firmwareMACAddressSelectionString;
+@property (retain) NSString *currentSessionMACAddressString;
+
 @property (readonly) pthread_rwlock_t *rwlockCoreExecute;
+
+- (void) updateFirmwareMACAddressString;
+- (void) updateCurrentSessionMACAddressString:(BOOL)isRomLoaded;
+- (void) generateFirmwareMACAddress;
 
 - (BOOL) isSlot1Ejected;
 - (void) slot1Eject;

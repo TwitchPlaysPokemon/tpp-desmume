@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2012-2014 DeSmuME Team
+	Copyright (C) 2012-2018 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -74,6 +74,8 @@ class OGLImage;
 	NSMenuItem *displayRotationMenuCustomItem;
 	NSTextField *displayRotationField;
 	
+	NSPopUpButton *openglMSAAPopUpButton;
+	
 	NSImage *iconVolumeFull;
 	NSImage *iconVolumeTwoThird;
 	NSImage *iconVolumeOneThird;
@@ -81,6 +83,11 @@ class OGLImage;
 	NSPopUpButton *spuSyncMethodMenu;
 	
 	DisplayPreviewView *previewView;
+	
+	NSString *firmwareMACAddressString;
+	NSString *subnetMaskString_AP1;
+	NSString *subnetMaskString_AP2;
+	NSString *subnetMaskString_AP3;
 	
 	NSMutableDictionary *bindings;
 }
@@ -110,7 +117,14 @@ class OGLImage;
 @property (readonly) IBOutlet NSTextField *displayRotationField;
 @property (readonly) IBOutlet NSPopUpButton *spuSyncMethodMenu;
 
+@property (readonly) IBOutlet NSPopUpButton *openglMSAAPopUpButton;
+
 @property (readonly) IBOutlet DisplayPreviewView *previewView;
+
+@property (retain) NSString *firmwareMACAddressString;
+@property (retain) NSString *subnetMaskString_AP1;
+@property (retain) NSString *subnetMaskString_AP2;
+@property (retain) NSString *subnetMaskString_AP3;
 
 @property (readonly) NSMutableDictionary *bindings;
 
@@ -145,7 +159,14 @@ class OGLImage;
 - (IBAction) closeFirmwareConfigSheet:(id)sender;
 - (void) didEndFirmwareConfigSheet:(NSWindow *)sheet returnCode:(NSInteger)returnCode contextInfo:(void *)contextInfo;
 
+- (IBAction) generateFirmwareMACAddress:(id)sender;
+- (IBAction) updateFirmwareMACAddressString:(id)sender;
+- (IBAction) updateSubnetMaskString_AP1:(id)sender;
+- (IBAction) updateSubnetMaskString_AP2:(id)sender;
+- (IBAction) updateSubnetMaskString_AP3:(id)sender;
+
 - (void) switchContentView:(NSView *)theView;
+- (void) markUnsupportedOpenGLMSAAMenuItems;
 - (void) setupUserDefaults;
 
 @end

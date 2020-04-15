@@ -1,6 +1,6 @@
  /*
 	Copyright (C) 2007 Pascal Giard (evilynux)
-	Copyright (C) 2006-2017 DeSmuME team
+	Copyright (C) 2006-2019 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -138,6 +138,8 @@ static void ResetSaveStateTimes();
 static void LoadSaveStateInfo();
 static void Printscreen();
 static void Reset();
+static void SetAudioVolume();
+static void SetFirmwareLanguage();
 static void Edit_Controls();
 static void Edit_Joystick_Controls();
 static void MenuSave(GtkMenuItem *item, gpointer slot);
@@ -358,6 +360,8 @@ static const char *ui_description =
 "        <menuitem action='save_t5'/>"
 "        <menuitem action='save_t6'/>"
 "      </menu>"
+"      <menuitem action='setaudiovolume'/>"
+"      <menuitem action='setfirmwarelanguage'/>"
 "      <menuitem action='editctrls'/>"
 "      <menuitem action='editjoyctrls'/>"
 "    </menu>"
@@ -436,6 +440,8 @@ static const GtkActionEntry action_entries[] = {
         { "cheatsearch",     NULL,      "_Search",        NULL,       NULL,   CheatSearch },
         { "cheatlist",       NULL,      "_List",        NULL,       NULL,   CheatList },
       { "ConfigSaveMenu", NULL, "_Saves" },
+      { "setaudiovolume", NULL, "Set audio _volume", NULL, NULL, SetAudioVolume },
+      { "setfirmwarelanguage", NULL, "Set firmware _language", NULL, NULL, SetFirmwareLanguage },
       { "editctrls",  NULL,        "_Edit controls",NULL,    NULL,   Edit_Controls },
       { "editjoyctrls",  NULL,     "Edit _Joystick controls",NULL,       NULL,   Edit_Joystick_Controls },
 
@@ -783,10 +789,9 @@ void *
 createThread_gdb( void (*thread_function)( void *data),
                   void *thread_data)
 {
-  GThread *new_thread = g_thread_create( (GThreadFunc)thread_function,
-                                         thread_data,
-                                         TRUE,
-                                         NULL);
+  GThread *new_thread = g_thread_new(NULL,
+                                     (GThreadFunc)thread_function,
+                                     thread_data);
 
   return new_thread;
 }
@@ -893,6 +898,9 @@ static void ToggleFullscreen(GtkToggleAction *action)
   config.window_fullscreen = gtk_toggle_action_get_active(action);
   if (config.window_fullscreen)
   {
+    GdkColor black = {0, 0, 0, 0};
+    gtk_widget_modify_bg(pDrawingArea, GTK_STATE_NORMAL, &black);
+
     gtk_widget_hide(pMenuBar);
     gtk_widget_hide(pToolBar);
     gtk_widget_hide(pStatusBar);
@@ -903,6 +911,8 @@ static void ToggleFullscreen(GtkToggleAction *action)
   }
   else
   {
+    gtk_widget_modify_bg(pDrawingArea, GTK_STATE_NORMAL, NULL);
+
     if (config.view_menu) {
       gtk_widget_show(pMenuBar);
     }
@@ -1064,7 +1074,7 @@ static void RecordMovieDialog()
     switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
     case GTK_RESPONSE_OK:
         sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
-        FCEUI_SaveMovie(sPath,L"",0,"", FCEUI_MovieGetRTCDefault());
+        FCEUI_SaveMovie(sPath,L"",START_BLANK,"", FCEUI_MovieGetRTCDefault());
         g_free(sPath);
         break;
     default:
@@ -1904,6 +1914,83 @@ static gint Key_Release(GtkWidget *w, GdkEventKey *e, gpointer data)
 
 }
 
+/////////////////////////////// SET AUDIO VOLUME //////////////////////////////////////
+
+static void CallbackSetAudioVolume(GtkWidget *hscale, gpointer data)
+{
+	SNDSDLSetAudioVolume(gtk_range_get_value(GTK_RANGE(hscale)));
+	config.audio_volume = SNDSDLGetAudioVolume();
+}
+
+static void SetAudioVolume()
+{
+	GtkWidget *dialog = NULL;
+	GtkWidget *hscale = NULL;
+	int audio_volume = SNDSDLGetAudioVolume();
+	dialog = gtk_dialog_new_with_buttons("Set audio volume", GTK_WINDOW(pWindow), GTK_DIALOG_MODAL, GTK_STOCK_OK, GTK_RESPONSE_OK, GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL);
+	hscale = gtk_hscale_new_with_range(0, SDL_MIX_MAXVOLUME, 1);
+	gtk_range_set_value(GTK_RANGE(hscale), SNDSDLGetAudioVolume());
+	g_signal_connect(G_OBJECT(hscale), "value-changed", G_CALLBACK(CallbackSetAudioVolume), NULL);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), hscale, TRUE, FALSE, 0);
+	gtk_widget_show_all(GTK_DIALOG(dialog)->vbox);
+	switch(gtk_dialog_run(GTK_DIALOG(dialog)))
+	{
+		case GTK_RESPONSE_OK:
+			break;
+		case GTK_RESPONSE_CANCEL:
+		case GTK_RESPONSE_NONE:
+			SNDSDLSetAudioVolume(audio_volume);
+			config.audio_volume = SNDSDLGetAudioVolume();
+			break;
+	}
+	gtk_widget_destroy(dialog);
+}
+
+/////////////////////////////// SET FIRMWARE LANGUAGE //////////////////////////////////////
+
+static void CallbackSetFirmwareLanguage(GtkWidget *check_button, gpointer data)
+{
+	gtk_widget_set_sensitive(GTK_WIDGET(data), gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button)));
+}
+
+static void SetFirmwareLanguage()
+{
+	GtkWidget *dialog = NULL;
+	GtkWidget *combo_box_text = NULL;
+	GtkWidget *check_button = NULL;
+	const char *languages[6] = {"Japanese", "English", "French", "German", "Italian", "Spanish"};
+	gchar *text = NULL;
+	dialog = gtk_dialog_new_with_buttons("Set firmware language", GTK_WINDOW(pWindow), GTK_DIALOG_MODAL, GTK_STOCK_OK, GTK_RESPONSE_OK, GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL);
+	combo_box_text = gtk_combo_box_text_new();
+	for(int index = 0; index < 6; index++)
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo_box_text), languages[index]);
+	gtk_combo_box_set_active(GTK_COMBO_BOX(combo_box_text), config.firmware_language);
+	gtk_widget_set_sensitive(combo_box_text, config.command_line_overriding_firmware_language);
+	check_button = gtk_check_button_new_with_mnemonic("_Enable command line overriding");
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_button), config.command_line_overriding_firmware_language);
+	g_signal_connect(G_OBJECT(check_button), "toggled", G_CALLBACK(CallbackSetFirmwareLanguage), combo_box_text);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), check_button, TRUE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), combo_box_text, TRUE, FALSE, 0);
+	gtk_widget_show_all(GTK_DIALOG(dialog)->vbox);
+	switch(gtk_dialog_run(GTK_DIALOG(dialog)))
+	{
+		case GTK_RESPONSE_OK:
+			text = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo_box_text));
+			for(int index = 0; index < 6; index++)
+				if(strcmp(text, languages[index]) == 0)
+				{
+					CommonSettings.fwConfig.language = index;
+					config.firmware_language = index;
+				}
+			config.command_line_overriding_firmware_language = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button));
+			break;
+		case GTK_RESPONSE_CANCEL:
+		case GTK_RESPONSE_NONE:
+			break;
+	}
+	gtk_widget_destroy(dialog);
+}
+
 /////////////////////////////// CONTROLS EDIT //////////////////////////////////////
 
 static void AcceptNewInputKey(GtkWidget *w, GdkEventKey *e, struct modify_key_ctx *ctx)
@@ -2238,7 +2325,7 @@ static void GraphicsSettingsDialog() {
 #ifdef HAVE_OPENGL
 	// OpenGL Multisample
 	wMultisample = gtk_check_button_new_with_label("Multisample Antialiasing (OpenGL)");
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wMultisample), CommonSettings.GFX3D_Renderer_Multisample);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wMultisample), (CommonSettings.GFX3D_Renderer_MultisampleSize > 0) ? TRUE : FALSE);
 	gtk_table_attach(GTK_TABLE(wTable), wMultisample, 1, 2, 2, 3,
 			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
 			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 10, 0);
@@ -2309,7 +2396,8 @@ static void GraphicsSettingsDialog() {
 		CommonSettings.GFX3D_Renderer_TextureScalingFactor = config.textureUpscale = scale;
 		CommonSettings.GFX3D_HighResolutionInterpolateColor = config.highColorInterpolation = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(wHCInterpolate));
 #ifdef HAVE_OPENGL
-		CommonSettings.GFX3D_Renderer_Multisample = config.multisampling = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(wMultisample));
+		config.multisampling = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(wMultisample));
+		CommonSettings.GFX3D_Renderer_MultisampleSize = (config.multisampling) ? 4 : 0;
 #endif
     }
     // End: OK Response Block
@@ -2357,7 +2445,8 @@ static void ToggleLayerVisibility(GtkToggleAction* action, gpointer data)
 static void Printscreen()
 {
     GdkPixbuf *screenshot;
-    gchar *filename, *filen;
+    const gchar *dir;
+    gchar *filename = NULL, *filen = NULL;
     GError *error = NULL;
     u8 rgb[256 * 384 * 4];
     static int seq = 0;
@@ -2386,15 +2475,27 @@ static void Printscreen()
                           NULL,
                           NULL);
 
-    filen = g_strdup_printf("desmume-screenshot-%d.png", seq);
-    filename = g_build_filename(g_get_user_special_dir(G_USER_DIRECTORY_PICTURES), filen, NULL);
+    dir = g_get_user_special_dir(G_USER_DIRECTORY_PICTURES);
+    if (dir == NULL) {
+        dir = g_get_user_special_dir(G_USER_DIRECTORY_DESKTOP);
+    }
+    if (dir == NULL) {
+        dir = g_get_home_dir();
+    }
+
+    do {
+        g_free(filen);
+        g_free(filename);
+        filen = g_strdup_printf("desmume-screenshot-%d.png", seq++);
+        filename = g_build_filename(dir, filen, NULL);
+    }
+    while (g_file_test(filename, G_FILE_TEST_EXISTS));
 
     gdk_pixbuf_save(screenshot, filename, "png", &error, NULL);
     if (error) {
         g_error_free (error);
         g_printerr("Failed to save %s", filename);
-    } else {
-        seq++;
+        seq--;
     }
 
     //free(rgb);
@@ -2444,7 +2545,7 @@ static void SelectFirmwareFile()
     case GTK_RESPONSE_OK:
         sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
         CommonSettings.UseExtFirmware = true;
-        strncpy(CommonSettings.Firmware, (const char*)sPath, g_utf8_strlen(sPath, -1));
+        strncpy(CommonSettings.ExtFirmwarePath, (const char*)sPath, g_utf8_strlen(sPath, -1));
         g_free(sPath);
         break;
     default:
@@ -3004,17 +3105,14 @@ common_gtk_main( class configured_features *my_config)
     GtkWidget *pMenuBar;
     GtkWidget *pToolBar;
 
-    /* the firmware settings */
-    struct NDS_fw_config_data fw_config;
-
-    /* default the firmware settings, they may get changed later */
-    NDS_FillDefaultFirmwareConfigData( &fw_config);
-
     /* use any language set on the command line */
     if ( my_config->firmware_language != -1) {
-        fw_config.language = my_config->firmware_language;
+		CommonSettings.fwConfig.language = my_config->firmware_language;
     }
 
+    /* if the command line overriding is enabled then use the language set on the GUI */
+    if(config.command_line_overriding_firmware_language)
+		CommonSettings.fwConfig.language = config.firmware_language;
 
     //------------------addons----------
     my_config->process_addonCommands();
@@ -3128,9 +3226,6 @@ common_gtk_main( class configured_features *my_config)
         }
     }
 #endif
-
-    /* Create the dummy firmware */
-    NDS_CreateDummyFirmware( &fw_config);
 
     /* Initialize joysticks */
     if(!init_joy()) return 1;
@@ -3275,7 +3370,6 @@ common_gtk_main( class configured_features *my_config)
     gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "cheatsearch"), FALSE);
 
     nds_screen.gap_size = config.view_gap ? GAP_SIZE : 0;
-    gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "gap"), config.view_gap);
 
     nds_screen.swap = config.view_swap;
     gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "orient_swapscreens"), config.view_swap);
@@ -3304,6 +3398,10 @@ common_gtk_main( class configured_features *my_config)
 
     /* Creating the place for showing DS screens */
     pDrawingArea = gtk_drawing_area_new();
+
+    /* This toggle action must not be set active before the pDrawingArea initialization to avoid a GTK warning */
+    gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "gap"), config.view_gap);
+
     gtk_container_add (GTK_CONTAINER (pVBox), pDrawingArea);
 
     gtk_widget_set_events(pDrawingArea,
@@ -3411,7 +3509,7 @@ common_gtk_main( class configured_features *my_config)
 	}
 
     CommonSettings.GFX3D_HighResolutionInterpolateColor = config.highColorInterpolation;
-    CommonSettings.GFX3D_Renderer_Multisample = config.multisampling;
+	CommonSettings.GFX3D_Renderer_MultisampleSize = (config.multisampling) ? 4 : 0;
     CommonSettings.GFX3D_Renderer_TextureDeposterize = config.textureDeposterize;
     CommonSettings.GFX3D_Renderer_TextureScalingFactor = (config.textureUpscale == 1 ||
     														config.textureUpscale == 2 ||
@@ -3448,6 +3546,8 @@ common_gtk_main( class configured_features *my_config)
     if (my_config->timeout > 0) {
         g_timeout_add_seconds(my_config->timeout, timeout_exit_cb, GINT_TO_POINTER(my_config->timeout));
     }
+
+    SNDSDLSetAudioVolume(config.audio_volume);
 
     /* Video filter parameters */
     video->SetFilterParameteri(VF_PARAM_SCANLINE_A, _scanline_filter_a);
@@ -3510,9 +3610,6 @@ int main (int argc, char *argv[])
     {
       fprintf(stderr, "Warning: X11 not thread-safe\n");
     }
-
-  if (!g_thread_supported())
-    g_thread_init( NULL);
 
   gtk_init(&argc, &argv);
 

@@ -81,6 +81,8 @@ struct ClientExecutionControlSettings
 	std::string filePathFirmware;
 	std::string filePathSlot1R4;
 	
+	FirmwareConfig fwConfig;
+	
 	std::string cpuEmulationEngineName;
 	std::string slot1DeviceName;
 	
@@ -95,9 +97,8 @@ struct ClientExecutionControlSettings
 	bool enableDebugConsole;
 	bool enableEnsataEmulation;
 	
-	int wifiMode;
+	int wifiEmulationMode;
 	int wifiBridgeDeviceIndex;
-	uint32_t wifiIP4Address;
 	
 	bool enableCheats;
 	
@@ -293,6 +294,10 @@ public:
 	bool GetEnableBIOSPatchDelayLoop();
 	void SetEnableBIOSPatchDelayLoop(bool enable);
 	
+	FirmwareConfig GetFirmwareConfig();
+	FirmwareConfig GetFirmwareConfigApplied();
+	void SetFirmwareConfig(const FirmwareConfig &inConfig);
+	
 	bool GetEnableExternalFirmware();
 	void SetEnableExternalFirmware(bool enable);
 	
@@ -305,14 +310,13 @@ public:
 	bool GetEnableEnsataEmulation();
 	void SetEnableEnsataEmulation(bool enable);
 	
-	int GetWifiMode();
-	void SetWifiMode(int wifiMode);
+	int GetWifiEmulationMode();
+	void SetWifiEmulationMode(int wifiEmulationMode);
 	
 	int GetWifiBridgeDeviceIndex();
 	void SetWifiBridgeDeviceIndex(int wifiBridgeDeviceIndex);
 	
-	uint32_t GetWifiIP4Address();
-	void SetWifiIP4Address(uint32_t ip4Address);
+	uint8_t* GetCurrentSessionMACAddress();
 	
 	bool GetEnableCheats();
 	void SetEnableCheats(bool enable);

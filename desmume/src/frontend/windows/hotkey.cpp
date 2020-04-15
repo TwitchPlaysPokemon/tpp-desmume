@@ -3,7 +3,7 @@
 	licensed under the terms supplied at the end of this file (for the terms are very long!)
 	Differences from that baseline version are:
 
-	Copyright (C) 2009-2017 DeSmuME team
+	Copyright (C) 2009-2019 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -232,11 +232,11 @@ void HK_QuickScreenShot(int param, bool justPressed)
 void HK_PrintScreen(int param, bool justPressed)
 {
 	if(!justPressed) return;
-  if(!romloaded) return;
+	if(!romloaded) return;
 
 	bool unpause = NDS_Pause(false);
 
-	char outFilename[MAX_PATH];
+	char outFilename[MAX_PATH] = "";
 	
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn,sizeof(ofn));
@@ -249,30 +249,30 @@ void HK_PrintScreen(int param, bool justPressed)
 	ofn.lpstrDefExt = "png";
 	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST;
 
-	std::string filename = path.getpath(path.SCREENSHOTS);
+	std::string dir = path.getpath(path.SCREENSHOTS);
+	ofn.lpstrInitialDir = dir.c_str();
 
-	char file[MAX_PATH];
-	ZeroMemory(file, sizeof(file));
-	path.formatname(file);
-	filename += file;
-
+	path.formatname(outFilename);
 	if(path.imageformat() == PathInfo::PNG)
 	{
-		filename += ".png";
+		strcat(outFilename, ".png");
 		ofn.lpstrDefExt = "png";
 		ofn.nFilterIndex = 1;
 	}
 	else if(path.imageformat() == PathInfo::BMP)
 	{
-		filename += ".bmp";
+		strcat(outFilename, ".bmp");
 		ofn.lpstrDefExt = "bmp";
 		ofn.nFilterIndex = 2;
 	}
 
-	strcpy(outFilename,filename.c_str());
 	if(GetSaveFileName(&ofn))
 	{
 		DoScreenshot(outFilename);
+
+		dir = Path::GetFileDirectoryPath(outFilename);
+		path.setpath(path.SCREENSHOTS, dir);
+		WritePrivateProfileString(SECTION, SCREENSHOTKEY, dir.c_str(), IniName);
 	}
 
 	if(unpause) NDS_UnPause(false);
@@ -338,6 +338,21 @@ void HK_StateQuickLoadSlot(int, bool justPressed)
 
 void HK_MicrophoneKeyDown(int, bool justPressed) { NDS_setMic(1); }
 void HK_MicrophoneKeyUp(int) { NDS_setMic(0); }
+
+void Mic_NextSample();
+void Mic_PrevSample();
+
+void HK_NextSampleKeyDown(int, bool justPressed)
+{
+	Mic_NextSample();
+	driver->AddLine("Mic sample %d selected", MicSampleSelection);
+}
+
+void HK_PrevSampleKeyDown(int, bool justPressed)
+{
+	Mic_PrevSample();
+	driver->AddLine("Mic sample %d selected", MicSampleSelection);
+}
 
 void HK_AutoHoldKeyDown(int, bool justPressed) {AutoHoldPressed = true;}
 void HK_AutoHoldKeyUp(int) {AutoHoldPressed = false;}
@@ -702,6 +717,18 @@ void InitCustomKeys (SCustomKeys *keys)
 	keys->Microphone.page = HOTKEY_PAGE_MAIN;
 	keys->Microphone.key = NULL;
 
+	keys->PrevSample.handleKeyDown = HK_PrevSampleKeyDown;
+	keys->PrevSample.code = "Mic Prev Sample";
+	keys->PrevSample.name = L"Mic Prev Sample";
+	keys->PrevSample.page = HOTKEY_PAGE_MAIN;
+	keys->PrevSample.key = NULL;
+
+	keys->NextSample.handleKeyDown = HK_NextSampleKeyDown;
+	keys->NextSample.code = "Mic Next Sample";
+	keys->NextSample.name = L"Mic Next Sample";
+	keys->NextSample.page = HOTKEY_PAGE_MAIN;
+	keys->NextSample.key = NULL;
+
 	keys->AutoHold.handleKeyDown = HK_AutoHoldKeyDown;
 	keys->AutoHold.handleKeyUp = HK_AutoHoldKeyUp;
 	keys->AutoHold.code = "AutoHold";
@@ -715,11 +742,7 @@ void InitCustomKeys (SCustomKeys *keys)
 	keys->AutoHoldClear.page = HOTKEY_PAGE_MAIN;
 	keys->AutoHoldClear.key = NULL;
 
-	keys->ToggleRasterizer.handleKeyDown = HK_ToggleRasterizer;
-	keys->ToggleRasterizer.code = "ToggleRasterizer";
-	keys->ToggleRasterizer.name = STRW(ID_LABEL_HK12);
-	keys->ToggleRasterizer.page = HOTKEY_PAGE_MAIN;
-	keys->ToggleRasterizer.key = VK_SUBTRACT;
+
 
 	//Tools Page ----------------------------------------------------------
 	keys->PrintScreen.handleKeyDown = HK_PrintScreen;
@@ -1058,6 +1081,12 @@ void InitCustomKeys (SCustomKeys *keys)
 	keys->ToggleSubOBJLayer.name = STRW(ID_LABEL_HK76);
 	keys->ToggleSubOBJLayer.page = HOTKEY_PAGE_OTHER;
 	keys->ToggleSubOBJLayer.key = NULL;
+
+	keys->ToggleRasterizer.handleKeyDown = HK_ToggleRasterizer;
+	keys->ToggleRasterizer.code = "ToggleRasterizer";
+	keys->ToggleRasterizer.name = STRW(ID_LABEL_HK12);
+	keys->ToggleRasterizer.page = HOTKEY_PAGE_OTHER;
+	keys->ToggleRasterizer.key = VK_SUBTRACT;
 
 	//State/Slots Pages ------------------------------------------------
 	keys->NextSaveSlot.handleKeyDown = HK_NextSaveSlot;

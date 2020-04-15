@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2009-2017 DeSmuME team
+	Copyright (C) 2009-2019 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -26,6 +26,8 @@
 #ifndef _MSC_VER 
 #include <stdint.h>
 #endif
+
+static const char hexValid[23] = {"0123456789ABCDEFabcdef"};
 
 CHEATS *cheats = NULL;
 CHEATSEARCH *cheatSearch = NULL;
@@ -191,6 +193,14 @@ void CHEATS::ARparser(CHEATS_LIST& list)
 		}
 		if(type == 0xD0 || type == 0xD1 || type == 0xD2) {}
 		else if(type == 0xC5) {}
+		else if(type == 0x0E)
+		{
+			if (statusSkip) {
+				CHEATLOG(" (skip multiple lines!)\n");
+				i += (lo + 7) / 8;
+				continue;
+			}
+		}
 		else
 		{
 			if(statusSkip) {

@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2005 Guillaume Duhamel
-	Copyright (C) 2008-2015 DeSmuME team
+	Copyright (C) 2008-2019 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -49,6 +49,10 @@
 #endif
 
 #ifdef __GNUC__
+	#ifdef __ALTIVEC__
+		#define ENABLE_ALTIVEC
+	#endif
+
 	#ifdef __SSE__
 		#define ENABLE_SSE
 	#endif
@@ -81,8 +85,27 @@
 		#define ENABLE_AVX2
 	#endif
 
-	#ifdef __ALTIVEC__
-		#define ENABLE_ALTIVEC
+	// AVX-512 is special because it has multiple tiers of support.
+	//
+	// For our case, Tier-0 will be the baseline AVX-512 tier that includes the basic Foundation and
+	// Conflict Detection extensions, which should be supported on all AVX-512 CPUs. Higher tiers
+	// include more extensions, where each higher tier also assumes support for all lower tiers.
+	//
+	// For typical use cases in DeSmuME, the most practical AVX-512 tier will be Tier-1.
+	#if defined(__AVX512F__) && defined(__AVX512CD__)
+		#define ENABLE_AVX512_0
+	#endif
+
+	#if defined(ENABLE_AVX512_0) && defined(__AVX512BW__) && defined(__AVX512DQ__)
+		#define ENABLE_AVX512_1
+	#endif
+
+	#if defined(ENABLE_AVX512_1) && defined(__AVX512IFMA__) && defined(__AVX512VBMI__)
+		#define ENABLE_AVX512_2
+	#endif
+
+	#if defined(ENABLE_AVX512_2) && defined(__AVX512VNNI__) && defined(__AVX512VBMI2__) && defined(__AVX512BITALG__)
+		#define ENABLE_AVX512_3
 	#endif
 #endif
 
@@ -111,7 +134,7 @@
 //------------alignment macros-------------
 //dont apply these to types without further testing. it only works portably here on declarations of variables
 //cant we find a pattern other people use more successfully?
-#if _MSC_VER >= 1900
+#if _MSC_VER >= 9999 // Was 1900. The way we use DS_ALIGN doesn't jive with how alignas() wants itself to be used, so just use __declspec(align(X)) for now to avoid problems.
 	#define DS_ALIGN(X) alignas(X)
 #elif defined(_MSC_VER) || defined(__INTEL_COMPILER)
 	#define DS_ALIGN(X) __declspec(align(X))
@@ -245,7 +268,8 @@ typedef __m128i v128u32;
 typedef __m128i v128s32;
 #endif
 
-#ifdef ENABLE_AVX2
+#if defined(ENABLE_AVX) || defined(ENABLE_AVX512_0)
+
 #include <immintrin.h>
 typedef __m256i v256u8;
 typedef __m256i v256s8;
@@ -253,7 +277,17 @@ typedef __m256i v256u16;
 typedef __m256i v256s16;
 typedef __m256i v256u32;
 typedef __m256i v256s32;
+
+#if defined(ENABLE_AVX512_0)
+typedef __m512i v512u8;
+typedef __m512i v512s8;
+typedef __m512i v512u16;
+typedef __m512i v512s16;
+typedef __m512i v512u32;
+typedef __m512i v512s32;
 #endif
+
+#endif // defined(ENABLE_AVX) || defined(ENABLE_AVX512_0)
 
 /*---------- GPU3D fixed-points types -----------*/
 
@@ -302,6 +336,84 @@ typedef int desmume_BOOL;
 #define FALSE 0
 #endif
 
+// Atomic functions
+#if defined(HOST_WINDOWS)
+#include <winnt.h>
+
+//#define atomic_add_32(V,M)					InterlockedAddNoFence((volatile LONG *)(V),(LONG)(M))			// Requires Windows 8
+inline s32 atomic_add_32(volatile s32 *V, s32 M)						{ return (s32)(InterlockedExchangeAdd((volatile LONG *)V, (LONG)M) + M); }
+inline s32 atomic_add_barrier32(volatile s32 *V, s32 M)					{ return (s32)(InterlockedExchangeAdd((volatile LONG *)V, (LONG)M) + M); }
+
+//#define atomic_inc_32(V)						InterlockedIncrementNoFence((volatile LONG *)(V))				// Requires Windows 8
+#define atomic_inc_32(V)						_InterlockedIncrement((volatile LONG *)(V))
+#define atomic_inc_barrier32(V)					_InterlockedIncrement((volatile LONG *)(V))
+//#define atomic_dec_32(V)						InterlockedDecrementNoFence((volatile LONG *)(V))				// Requires Windows 8
+#define atomic_dec_32(V)						_InterlockedDecrement((volatile LONG *)(V))
+#define atomic_dec_barrier32(V)					_InterlockedDecrement((volatile LONG *)(V))
+
+//#define atomic_or_32(V,M)						InterlockedOrNoFence((volatile LONG *)(V),(LONG)(M))			// Requires Windows 8
+#define atomic_or_32(V,M)						_InterlockedOr((volatile LONG *)(V),(LONG)(M))
+#define atomic_or_barrier32(V,M)				_InterlockedOr((volatile LONG *)(V),(LONG)(M))
+//#define atomic_and_32(V,M)					InterlockedAndNoFence((volatile LONG *)(V),(LONG)(M))			// Requires Windows 8
+#define atomic_and_32(V,M)						_InterlockedAnd((volatile LONG *)(V),(LONG)(M))
+#define atomic_and_barrier32(V,M)				_InterlockedAnd((volatile LONG *)(V),(LONG)(M))
+//#define atomic_xor_32(V,M)					InterlockedXorNoFence((volatile LONG *)(V),(LONG)(M))			// Requires Windows 8
+#define atomic_xor_32(V,M)						_InterlockedXor((volatile LONG *)(V),(LONG)(M))
+#define atomic_xor_barrier32(V,M)				_InterlockedXor((volatile LONG *)(V),(LONG)(M))
+
+inline bool atomic_test_and_set_32(volatile s32 *V, s32 M)				{ return (_interlockedbittestandset((volatile LONG *)V, (LONG)M)) ? true : false; }
+inline bool atomic_test_and_set_barrier32(volatile s32 *V, s32 M)		{ return (_interlockedbittestandset((volatile LONG *)V, (LONG)M)) ? true : false; }
+inline bool atomic_test_and_clear_32(volatile s32 *V, s32 M)			{ return (_interlockedbittestandreset((volatile LONG *)V, (LONG)M)) ? true : false; }
+inline bool atomic_test_and_clear_barrier32(volatile s32 *V, s32 M)		{ return (_interlockedbittestandreset((volatile LONG *)V, (LONG)M)) ? true : false; }
+
+#elif defined(DESMUME_COCOA)
+#include <libkern/OSAtomic.h>
+
+#define atomic_add_32(V,M)						OSAtomicAdd32((M),(V))
+#define atomic_add_barrier32(V,M)				OSAtomicAdd32Barrier((M),(V))
+
+#define atomic_inc_32(V)						OSAtomicIncrement32((V))
+#define atomic_inc_barrier32(V)					OSAtomicIncrement32Barrier((V))
+#define atomic_dec_32(V)						OSAtomicDecrement32((V))
+#define atomic_dec_barrier32(V)					OSAtomicDecrement32Barrier((V))
+
+#define atomic_or_32(V,M)						OSAtomicOr32((M),(volatile uint32_t *)(V))
+#define atomic_or_barrier32(V,M)				OSAtomicOr32Barrier((M),(volatile uint32_t *)(V))
+#define atomic_and_32(V,M)						OSAtomicAnd32((M),(volatile uint32_t *)(V))
+#define atomic_and_barrier32(V,M)				OSAtomicAnd32Barrier((M),(volatile uint32_t *)(V))
+#define atomic_xor_32(V,M)						OSAtomicXor32((M),(volatile uint32_t *)(V))
+#define atomic_xor_barrier32(V,M)				OSAtomicXor32Barrier((M),(volatile uint32_t *)(V))
+
+#define atomic_test_and_set_32(V,M)				OSAtomicTestAndSet((M),(V))
+#define atomic_test_and_set_barrier32(V,M)		OSAtomicTestAndSetBarrier((M),(V))
+#define atomic_test_and_clear_32(V,M)			OSAtomicTestAndClear((M),(V))
+#define atomic_test_and_clear_barrier32(V,M)	OSAtomicTestAndClearBarrier((M),(V))
+
+#else // Just use C++11 std::atomic
+#include <atomic>
+
+inline s32 atomic_add_32(volatile s32 *V, s32 M)			{ return std::atomic_fetch_add_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_relaxed) + M; }
+inline s32 atomic_add_barrier32(volatile s32 *V, s32 M)		{ return std::atomic_fetch_add_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_seq_cst) + M; }
+
+inline s32 atomic_inc_32(volatile s32 *V)					{ return atomic_add_32(V, 1); }
+inline s32 atomic_inc_barrier32(volatile s32 *V)			{ return atomic_add_barrier32(V, 1); }
+inline s32 atomic_dec_32(volatile s32 *V)					{ return atomic_add_32(V, -1); }
+inline s32 atomic_dec_barrier32(volatile s32 *V)			{ return atomic_add_barrier32(V, -1); }
+
+inline s32 atomic_or_32(volatile s32 *V, s32 M)				{ return std::atomic_fetch_or_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_relaxed) | M; }
+inline s32 atomic_or_barrier32(volatile s32 *V, s32 M)		{ return std::atomic_fetch_or_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_seq_cst) | M; }
+inline s32 atomic_and_32(volatile s32 *V, s32 M)			{ return std::atomic_fetch_and_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_relaxed) & M; }
+inline s32 atomic_and_barrier32(volatile s32 *V, s32 M)		{ return std::atomic_fetch_and_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_seq_cst) & M; }
+inline s32 atomic_xor_32(volatile s32 *V, s32 M)			{ return std::atomic_fetch_xor_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_relaxed) ^ M; }
+inline s32 atomic_xor_barrier32(volatile s32 *V, s32 M)		{ return std::atomic_fetch_xor_explicit<s32>((volatile std::atomic<s32> *)V, M, std::memory_order::memory_order_seq_cst) ^ M; }
+
+inline bool atomic_test_and_set_32(volatile s32 *V, s32 M)				{ return (std::atomic_fetch_or_explicit<s32>((volatile std::atomic<s32> *)V,(0x80>>((M)&0x07)), std::memory_order::memory_order_relaxed) & (0x80>>((M)&0x07))) ? true : false; }
+inline bool atomic_test_and_set_barrier32(volatile s32 *V, s32 M)		{ return (std::atomic_fetch_or_explicit<s32>((volatile std::atomic<s32> *)V,(0x80>>((M)&0x07)), std::memory_order::memory_order_seq_cst) & (0x80>>((M)&0x07))) ? true : false; }
+inline bool atomic_test_and_clear_32(volatile s32 *V, s32 M)			{ return (std::atomic_fetch_and_explicit<s32>((volatile std::atomic<s32> *)V,~(s32)(0x80>>((M)&0x07)), std::memory_order::memory_order_relaxed) & (0x80>>((M)&0x07))) ? true : false; }
+inline bool atomic_test_and_clear_barrier32(volatile s32 *V, s32 M)		{ return (std::atomic_fetch_and_explicit<s32>((volatile std::atomic<s32> *)V,~(s32)(0x80>>((M)&0x07)), std::memory_order::memory_order_seq_cst) & (0x80>>((M)&0x07))) ? true : false; }
+
+#endif
+
 /* little endian (ds' endianess) to local endianess convert macros */
 #ifdef MSB_FIRST	/* local arch is big endian */
 # define LE_TO_LOCAL_16(x) ((((x)&0xff)<<8)|(((x)>>8)&0xff))
@@ -322,61 +434,6 @@ typedef int desmume_BOOL;
 // kilobytes and megabytes macro
 #define MB(x) ((x)*1024*1024)
 #define KB(x) ((x)*1024)
-
-#define CPU_STR(c) ((c==ARM9)?"ARM9":"ARM7")
-typedef enum
-{
-	ARM9 = 0,
-	ARM7 = 1
-} cpu_id_t;
-
-inline u64 double_to_u64(double d)
-{
-	union
-	{
-		u64 a;
-		double b;
-	} fuxor;
-	
-	fuxor.b = d;
-	return fuxor.a;
-}
-
-inline double u64_to_double(u64 u)
-{
-	union
-	{
-		u64 a;
-		double b;
-	} fuxor;
-	
-	fuxor.a = u;
-	return fuxor.b;
-}
-
-inline u32 float_to_u32(float f)
-{
-	union
-	{
-		u32 a;
-		float b;
-	} fuxor;
-	
-	fuxor.b = f;
-	return fuxor.a;
-}
-
-inline float u32_to_float(u32 u)
-{
-	union
-	{
-		u32 a;
-		float b;
-	} fuxor;
-	
-	fuxor.a = u;
-	return fuxor.b;
-}
 
 //fairly standard for loop macros
 #define MACRODO1(TRICK,TODO) { const size_t X = TRICK; TODO; }
@@ -443,21 +500,9 @@ inline float u32_to_float(u32 u)
 #define	CTASSERT(x)		typedef char __assert ## y[(x) ? 1 : -1]
 #endif
 
-static const char hexValid[23] = {"0123456789ABCDEFabcdef"};
-
-
 template<typename T> inline void reconstruct(T* t) { 
 	t->~T();
 	new(t) T();
-}
-
-/* fixed point speedup macros */
-
-
-FORCEINLINE s32 sfx32_shiftdown(const s64 a)
-{
-	//TODO: replace me with direct calls to sfx32_shiftdown
-	return fx32_shiftdown(a);
 }
 
 #endif

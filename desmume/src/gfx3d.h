@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2006 yopyop
-	Copyright (C) 2008-2018 DeSmuME team
+	Copyright (C) 2008-2019 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -477,31 +477,38 @@ struct VIEWPORT {
 //four corners of the hexagon, and you will observe a decagon
 #define MAX_CLIPPED_VERTS 10
 
+enum ClipperMode
+{
+	ClipperMode_DetermineClipOnly = 0,		// Retains only the pointer to the original polygon info. All other information in CPoly is considered undefined.
+	ClipperMode_Full = 1,					// Retains all of the modified polygon's info in CPoly, including the clipped vertex info.
+	ClipperMode_FullColorInterpolate = 2	// Same as ClipperMode_Full, but the vertex color attribute is better interpolated.
+};
+
+struct CPoly
+{
+	u16 index; // The index number of this polygon in the full polygon list.
+	PolygonType type; //otherwise known as "count" of verts
+	POLY *poly;
+	VERT clipVerts[MAX_CLIPPED_VERTS];
+};
+
 class GFX3D_Clipper
 {
-public:
+protected:
+	size_t _clippedPolyCounter;
+	CPoly *_clippedPolyList; // The output of clipping operations goes into here. Be sure you init it before clipping!
 	
-	struct TClippedPoly
-	{
-		PolygonType type; //otherwise known as "count" of verts
-		POLY *poly;
-		VERT clipVerts[MAX_CLIPPED_VERTS];
-	};
-
-	//the entry point for poly clipping
-	template<bool hirez> void clipPoly(const POLY &poly, const VERT **verts);
-
-	//the output of clipping operations goes into here.
-	//be sure you init it before clipping!
-	TClippedPoly *clippedPolys;
-	size_t clippedPolyCounter;
-	void reset() { clippedPolyCounter=0; }
-
-private:
-	TClippedPoly tempClippedPoly;
-	TClippedPoly outClippedPoly;
-	FORCEINLINE void clipSegmentVsPlane(VERT** verts, const int coord, int which);
-	FORCEINLINE void clipPolyVsPlane(const int coord, int which);
+public:
+	GFX3D_Clipper();
+	
+	const CPoly* GetClippedPolyBufferPtr();
+	void SetClippedPolyBufferPtr(CPoly *bufferPtr);
+	
+	const CPoly& GetClippedPolyByIndex(size_t index) const;
+	size_t GetPolyCount() const;
+	
+	void Reset();
+	template<ClipperMode CLIPPERMODE> bool ClipPoly(const u16 polyIndex, const POLY &poly, const VERT **verts); // the entry point for poly clipping
 };
 
 //used to communicate state to the renderer
@@ -558,7 +565,7 @@ struct GFX3D_State
 	u32 fogShift;
 
 	bool invalidateToon;
-	u16 u16ToonTable[32];
+	CACHE_ALIGN u16 u16ToonTable[32];
 	u8 shininessTable[128];
 	u8 *fogDensityTable;		// Alias to MMU.ARM9_REG+0x0360
 	u16 *edgeMarkColorTable;	// Alias to MMU.ARM9_REG+0x0330
@@ -594,6 +601,10 @@ struct GFX3D
 	POLYLIST *polylist;
 	VERT *vertList;
 	INDEXLIST indexlist;
+	
+	size_t clippedPolyCount;
+	size_t clippedPolyOpaqueCount;
+	CPoly *clippedPolyList;
 	
 	size_t vertListCount;
 	u32 render3DFrameCount;			// Increments when gfx3d_doFlush() is called. Resets every 60 video frames.
@@ -636,9 +647,10 @@ void gfx3d_glGetLightColor(const size_t index, u32 &dst);
 
 struct SFORMAT;
 extern SFORMAT SF_GFX3D[];
-void gfx3d_Update3DFramebuffers(FragmentColor *framebufferMain, u16 *framebuffer16);
+void gfx3d_PrepareSaveStateBufferWrite();
 void gfx3d_savestate(EMUFILE &os);
 bool gfx3d_loadstate(EMUFILE &is, int size);
+void gfx3d_FinishLoadStateBufferRead();
 
 void gfx3d_ClearStack();
 
