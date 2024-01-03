@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2014-2018 DeSmuME team
+	Copyright (C) 2014-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -65,6 +65,7 @@ protected:
 	GLint _versionMajor;
 	GLint _versionMinor;
 	GLint _versionRevision;
+	char _rendererString[256];
 	ShaderSupportTier _shaderSupport;
 	bool _useShader150;
 	
@@ -76,6 +77,11 @@ protected:
 public:
 	OGLContextInfo();
 	virtual ~OGLContextInfo() {};
+	
+	int GetVersionMajor() const;
+	int GetVersionMinor() const;
+	int GetVersionRevision() const;
+	const char* GetRendererString() const;
 		
 	bool IsUsingShader150();
 	bool IsVBOSupported();
@@ -181,7 +187,6 @@ protected:
 	bool _useShader150;
 	ShaderSupportTier _shaderSupport;
 	
-	bool _needUploadVertices;
 	bool _useDeposterize;
 	bool _useShaderBasedPixelScaler;
 	bool _filtersPreferGPU;
@@ -208,7 +213,6 @@ protected:
 	GLuint _texHQ3xLUT;
 	GLuint _texHQ4xLUT;
 	
-	GLint _vtxBuffer[8];
 	GLfloat _texCoordBuffer[8];
 	
 	GLuint _texVideoInputDataID;
@@ -225,11 +229,6 @@ protected:
 	GLint _uniformRenderFlipped;
 	GLint _uniformBacklightIntensity;
 	
-	void UploadVerticesOGL();
-	void UploadTexCoordsOGL();
-	void UploadTransformationOGL();
-	
-	void UpdateVertices();
 	void UpdateTexCoords(GLfloat s, GLfloat t);
 	
 public:
@@ -297,6 +296,8 @@ protected:
 	GLuint _vboElementID;
 	GLuint _texCharMap;
 	
+	std::vector<uint32_t *> *_workingCharBufferList;
+	
 	void _UpdateVerticesOGL();
 	
 public:
@@ -333,12 +334,13 @@ public:
 	bool SetGPUPixelScalerOGL(const VideoFilterTypeID filterID);
 	
 	void LoadNativeDisplayByID_OGL(const NDSDisplayID displayID);
+	void LoadCustomDisplayByID_OGL(const NDSDisplayID displayID);
 	void ProcessOGL();
 	
 	virtual void RenderOGL(bool isRenderingFlipped);
 };
 
-class OGLClientFetchObject : public GPUClientFetchObject
+class OGLClientSharedData
 {
 protected:
 	OGLContextInfo *_contextInfo;
@@ -360,14 +362,19 @@ protected:
 	pthread_rwlock_t _texFetchRWLock[2];
 	bool _srcCloneNeedsUpdate[2][OPENGL_FETCH_BUFFER_COUNT];
 	
-	virtual void _FetchNativeDisplayByID(const NDSDisplayID displayID, const u8 bufferIndex);
-	virtual void _FetchCustomDisplayByID(const NDSDisplayID displayID, const u8 bufferIndex);
-	
 public:
-	OGLClientFetchObject();
-	virtual ~OGLClientFetchObject();
+	OGLClientSharedData();
+	virtual ~OGLClientSharedData();
 	
+	void SetContextInfo(OGLContextInfo *contextInfo);
 	OGLContextInfo* GetContextInfo() const;
+	
+	void SetUseDirectToCPUFilterPipeline(bool willUseDirectCPU);
+	bool UseDirectToCPUFilterPipeline() const;
+	
+	virtual GLuint GetFetchTexture(const NDSDisplayID displayID);
+	virtual void SetFetchTexture(const NDSDisplayID displayID, GLuint texID);
+	
 	uint32_t* GetSrcClone(const NDSDisplayID displayID, const u8 bufferIndex) const;
 	GLuint GetTexNative(const NDSDisplayID displayID, const u8 bufferIndex) const;
 	GLuint GetTexCustom(const NDSDisplayID displayID, const u8 bufferIndex) const;
@@ -380,17 +387,19 @@ public:
 	GLuint GetTexHQ4xLUT() const;
 	
 	void CopyFromSrcClone(uint32_t *dstBufferPtr, const NDSDisplayID displayID, const u8 bufferIndex);
-	void FetchNativeDisplayToSrcClone(const NDSDisplayID displayID, const u8 bufferIndex, bool needsLock);
+	void FetchNativeDisplayToSrcClone(const NDSDisplayInfo *displayInfoList, const NDSDisplayID displayID, const u8 bufferIndex, bool needsLock);
+	void FetchCustomDisplayToSrcClone(const NDSDisplayInfo *displayInfoList, const NDSDisplayID displayID, const u8 bufferIndex, bool needsLock);
 	void FetchTextureWriteLock(const NDSDisplayID displayID);
 	void FetchTextureReadLock(const NDSDisplayID displayID);
 	void FetchTextureUnlock(const NDSDisplayID displayID);
 	
-	virtual void Init();
-	virtual void SetFetchBuffers(const NDSDisplayInfo &currentDisplayInfo);
-	virtual void FetchFromBufferIndex(const u8 index);
-	
-	virtual GLuint GetFetchTexture(const NDSDisplayID displayID);
-	virtual void SetFetchTexture(const NDSDisplayID displayID, GLuint texID);
+	// OpenGL-specific functions that must be called in response to their
+	// corresponding GPUClientFetchObject methods.
+	void InitOGL();
+	void SetFetchBuffersOGL(const NDSDisplayInfo *displayInfoList, const NDSDisplayInfo &currentDisplayInfo);
+	void FetchFromBufferIndexOGL(const u8 index, const NDSDisplayInfo &currentDisplayInfo);
+	void FetchNativeDisplayByID_OGL(const NDSDisplayInfo *displayInfoList, const NDSDisplayID displayID, const u8 bufferIndex);
+	void FetchCustomDisplayByID_OGL(const NDSDisplayInfo *displayInfoList, const NDSDisplayID displayID, const u8 bufferIndex);
 };
 
 class OGLVideoOutput : public ClientDisplay3DPresenter
@@ -418,6 +427,7 @@ protected:
 	virtual void _UpdateViewScale();
 	
 	virtual void _LoadNativeDisplayByID(const NDSDisplayID displayID);
+	virtual void _LoadCustomDisplayByID(const NDSDisplayID displayID);
 	virtual void _ResizeCPUPixelScaler(const VideoFilterTypeID filterID);
 	
 public:
@@ -447,6 +457,7 @@ public:
 	// Client view interface
 	virtual void ProcessDisplays();
 	virtual void CopyFrameToBuffer(uint32_t *dstBuffer);
+	virtual void PrerenderStateSetupOGL();
 	virtual void RenderFrameOGL(bool isRenderingFlipped);
 	
 	virtual const OGLProcessedFrameInfo& GetProcessedFrameInfo();

@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2012-2017 DeSmuME team
+	Copyright (C) 2012-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -17,11 +17,13 @@
 
 #import "OESoundInterface.h"
 
-#import "cocoa_globals.h"
+#import "../cocoa_globals.h"
 #include <pthread.h>
+#include "NDSGameCore.h"
 
 
 OERingBuffer *openEmuSoundInterfaceBuffer = nil;
+static BOOL kWillUseOldAPI = NO;
 
 // Sound interface to the SPU
 SoundInterface_struct SNDOpenEmu = {
@@ -48,6 +50,7 @@ SoundInterface_struct *SNDCoreList[] = {
 int SNDOpenEmuInit(int buffer_size)
 {
 	[openEmuSoundInterfaceBuffer setLength:buffer_size * 4 / SPU_SAMPLE_SIZE];
+	kWillUseOldAPI = ![openEmuSoundInterfaceBuffer respondsToSelector:@selector(freeBytes)];
 	
 	return 0;
 }
@@ -70,11 +73,12 @@ void SNDOpenEmuUpdateAudio(s16 *buffer, u32 num_samples)
 
 u32 SNDOpenEmuGetAudioSpace()
 {
-	// TODO: Use the newer-named method, [OERingBuffer freeBytes], when a newer version of OpenEmu.app released.
-	// But for now, use the older-named method, [OERingBuffer usedBytes].
+	if (kWillUseOldAPI)
+	{
+		SILENCE_DEPRECATION_OPENEMU( return (u32)[openEmuSoundInterfaceBuffer usedBytes] / SPU_SAMPLE_SIZE; )
+	}
 	
-	//return (u32)[openEmuSoundInterfaceBuffer freeBytes] / SPU_SAMPLE_SIZE;
-	return (u32)[openEmuSoundInterfaceBuffer usedBytes] / SPU_SAMPLE_SIZE;
+	return (u32)[openEmuSoundInterfaceBuffer freeBytes] / SPU_SAMPLE_SIZE;
 }
 
 void SNDOpenEmuMuteAudio()

@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2009-2019 DeSmuME Team
+	Copyright (C) 2009-2022 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -32,6 +32,10 @@
 
 #define MAX_FW_NICKNAME_LENGTH 10
 #define MAX_FW_MESSAGE_LENGTH 26
+
+extern const char *defaultNickname;
+extern const char *defaultMessage;
+extern const char* defaultMacAddressStr;
 
 struct FirmwareConfig
 {
@@ -436,7 +440,7 @@ public:
 	bool loadSettings(const char *firmwareUserSettingsFilePath);
 	bool saveSettings(const char *firmwareUserSettingsFilePath);
 
-	bool loaded();
+	bool isLoaded();
 	void* getTouchCalibrate();
 	
 	static std::string GetUserSettingsFilePath(const char *firmwareFilePath);
@@ -444,6 +448,8 @@ public:
 
 int copy_firmware_user_data( u8 *dest_buffer, const u8 *fw_data);
 
+void NDS_GetFirmwareMACAddressAsStr(const FirmwareConfig& config, char outMacStr[13]);
+void NDS_SetFirmwareMACAddressFromStr(FirmwareConfig& config, const char* MacStr);
 void NDS_GetDefaultFirmwareConfig(FirmwareConfig &outConfig);
 void NDS_GetCurrentWFCUserID(u8 *outMAC, u8 *outUserID);
 void NDS_ApplyFirmwareSettings(NDSFirmwareData *outFirmware,

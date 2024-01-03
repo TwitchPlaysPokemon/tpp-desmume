@@ -93,8 +93,10 @@ const char MSR_FIELD[16][5] = {
                                      Registre[REG_POS(i,0)],\
                                      tmp);
 #define DATAPROC_ROR_IMM(nom, s)      char tmp[10] = "";\
-     if(((i>>7)&0x1F)!=0)\
+     if(((i>>7)&0x1F)==0)\
           sprintf(tmp, ", RRX");\
+     else\
+          sprintf(tmp, ", ROR %d", (int)((i>>7)&0x1F));\
      sprintf(txt, "%s%s%s %s, %s, %s%s",\
                                      #nom,\
                                      Condition[CONDITION(i)],\
@@ -208,8 +210,10 @@ const char MSR_FIELD[16][5] = {
                                      tmp,\
                                      op3);
 #define LDRSTR_ROR_IMM(nom, op, op2, op3)      char tmp[10] = "";\
-     if(((i>>7)&0x1F)!=0)\
+     if(((i>>7)&0x1F)==0)\
           sprintf(tmp, ", RRX");\
+     else\
+          sprintf(tmp, ", ROR %d", (int)((i>>7)&0x1F));\
      sprintf(txt, "%s%s %s, [%s%s, %s%s%s%s",\
                                      #nom,\
                                      Condition[CONDITION(i)],\
@@ -2118,17 +2122,17 @@ return txt;}
 static char * OP_LDR_P_IMM_OFF(u32 adr, u32 i, char * txt)
 {
 	if(REG_POS(i,16) == 15)
-		sprintf(txt, "LDR%s %s, [%08X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], (adr + 8 + (int)(i&0x7FF)));
+		sprintf(txt, "LDR%s %s, [%08X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], (adr + 8 + (int)(i&0xFFF)));
 	else
-		sprintf(txt, "LDR%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+		sprintf(txt, "LDR%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDR_M_IMM_OFF(u32 adr, u32 i, char * txt)
 {
 	if(REG_POS(i,16) == 15)
-		sprintf(txt, "LDR%s %s, [%08X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], (adr + 8 - (int)(i&0x7FF)));
+		sprintf(txt, "LDR%s %s, [%08X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], (adr + 8 - (int)(i&0xFFF)));
 	else
-		sprintf(txt, "LDR%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+		sprintf(txt, "LDR%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDREX(u32 adr, u32 i, char * txt)
@@ -2178,12 +2182,12 @@ return txt;}
 
 static char * OP_LDR_P_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDR%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDR%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDR_M_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDR%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDR%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDR_P_LSL_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
@@ -2228,17 +2232,17 @@ return txt;}
 
 static char * OP_LDR_P_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDR%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDR%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDR_P_IMM_OFF_POSTIND2(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDR%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDR%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDR_M_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDR%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDR%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDR_P_LSL_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
@@ -2285,12 +2289,12 @@ return txt;}
 
 static char * OP_LDRB_P_IMM_OFF(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRB%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRB%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRB_M_IMM_OFF(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRB%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRB%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRB_P_LSL_IMM_OFF(u32 adr, u32 i, char * txt)
@@ -2335,12 +2339,12 @@ return txt;}
 
 static char * OP_LDRB_P_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRB%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRB%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRB_M_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRB%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRB%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRB_P_LSL_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
@@ -2385,12 +2389,12 @@ return txt;}
 
 static char * OP_LDRB_P_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRB%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRB%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRB_M_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRB%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRB%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRB_P_LSL_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
@@ -2437,12 +2441,12 @@ return txt;}
 
 static char * OP_STR_P_IMM_OFF(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STR%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STR%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STR_M_IMM_OFF(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STR%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STR%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STREX(u32 adr, u32 i, char * txt)
@@ -2492,12 +2496,12 @@ return txt;}
 
 static char * OP_STR_P_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STR%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STR%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STR_M_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STR%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STR%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STR_P_LSL_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
@@ -2542,12 +2546,12 @@ return txt;}
 
 static char * OP_STR_P_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STR%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STR%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STR_M_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STR%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STR%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STR_P_LSL_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
@@ -2594,12 +2598,12 @@ return txt;}
 
 static char * OP_STRB_P_IMM_OFF(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRB%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRB%s %s, [%s, #%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRB_M_IMM_OFF(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRB%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRB%s %s, [%s, -#%X]", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRB_P_LSL_IMM_OFF(u32 adr, u32 i, char * txt)
@@ -2644,12 +2648,12 @@ return txt;}
 
 static char * OP_STRB_P_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRB%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRB%s %s, [%s, #%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRB_M_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRB%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRB%s %s, [%s, -#%X]!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRB_P_LSL_IMM_OFF_PREIND(u32 adr, u32 i, char * txt)
@@ -2694,12 +2698,12 @@ return txt;}
 
 static char * OP_STRB_P_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRB%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRB%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRB_M_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRB%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRB%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRB_P_LSL_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
@@ -2747,12 +2751,12 @@ return txt;}
 #if 0
 static char * OP_LDRBT_P_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRBT%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRBT%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRBT_M_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "LDRBT%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "LDRBT%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_LDRBT_P_LSL_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
@@ -2799,12 +2803,12 @@ return txt;}
 
 static char * OP_STRBT_P_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRBT%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRBT%s %s, [%s], #%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRBT_M_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)
 {
-     sprintf(txt, "STRBT%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0x7FF));
+     sprintf(txt, "STRBT%s %s, [%s], -#%X!", Condition[CONDITION(i)], Registre[REG_POS(i,12)], Registre[REG_POS(i,16)], (int)(i&0xFFF));
 return txt;}
 
 static char * OP_STRBT_P_LSL_IMM_OFF_POSTIND(u32 adr, u32 i, char * txt)

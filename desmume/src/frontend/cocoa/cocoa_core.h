@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2011-2018 DeSmuME team
+	Copyright (C) 2011-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
 
 #import <Cocoa/Cocoa.h>
 #include <pthread.h>
-#include <libkern/OSAtomic.h>
 #include <string>
 #import "cocoa_util.h"
 
@@ -32,6 +31,7 @@ class ClientExecutionControl;
 @class CocoaDSFirmware;
 @class CocoaDSGPU;
 @class CocoaDSOutput;
+@class CocoaDSCheatManager;
 
 typedef struct
 {
@@ -49,6 +49,7 @@ typedef struct
 	CocoaDSController *cdsController;
 	CocoaDSFirmware *cdsFirmware;
 	CocoaDSGPU *cdsGPU;
+	CocoaDSCheatManager *cdsCheatManager;
 	NSMutableArray *cdsOutputList;
 	
 	pthread_t coreThread;
@@ -65,20 +66,22 @@ typedef struct
 	NSString *firmwareMACAddressSelectionString;
 	NSString *currentSessionMACAddressString;
 	
-	OSSpinLock spinlockCdsController;
-	OSSpinLock spinlockMasterExecute;
+	apple_unfairlock_t _unfairlockMasterExecute;
 }
 
 @property (readonly, nonatomic) ClientExecutionControl *execControl;
 
-@property (retain) CocoaDSController *cdsController;
 @property (retain) CocoaDSFirmware *cdsFirmware;
-@property (retain) CocoaDSGPU *cdsGPU;
-@property (retain) NSMutableArray *cdsOutputList;
+@property (readonly) CocoaDSController *cdsController;
+@property (readonly) CocoaDSGPU *cdsGPU;
+@property (readonly) CocoaDSCheatManager *cdsCheatManager;
+@property (readonly) NSMutableArray *cdsOutputList;
 
 @property (assign) BOOL masterExecute;
 @property (assign) BOOL isFrameSkipEnabled;
+@property (assign) NSInteger framesToSkipSetting;
 @property (assign) NSInteger coreState;
+@property (assign) BOOL emulationPaused;
 
 @property (assign) BOOL isSpeedLimitEnabled;
 @property (assign) BOOL isCheatingEnabled;

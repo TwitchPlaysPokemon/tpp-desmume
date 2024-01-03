@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2010-2017 DeSmuME team
+	Copyright (C) 2010-2021 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -44,14 +44,6 @@ public:
 		static Slot1InfoSimple info("R4", "Slot1 R4 emulation", 0x03);
 		return &info;
 	}
-
-	//called once when the emulator starts up, or when the device springs into existence
-	virtual bool init()
-	{
-		//strange to do this here but we need to make sure its done at some point
-		srand(time(NULL));
-		return true;
-	}
 	
 	virtual void connect()
 	{
@@ -90,9 +82,9 @@ public:
 		return protocol.read_GCDATAIN(PROCNUM);
 	}
 
-	virtual void slot1client_startOperation(eSlot1Operation operation)
+	virtual void slot1client_startOperation(eSlot1Operation theOperation)
 	{
-		if(operation != eSlot1Operation_Unknown)
+		if (theOperation != eSlot1Operation_Unknown)
 			return;
 
 		u32 address;
@@ -117,9 +109,9 @@ public:
 		}
 	}
 
-	virtual u32 slot1client_read_GCDATAIN(eSlot1Operation operation)
+	virtual u32 slot1client_read_GCDATAIN(eSlot1Operation theOperation)
 	{
-		if (operation != eSlot1Operation_Unknown)
+		if (theOperation != eSlot1Operation_Unknown)
 			return 0;
 
 		u32 val = 0;
@@ -149,9 +141,9 @@ public:
 		return val;
 	}
 
-	void slot1client_write_GCDATAIN(eSlot1Operation operation, u32 val)
+	void slot1client_write_GCDATAIN(eSlot1Operation theOperation, u32 val)
 	{
-		if (operation != eSlot1Operation_Unknown)
+		if (theOperation != eSlot1Operation_Unknown)
 			return;
 
 		int cmd = protocol.command.bytes[0];

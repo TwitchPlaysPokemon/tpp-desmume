@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2011-2018 DeSmuME Team
+	Copyright (C) 2011-2022 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -25,9 +25,9 @@
 
 
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_5
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSUserInterfaceValidations>
 #else
-@interface AppDelegate : NSObject
+@interface AppDelegate : NSObject<NSUserInterfaceValidations>
 #endif
 {
 	NSObject *dummyObject;
@@ -36,6 +36,8 @@
 	NSObjectController *emuControlController;
 	NSObjectController *prefWindowController;
 	NSObjectController *cdsCoreController;
+	NSObjectController *databaseFileController;
+	NSArrayController *gameListController;
 	FileMigrationDelegate *migrationDelegate;
 	MacAVCaptureToolDelegate *avCaptureToolDelegate;
 	WifiSettingsPanelDelegate *wifiSettingsPanelDelegate;
@@ -47,8 +49,12 @@
 	NSMenu *mLoadStateSlot;
 	NSMenu *mSaveStateSlot;
 	
+	BOOL isAppRunningOnPowerPC;
 	BOOL isAppRunningOnIntel;
+	BOOL isAppRunningOnARM64;
+	
     BOOL isDeveloperPlusBuild;
+	
 	BOOL didApplicationFinishLaunching;
 	NSString *delayedROMFileName;
 }
@@ -59,6 +65,8 @@
 @property (readonly) IBOutlet NSObjectController *emuControlController;
 @property (readonly) IBOutlet NSObjectController *prefWindowController;
 @property (readonly) IBOutlet NSObjectController *cdsCoreController;
+@property (readonly) IBOutlet NSObjectController *databaseFileController;
+@property (readonly) IBOutlet NSArrayController *gameListController;
 @property (readonly) IBOutlet FileMigrationDelegate *migrationDelegate;
 @property (readonly) IBOutlet MacAVCaptureToolDelegate *avCaptureToolDelegate;
 @property (readonly) IBOutlet WifiSettingsPanelDelegate *wifiSettingsPanelDelegate;
@@ -68,8 +76,12 @@
 @property (readonly) IBOutlet NSMenu *mSaveStateSlot;
 @property (readonly) IBOutlet InputPrefsView *inputPrefsView;
 
-@property (assign) BOOL isAppRunningOnIntel;
-@property (assign) BOOL isDeveloperPlusBuild;
+@property (readonly) BOOL isAppRunningOnPowerPC;
+@property (readonly) BOOL isAppRunningOnIntel;
+@property (readonly) BOOL isAppRunningOnARM64;
+
+@property (readonly) BOOL isDeveloperPlusBuild;
+
 @property (assign) BOOL didApplicationFinishLaunching;
 @property (copy) NSString *delayedROMFileName;
 
@@ -77,9 +89,11 @@
 - (IBAction) launchForums:(id)sender;
 - (IBAction) supportRequest:(id)sender;
 - (IBAction) bugReport:(id)sender;
+- (IBAction) changeAppAppearance:(id)sender;
 
 - (void) setupSlotMenuItems;
 - (NSMenuItem *) addSlotMenuItem:(NSMenu *)menu slotNumber:(NSUInteger)slotNumber;
 - (void) setupUserDefaults;
+- (void) handleSystemAppearanceThemeChange:(NSNotification *) notification;
 
 @end

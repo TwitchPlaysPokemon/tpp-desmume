@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2017-2018 DeSmuME team
+	Copyright (C) 2017-2021 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -106,6 +106,7 @@ struct ClientExecutionControlSettings
 	double executionSpeed;
 	
 	bool enableFrameSkip;
+	uint8_t framesToSkipSetting;
 	uint64_t frameJumpRelativeTarget;
 	uint64_t frameJumpTarget;
 	
@@ -337,6 +338,10 @@ public:
 	void SetFramesToSkip(uint8_t numFrames);
 	void ResetFramesToSkip();
 	
+	uint8_t GetFramesToSkipSetting();
+	uint8_t GetFramesToSkipSettingApplied();
+	void SetFramesToSkipSetting(uint8_t numFrames);
+	
 	uint64_t GetFrameJumpRelativeTarget();
 	void SetFrameJumpRelativeTarget(uint64_t newRelativeTarget);
 	
@@ -373,6 +378,8 @@ public:
 	
 	void FetchOutputPostNDSExec();
 	const NDSFrameInfo& GetNDSFrameInfo();
+	static void GenerateNDSFrameInfo(ClientInputHandler *inputHandler, NDSFrameInfo &outInfo);
+	static void UpdateNDSFrameInfoInput(ClientInputHandler *inputHandler, NDSFrameInfo &outInfo);
 	void SetFrameInfoExecutionSpeed(double executionSpeed);
 	uint64_t GetFrameIndex();
 	

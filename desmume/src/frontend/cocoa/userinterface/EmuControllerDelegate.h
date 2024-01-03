@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013-2018 DeSmuME Team
+	Copyright (C) 2013-2023 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  */
 
 #import <Cocoa/Cocoa.h>
-#include <libkern/OSAtomic.h>
 #import "../cocoa_input.h"
+#include "../utilities.h"
 
 @class InputManager;
 @class CocoaDSRom;
@@ -42,8 +42,6 @@ class AudioSampleBlockGenerator;
 	CocoaDSRom *currentRom;
 	CocoaDSFirmware *cdsFirmware;
 	CocoaDSSpeaker *cdsSpeaker;
-	CocoaDSCheatManager *cdsCheats;
-	CocoaDSCheatManager *dummyCheatList;
 	
 	CheatWindowDelegate *cheatWindowDelegate;
 	MacScreenshotCaptureToolDelegate *screenshotCaptureToolDelegate;
@@ -56,8 +54,8 @@ class AudioSampleBlockGenerator;
 	NSObjectController *cheatWindowController;
 	NSObjectController *slot2WindowController;
 	NSArrayController *inputDeviceListController;
-	NSArrayController *cheatListController;
-	NSArrayController *cheatDatabaseController;
+	
+	NSMenu *cheatDatabaseRecentsMenu;
 	
 	RomInfoPanel *romInfoPanel;
 	
@@ -78,15 +76,18 @@ class AudioSampleBlockGenerator;
 	NSWindow *ndsErrorSheet;
 	NSTextField *ndsErrorStatusTextField;
 	NSView *exportRomSavePanelAccessoryView;
+	NSLevelIndicator *ndsMicLevelIndicator;
 	
 	NSPopUpButton *openglMSAAPopUpButton;
 	
 	BOOL isSaveStateEdited;
 	
+	BOOL isRunningDarkMode;
 	BOOL isWorking;
 	BOOL isRomLoading;
 	NSString *statusText;
 	float currentVolumeValue;
+	NSString *micStatusTooltip;
 	NSImage *currentMicStatusIcon;
 	NSImage *currentVolumeIcon;
 	BOOL isShowingSaveStateDialog;
@@ -104,7 +105,9 @@ class AudioSampleBlockGenerator;
 	float lastSetVolumeValue;
 	
 	NSImage *iconMicDisabled;
+	NSImage *iconMicDisabledDM;
 	NSImage *iconMicIdle;
+	NSImage *iconMicIdleNoHardware;
 	NSImage *iconMicActive;
 	NSImage *iconMicInClip;
 	NSImage *iconMicManualOverride;
@@ -112,6 +115,10 @@ class AudioSampleBlockGenerator;
 	NSImage *iconVolumeTwoThird;
 	NSImage *iconVolumeOneThird;
 	NSImage *iconVolumeMute;
+	NSImage *iconVolumeFullDM;
+	NSImage *iconVolumeTwoThirdDM;
+	NSImage *iconVolumeOneThirdDM;
+	NSImage *iconVolumeMuteDM;
 	NSImage *iconExecute;
 	NSImage *iconPause;
 	NSImage *iconSpeedNormal;
@@ -120,8 +127,8 @@ class AudioSampleBlockGenerator;
 	DisplayWindowController *mainWindow;
 	NSMutableArray *windowList;
 	
-	OSSpinLock spinlockFirmware;
-	OSSpinLock spinlockSpeaker;
+	apple_unfairlock_t _unfairlockFirmware;
+	apple_unfairlock_t _unfairlockSpeaker;
 }
 
 @property (readonly) IBOutlet InputManager *inputManager;
@@ -129,7 +136,6 @@ class AudioSampleBlockGenerator;
 @property (assign) CocoaDSRom *currentRom; // Don't rely on autorelease since the emulator doesn't support concurrent unloading
 @property (retain) CocoaDSFirmware *cdsFirmware;
 @property (retain) CocoaDSSpeaker *cdsSpeaker;
-@property (retain) CocoaDSCheatManager *cdsCheats;
 
 @property (readonly) IBOutlet CheatWindowDelegate *cheatWindowDelegate;
 @property (readonly) IBOutlet MacScreenshotCaptureToolDelegate *screenshotCaptureToolDelegate;
@@ -142,8 +148,8 @@ class AudioSampleBlockGenerator;
 @property (readonly) IBOutlet NSObjectController *cheatWindowController;
 @property (readonly) IBOutlet NSObjectController *slot2WindowController;
 @property (readonly) IBOutlet NSArrayController *inputDeviceListController;
-@property (readonly) IBOutlet NSArrayController *cheatListController;
-@property (readonly) IBOutlet NSArrayController *cheatDatabaseController;
+
+@property (readonly) IBOutlet NSMenu *cheatDatabaseRecentsMenu;
 
 @property (readonly) IBOutlet RomInfoPanel *romInfoPanel;
 
@@ -159,6 +165,7 @@ class AudioSampleBlockGenerator;
 @property (readonly) IBOutlet NSWindow *ndsErrorSheet;
 @property (readonly) IBOutlet NSTextField *ndsErrorStatusTextField;
 @property (readonly) IBOutlet NSView *exportRomSavePanelAccessoryView;
+@property (readonly) IBOutlet NSLevelIndicator *ndsMicLevelIndicator;
 
 @property (readonly) IBOutlet NSPopUpButton *openglMSAAPopUpButton;
 
@@ -169,12 +176,14 @@ class AudioSampleBlockGenerator;
 
 @property (readonly) CGFloat lastSetSpeedScalar;
 
+@property (assign) BOOL isRunningDarkMode;
 @property (assign) BOOL isWorking;
 @property (assign) BOOL isRomLoading;
 @property (assign) NSString *statusText;
 @property (assign) BOOL isHardwareMicAvailable;
 @property (assign) float currentMicGainValue;
 @property (assign) float currentVolumeValue;
+@property (assign) NSString *micStatusTooltip;
 @property (retain) NSImage *currentMicStatusIcon;
 @property (retain) NSImage *currentVolumeIcon;
 @property (assign) BOOL isShowingSaveStateDialog;
@@ -205,10 +214,14 @@ class AudioSampleBlockGenerator;
 - (IBAction) stopReplay:(id)sender;
 - (IBAction) importRomSave:(id)sender;
 - (IBAction) exportRomSave:(id)sender;
+- (IBAction) openCheatDatabaseFile:(id)sender;
+- (IBAction) clearCheatDatabaseRecents:(id)sender;
+- (IBAction) openRecentCheatDatabase:(id)sender;
 
 // Emulation Menu
 - (IBAction) toggleSpeedLimiter:(id)sender;
 - (IBAction) toggleAutoFrameSkip:(id)sender;
+- (IBAction) framesToSkipSetting:(id)sender;
 - (IBAction) toggleCheats:(id)sender;
 - (IBAction) toggleExecutePause:(id)sender;
 - (IBAction) coreExecute:(id)sender;
@@ -217,6 +230,7 @@ class AudioSampleBlockGenerator;
 - (IBAction) frameJump:(id)sender;
 - (IBAction) reset:(id)sender;
 - (IBAction) changeRomSaveType:(id)sender;
+- (IBAction) changeHostMicrophonePermission:(id)sender;
 
 // View Menu
 - (IBAction) toggleAllDisplays:(id)sender;
@@ -288,6 +302,7 @@ class AudioSampleBlockGenerator;
 - (BOOL) loadRomByURL:(NSURL *)romURL asynchronous:(BOOL)willLoadAsync;
 - (void) loadRomDidFinish:(NSNotification *)aNotification;
 - (BOOL) unloadRom;
+- (void) updateCheatDatabaseRecentsMenu:(NSNotification *)aNotification;
 
 - (void) addOutputToCore:(CocoaDSOutput *)theOutput;
 - (void) removeOutputFromCore:(CocoaDSOutput *)theOutput;
@@ -310,9 +325,11 @@ class AudioSampleBlockGenerator;
 - (void) updateDisplayPanelTitles;
 - (void) appInit;
 - (void) fillOpenGLMSAAMenu;
+- (NSInteger) updateHostMicrophonePermissionStatus;
 - (void) readUserDefaults;
 - (void) writeUserDefaults;
 - (void) restoreDisplayWindowStates;
 - (void) saveDisplayWindowStates;
+- (void) handleAppearanceChange;
 
 @end

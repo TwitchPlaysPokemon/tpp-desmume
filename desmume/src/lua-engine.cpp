@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2009-2019 DeSmuME team
+	Copyright (C) 2009-2021 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,16 +19,21 @@
 
 #if defined(WIN32)
 	#include <windows.h>
-	#include <direct.h>
-	#include <MMSystem.h>
+    #if defined(WIN32_FRONTEND)
+        #include <direct.h>
+        #include <MMSystem.h>
 
-	typedef HMENU PlatformMenu;    // hMenu
-	#define MAX_MENU_COUNT (IDC_LUAMENU_RESERVE_END - IDC_LUAMENU_RESERVE_START + 1)
+        typedef HMENU PlatformMenu;    // hMenu
+        #define MAX_MENU_COUNT (IDC_LUAMENU_RESERVE_END - IDC_LUAMENU_RESERVE_START + 1)
 
-	#include "frontend/windows/main.h"
-	#include "frontend/windows/video.h"
-	#include "frontend/windows/resource.h"
-	#include "frontend/windows/display.h"
+        #include "frontend/windows/main.h"
+        #include "frontend/windows/video.h"
+        #include "frontend/windows/resource.h"
+        #include "frontend/windows/display.h"
+    #else
+        typedef void* PlatformMenu;
+        #define MAX_MENU_COUNT 0
+    #endif
 #else
 	// TODO: define appropriate types for menu
 	typedef void* PlatformMenu;
@@ -58,6 +63,7 @@
 #include "SPU.h"
 #include "saves.h"
 #include "emufile.h"
+#include "types.h"
 
 using namespace std;
 
@@ -507,7 +513,7 @@ static int doPopup(lua_State* L, const char* deftype, const char* deficon)
 
 	static const char * const titles [] = {"Notice", "Question", "Warning", "Error"};
 	const char* answer = "ok";
-#if defined(_WIN32)
+#if defined(WIN32_FRONTEND)
 	static const int etypes [] = {MB_OK, MB_YESNO, MB_YESNOCANCEL, MB_OKCANCEL, MB_ABORTRETRYIGNORE};
 	static const int eicons [] = {MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_ICONERROR};
 //	DialogsOpen++;
@@ -1370,7 +1376,7 @@ bool luabitop_validate(lua_State *L) // originally named as luaopen_bit
   if (b != (UBits)1437217655L || BAD_SAR) {  /* Perform a simple self-test. */
     const char *msg = "compiled with incompatible luaconf.h";
 #ifdef LUA_NUMBER_DOUBLE
-#if defined(_WIN32)
+#if defined(WIN32_FRONTEND)
     if (b == (UBits)1610612736L)
       msg = "use D3DCREATE_FPU_PRESERVE with DirectX";
 #endif
@@ -1442,7 +1448,7 @@ void indicateBusy(lua_State* L, bool busy)
 		lua_pop(L, 1);
 	}
 */
-#if defined(_WIN32)
+#if defined(WIN32_FRONTEND)
 	uintptr_t uid = luaStateToUIDMap[L->l_G->mainthread];
 	HWND hDlg = (HWND)uid;
 	char str [1024];
@@ -1496,7 +1502,7 @@ void LuaRescueHook(lua_State* L, lua_Debug *dbg)
 		if(!info.panic)
 		{
 			SPU_ClearOutputBuffer();
-#if defined(ASK_USER_ON_FREEZE) && defined(_WIN32)
+#if defined(ASK_USER_ON_FREEZE) && defined(WIN32_FRONTEND)
 			DialogsOpen++;
 			int answer = MessageBox(HWnd, "A Lua script has been running for quite a while. Maybe it is in an infinite loop.\n\nWould you like to stop the script?\n\n(Yes to stop it now,\n No to keep running and not ask again,\n Cancel to keep running but ask again later)", "Lua Alert", MB_YESNOCANCEL | MB_DEFBUTTON3 | MB_ICONASTERISK);
 			DialogsOpen--;
@@ -2017,8 +2023,8 @@ DEFINE_LUA_FUNCTION(memory_getregister, "cpu_dot_registername_string")
 					switch(rpm.dataSize)
 					{ default:
 					case 1: lua_pushinteger(L, *(unsigned char*)rpm.pointer); break;
-					case 2: lua_pushinteger(L, *(unsigned short*)rpm.pointer); break;
-					case 4: lua_pushinteger(L, *(unsigned long*)rpm.pointer); break;
+					case 2: lua_pushinteger(L, *(u16*)rpm.pointer); break;
+					case 4: lua_pushinteger(L, *(u32*)rpm.pointer); break;
 					}
 					return 1;
 				}
@@ -2033,7 +2039,7 @@ DEFINE_LUA_FUNCTION(memory_getregister, "cpu_dot_registername_string")
 DEFINE_LUA_FUNCTION(memory_setregister, "cpu_dot_registername_string,value")
 {
 	const char* qualifiedRegisterName = luaL_checkstring(L,1);
-	unsigned long value = (unsigned long)(luaL_checkinteger(L,2));
+	unsigned long value = (u32)(luaL_checkinteger(L,2));
 	lua_settop(L,0);
 	for(int cpu = 0; cpu < sizeof(cpuToRegisterMaps)/sizeof(*cpuToRegisterMaps); cpu++)
 	{
@@ -2050,8 +2056,8 @@ DEFINE_LUA_FUNCTION(memory_setregister, "cpu_dot_registername_string,value")
 					switch(rpm.dataSize)
 					{ default:
 					case 1: *(unsigned char*)rpm.pointer = (unsigned char)(value & 0xFF); break;
-					case 2: *(unsigned short*)rpm.pointer = (unsigned short)(value & 0xFFFF); break;
-					case 4: *(unsigned long*)rpm.pointer = value; break;
+					case 2: *(u16*)rpm.pointer = (u16)(value & 0xFFFF); break;
+					case 4: *(u32*)rpm.pointer = value; break;
 					}
 					return 0;
 				}
@@ -2256,7 +2262,7 @@ public:
 
 	virtual size_t fwrite(const void *ptr, size_t bytes)
 	{
-		if(!failbit)
+		if(!this->_failbit)
 		{
 			u8* dst = buf()+pos;
 			const u8* src = (const u8*)ptr;
@@ -2266,14 +2272,14 @@ public:
 				if(*src != *dst)
 				{
 					if(differences.size() == 100)
-						failbit = true;
+						this->_failbit = true;
 					else
 					{
 						const NDSDisplayInfo &dispInfo = GPU->GetDisplayInfo();
 						char temp [256];
 						sprintf(temp, " " /*"mismatch at "*/ "byte %d(0x%X at %p): %d(0x%X) != %d(0x%X)\n", i, i, dst, *src,*src, *dst,*dst);
 
-						if(ptr == dispInfo.masterNativeBuffer || ptr == dispInfo.masterCustomBuffer || ptr == GPU->GetEngineMain()->Get3DFramebufferMain()) // ignore screen-only differences since frame skipping can cause them and it's probably ok
+						if(ptr == dispInfo.masterNativeBuffer16 || ptr == dispInfo.masterCustomBuffer || ptr == GPU->GetEngineMain()->Get3DFramebufferMain()) // ignore screen-only differences since frame skipping can cause them and it's probably ok
 							break;
 
 						differences.push_back(temp); // <-- probably the best place for a breakpoint
@@ -2655,7 +2661,7 @@ static void prepare_reading()
 	}
 	else
 	{
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 		extern VideoInfo video;
 		curGuiData.data = video.buffer;
 		curGuiData.stridePix = 256;
@@ -3285,7 +3291,7 @@ DEFINE_LUA_FUNCTION(gui_settransparency, "transparency_4_to_0")
 // this function is only supported by the windows frontend.
 DEFINE_LUA_FUNCTION(gui_setlayermask, "main,sub")
 {
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	lua_Integer main = luaL_checkint(L, 1);
 	lua_Integer sub = luaL_checkint(L, 2);
 	SetLayerMasks(main, sub);
@@ -3516,7 +3522,7 @@ static void GetCurrentScriptDir(char* buffer, int bufLen)
 
 DEFINE_LUA_FUNCTION(emu_openscript, "filename")
 {
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	char curScriptDir[1024]; GetCurrentScriptDir(curScriptDir, 1024); // make sure we can always find scripts that are in the same directory as the current script
 	const char* filename = lua_isstring(L,1) ? lua_tostring(L,1) : NULL;
 	extern const char* OpenLuaScript(const char* filename, const char* extraDirToCheck, bool makeSubservient);
@@ -3538,7 +3544,7 @@ DEFINE_LUA_FUNCTION(emu_reset, "")
 
 static bool IsLuaMenuItem(PlatformMenuItem menuItem)
 {
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	return (menuItem >= IDC_LUAMENU_RESERVE_START && menuItem <= IDC_LUAMENU_RESERVE_END);
 #else
 	return false;
@@ -3547,7 +3553,7 @@ static bool IsLuaMenuItem(PlatformMenuItem menuItem)
 
 static bool SearchFreeMenuItem(PlatformMenu menu, PlatformMenuItem& menuItem)
 {
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	for (UINT menuItemId = IDC_LUAMENU_RESERVE_START; menuItemId <= IDC_LUAMENU_RESERVE_END; menuItemId++)
 	{
 		MENUITEMINFO mii;
@@ -3569,7 +3575,7 @@ static bool SearchFreeMenuItem(PlatformMenu menu, PlatformMenuItem& menuItem)
 
 static PlatformMenu AddSubMenu(PlatformMenu topMenu, PlatformMenu menu, const char* menuName)
 {
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	LuaContextInfo& info = GetCurrentInfo();
 	MENUITEMINFO mii;
 
@@ -3627,7 +3633,7 @@ static PlatformMenu AddSubMenu(PlatformMenu topMenu, PlatformMenu menu, const ch
 
 bool AddMenuEntries(PlatformMenu topMenu, PlatformMenu menu)
 {
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	LuaContextInfo& info = GetCurrentInfo();
 	lua_State* L = info.L;
 	luaL_checktype(L, -1, LUA_TTABLE);
@@ -3731,7 +3737,7 @@ bool AddMenuEntries(PlatformMenu topMenu, PlatformMenu menu)
 
 DEFINE_LUA_FUNCTION(emu_addmenu, "menuName, menuEntries")
 {
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	int nargs = lua_gettop(L);
 	if (nargs > 1 && !lua_isnil(L, 1))
 	{
@@ -3767,7 +3773,7 @@ DEFINE_LUA_FUNCTION(emu_setmenuiteminfo, "menuItem, infoTable")
 {
 	luaL_checktype(L, 1, LUA_TFUNCTION);
 	luaL_checktype(L, 2, LUA_TTABLE);
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 	LuaContextInfo& info = GetCurrentInfo();
 	map<PlatformMenuItem, PlatformMenu>::iterator it = info.menuData.menuItemMap.begin();
 	while(it != info.menuData.menuItemMap.end())
@@ -4054,7 +4060,7 @@ DEFINE_LUA_FUNCTION(sound_clear, "")
 	return 0;
 }
 
-#if defined(_WIN32)
+#if defined(WIN32_FRONTEND)
 const char* s_keyToName[256] =
 {
 	NULL,
@@ -4168,7 +4174,7 @@ DEFINE_LUA_FUNCTION(input_getcurrentinputstatus, "")
 {
 	lua_newtable(L);
 
-#if defined(_WIN32)
+#if defined(WIN32_FRONTEND)
 	// keyboard and mouse button status
 	{
 		extern bool allowBackgroundInput;
@@ -4696,6 +4702,7 @@ DEFINE_LUA_FUNCTION(stylus_write, "table")
 // joystickID: a value (0-15) that identifies the controller to read; default is 0 which is the "preferred device" set in the control panel
 // returnDiagonals: a boolean (true/false) that determines whether or not to return diagonal values from a supported D-pad; default is false, which ignores diagonal values
 DEFINE_LUA_FUNCTION(controller_get, "[joystickID = 0 [,returnDiagonals = false]]") {
+#if defined(WIN32_FRONTEND)
 	unsigned int i_joystickID = 0;bool f_returnDiagonals = 0; // initialize optional variables
 	switch (lua_gettop(L)) { // get number of arguments
 		case 1:
@@ -4799,6 +4806,9 @@ DEFINE_LUA_FUNCTION(controller_get, "[joystickID = 0 [,returnDiagonals = false]]
 	}
 
 	return 1; // return the table
+#else
+    return 0;
+#endif
 }
 static const struct luaL_reg controllerlib [] = {
 	{"get", controller_get},
@@ -5669,7 +5679,7 @@ void StopLuaScript(int uid)
 			for(int i = 0; i < LUAMEMHOOK_COUNT; i++)
 				CalculateMemHookRegions((LuaMemHookType)i);
 
-#if defined(WIN32)
+#if defined(WIN32_FRONTEND)
 			// remove items
 			map<PlatformMenuItem, PlatformMenu>::iterator it = info.menuData.menuItemMap.begin();
 			while(it != info.menuData.menuItemMap.end())

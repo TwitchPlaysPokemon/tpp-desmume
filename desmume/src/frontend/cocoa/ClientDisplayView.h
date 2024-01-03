@@ -139,8 +139,8 @@ private:
 	void __InstanceInit(const ClientDisplayPresenterProperties &props);
 	
 protected:
-	ClientDisplayPresenterProperties _renderProperty;
-	ClientDisplayPresenterProperties _stagedProperty;
+	ClientDisplayPresenterProperties _propsPending;
+	ClientDisplayPresenterProperties _propsApplied;
 	GPUClientFetchObject *_fetchObject;
 	
 	bool _useDeposterize;
@@ -154,6 +154,7 @@ protected:
 	double _scaleFactor;
 	
 	double _hudObjectScale;
+	bool _isHUDRenderMipmapped;
 	bool _isHUDVisible;
 	bool _showExecutionSpeed;
 	bool _showVideoFPS;
@@ -186,6 +187,8 @@ protected:
 	
 	FT_Library _ftLibrary;
 	const char *_lastFontFilePath;
+	uint8_t *_hudFontFileCache;
+	size_t _hudFontFileCacheSize;
 	GlyphInfo _glyphInfo[256];
 	size_t _glyphSize;
 	size_t _glyphTileSize;
@@ -258,6 +261,8 @@ public:
 	float GetHUDObjectScale() const;
 	virtual void SetHUDObjectScale(float objectScale);
 	
+	bool WillHUDRenderMipmapped() const;
+	void SetHUDRenderMipmapped(const bool mipmapState);
 	bool GetHUDVisibility() const;
 	virtual void SetHUDVisibility(const bool visibleState);
 	bool GetHUDShowExecutionSpeed() const;
@@ -360,10 +365,16 @@ public:
 	virtual void FlushAndFinalizeImmediate();
 	
 	// Touch screen input handling
+	static void GetNDSPoint(const ClientDisplayPresenterProperties &props,
+					 const double logicalClientWidth, const double logicalClientHeight,
+					 const double clientX, const double clientY,
+					 const bool isInitialTouchPress,
+					 uint8_t &outX, uint8_t &outY, bool &outTouchPressInMajorDisplay);
+	
 	void GetNDSPoint(const ClientDisplayPresenterProperties &props,
 					 const double logicalClientWidth, const double logicalClientHeight,
-					 const int inputID, const bool isInitialTouchPress,
 					 const double clientX, const double clientY,
+					 const int inputID, const bool isInitialTouchPress,
 					 uint8_t &outX, uint8_t &outY) const;
 	
 	// Utility methods

@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2012-2017 DeSmuME team
+	Copyright (C) 2012-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@
 @dynamic autohold;
 @dynamic paddleAdjust;
 @synthesize stylusPressure;
+@dynamic hardwareMicAuthorization;
 @dynamic isHardwareMicAvailable;
 @dynamic isHardwareMicIdle;
 @dynamic isHardwareMicInClip;
@@ -84,6 +85,16 @@
 	return inputHandler;
 }
 
+- (void) setHardwareMicAuthorization:(BOOL)isAuthorized
+{
+	inputHandler->SetHardwareMicAuthorized((isAuthorized) ? true : false);
+}
+
+- (BOOL) hardwareMicAuthorization
+{
+	return (inputHandler->IsHardwareMicAuthorized()) ? YES : NO;
+}
+
 - (BOOL) isHardwareMicAvailable
 {
 	return (inputHandler->IsHardwareMicAvailable()) ? YES : NO;
@@ -107,9 +118,7 @@
 	
 	if ( (delegate != nil) && [delegate respondsToSelector:@selector(doMicLevelUpdateFromController:)] )
 	{
-		NSAutoreleasePool *tempPool = [[NSAutoreleasePool alloc] init];
 		[[self delegate] doMicLevelUpdateFromController:self];
-		[tempPool release];
 	}
 }
 
@@ -239,6 +248,7 @@
 - (void) handleMicHardwareStateChanged:(CoreAudioInputDeviceInfo *)deviceInfo
 							 isEnabled:(BOOL)isHardwareEnabled
 							  isLocked:(BOOL)isHardwareLocked
+						  isAuthorized:(BOOL)isAuthorized
 {
 	NSAutoreleasePool *tempPool = [[NSAutoreleasePool alloc] init];
 	
@@ -263,11 +273,12 @@
 	inputHandler->ClearAverageMicLevel();
 	inputHandler->ReportAverageMicLevel();
 	
-	if ( (delegate != nil) && [delegate respondsToSelector:@selector(doMicHardwareStateChangedFromController:isEnabled:isLocked:)] )
+	if ( (delegate != nil) && [delegate respondsToSelector:@selector(doMicHardwareStateChangedFromController:isEnabled:isLocked:isAuthorized:)] )
 	{
 		[[self delegate] doMicHardwareStateChangedFromController:self
 													   isEnabled:isHardwareEnabled
-														isLocked:isHardwareLocked];
+														isLocked:isHardwareLocked
+													isAuthorized:isAuthorized];
 	}
 	
 	[tempPool release];
@@ -321,13 +332,24 @@ void MacInputHandler::StartHardwareMicDevice()
 	this->_CAInputDevice->Start();
 }
 
+void MacInputHandler::SetHardwareMicAuthorized(bool isAuthorized)
+{
+	this->_CAInputDevice->SetHardwareAuthorized(isAuthorized);
+}
+
+bool MacInputHandler::IsHardwareMicAuthorized()
+{
+	return this->_CAInputDevice->IsHardwareAuthorized();
+}
+
 bool MacInputHandler::IsHardwareMicAvailable()
 {
-	return ( this->_CAInputDevice->IsHardwareEnabled() && !this->_CAInputDevice->IsHardwareLocked() );
+	return ( this->_CAInputDevice->IsHardwareEnabled() && !this->_CAInputDevice->IsHardwareLocked() && this->_CAInputDevice->IsHardwareAuthorized() );
 }
 
 void MacInputHandler::ReportAverageMicLevel()
 {
+	this->ApplyAverageMicLevel();
 	[this->_cdsController setMicLevel:this->GetAverageMicLevel()];
 }
 
@@ -389,13 +411,15 @@ uint8_t CASampleReadCallback(void *inParam1, void *inParam2)
 void CAHardwareStateChangedCallback(CoreAudioInputDeviceInfo *deviceInfo,
 									const bool isHardwareEnabled,
 									const bool isHardwareLocked,
+									const bool isHardwareAuthorized,
 									void *inParam1,
 									void *inParam2)
 {
 	CocoaDSController *cdsController = (CocoaDSController *)inParam1;
 	[cdsController handleMicHardwareStateChanged:(CoreAudioInputDeviceInfo *)deviceInfo
 									   isEnabled:((isHardwareEnabled) ? YES : NO)
-										isLocked:((isHardwareLocked) ? YES : NO)];
+										isLocked:((isHardwareLocked) ? YES : NO)
+									isAuthorized:((isHardwareAuthorized) ? YES : NO)];
 }
 
 void CAHardwareGainChangedCallback(float normalizedGain, void *inParam1, void *inParam2)

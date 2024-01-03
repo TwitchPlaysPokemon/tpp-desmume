@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2006-2007 shash
-	Copyright (C) 2007-2019 DeSmuME team
+	Copyright (C) 2007-2023 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -156,9 +156,9 @@ protected:
 	size_t _framebufferPixCount;
 	size_t _framebufferSIMDPixCount;
 	size_t _framebufferColorSizeBytes;
-	FragmentColor *_framebufferColor;
+	Color4u8 *_framebufferColor;
 	
-	FragmentColor _clearColor6665;
+	Color4u8 _clearColor6665;
 	FragmentAttributes _clearAttributes;
 	
 	NDSColorFormat _internalRenderingFormat;
@@ -183,31 +183,33 @@ protected:
 	SSurface _textureDeposterizeDstSurface;
 	
 	u32 *_textureUpscaleBuffer;
-	Render3DTexture *_textureList[POLYLIST_SIZE];
+	Render3DTexture *_textureList[CLIPPED_POLYLIST_SIZE];
 	
 	size_t _clippedPolyCount;
 	size_t _clippedPolyOpaqueCount;
 	CPoly *_clippedPolyList;
+	POLY *_rawPolyList;
 	
 	CACHE_ALIGN u16 clearImageColor16Buffer[GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT];
 	CACHE_ALIGN u32 clearImageDepthBuffer[GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT];
 	CACHE_ALIGN u8 clearImageFogBuffer[GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT];
 	
+	virtual void _ClearImageBaseLoop(const u16 *__restrict inColor16, const u16 *__restrict inDepth16, u16 *__restrict outColor16, u32 *__restrict outDepth24, u8 *__restrict outFog);
 	template<bool ISCOLORBLANK, bool ISDEPTHBLANK> void _ClearImageScrolledLoop(const u8 xScroll, const u8 yScroll, const u16 *__restrict inColor16, const u16 *__restrict inDepth16,
 																				u16 *__restrict outColor16, u32 *__restrict outDepth24, u8 *__restrict outFog);
 	
 	
-	virtual Render3DError BeginRender(const GFX3D &engine);
+	virtual Render3DError BeginRender(const GFX3D_State &renderState, const GFX3D_GeometryList &renderGList);
 	virtual Render3DError RenderGeometry();
 	virtual Render3DError PostprocessFramebuffer();
 	virtual Render3DError EndRender();
-	virtual Render3DError FlushFramebuffer(const FragmentColor *__restrict srcFramebuffer, FragmentColor *__restrict dstFramebufferMain, u16 *__restrict dstFramebuffer16);
+	virtual Render3DError FlushFramebuffer(const Color4u8 *__restrict srcFramebuffer, Color4u8 *__restrict dstFramebufferMain, u16 *__restrict dstFramebuffer16);
 	
 	virtual Render3DError ClearUsingImage(const u16 *__restrict colorBuffer, const u32 *__restrict depthBuffer, const u8 *__restrict fogBuffer, const u8 opaquePolyID);
-	virtual Render3DError ClearUsingValues(const FragmentColor &clearColor6665, const FragmentAttributes &clearAttributes);
+	virtual Render3DError ClearUsingValues(const Color4u8 &clearColor6665, const FragmentAttributes &clearAttributes);
 	
 	virtual Render3DError SetupTexture(const POLY &thePoly, size_t polyRenderIndex);
-	virtual Render3DError SetupViewport(const u32 viewportValue);
+	virtual Render3DError SetupViewport(const GFX3D_Viewport viewport);
 	
 public:
 	static void* operator new(size_t size);
@@ -231,7 +233,7 @@ public:
 	
 	virtual Render3DError RenderPowerOff();				// Called when the renderer needs to handle a power-off condition by clearing its framebuffers.
 	
-	virtual Render3DError Render(const GFX3D &engine);	// Called when the renderer should do its job and render the current display lists.
+	virtual Render3DError Render(const GFX3D_State &renderState, const GFX3D_GeometryList &renderGList);	// Called whenever the 3D renderer needs to render the geometry lists.
 	
 	virtual Render3DError RenderFinish();				// Called whenever 3D rendering needs to finish. This function should block the calling thread
 														// and only release the block when 3D rendering is finished. (Before reading the 3D layer, be
@@ -256,7 +258,7 @@ public:
 	
 	virtual NDSColorFormat GetColorFormat() const;							// The output color format of the 3D renderer.
 	
-	virtual FragmentColor* GetFramebuffer();
+	virtual Color4u8* GetFramebuffer();
 	
 	bool GetRenderNeedsFinish() const;
 	void SetRenderNeedsFinish(const bool renderNeedsFinish);
@@ -270,6 +272,8 @@ public:
 	virtual ClipperMode GetPreferredPolygonClippingMode() const;
 	const CPoly& GetClippedPolyByIndex(size_t index) const;
 	size_t GetClippedPolyCount() const;
+	
+	const POLY* GetRawPolyList() const;
 };
 
 template <size_t SIMDBYTES>
@@ -281,12 +285,12 @@ public:
 	virtual Render3DError SetFramebufferSize(size_t w, size_t h);
 };
 
-#if defined(ENABLE_AVX)
+#if defined(ENABLE_AVX2)
 
-class Render3D_AVX : public Render3D_SIMD<32>
+class Render3D_AVX2 : public Render3D_SIMD<32>
 {
 public:
-	virtual Render3DError ClearFramebuffer(const GFX3D_State &renderState);
+	virtual void _ClearImageBaseLoop(const u16 *__restrict inColor16, const u16 *__restrict inDepth16, u16 *__restrict outColor16, u32 *__restrict outDepth24, u8 *__restrict outFog);
 };
 
 #elif defined(ENABLE_SSE2)
@@ -294,13 +298,24 @@ public:
 class Render3D_SSE2 : public Render3D_SIMD<16>
 {
 public:
-	virtual Render3DError ClearFramebuffer(const GFX3D_State &renderState);
+	virtual void _ClearImageBaseLoop(const u16 *__restrict inColor16, const u16 *__restrict inDepth16, u16 *__restrict outColor16, u32 *__restrict outDepth24, u8 *__restrict outFog);
+};
+
+#elif defined(ENABLE_NEON_A64)
+
+class Render3D_NEON : public Render3D_SIMD<16>
+{
+public:
+	virtual void _ClearImageBaseLoop(const u16 *__restrict inColor16, const u16 *__restrict inDepth16, u16 *__restrict outColor16, u32 *__restrict outDepth24, u8 *__restrict outFog);
 };
 
 #elif defined(ENABLE_ALTIVEC)
 
-class Render3D_Altivec : public Render3D_SIMD<16>
-{};
+class Render3D_AltiVec : public Render3D_SIMD<16>
+{
+public:
+	virtual void _ClearImageBaseLoop(const u16 *__restrict inColor16, const u16 *__restrict inDepth16, u16 *__restrict outColor16, u32 *__restrict outDepth24, u8 *__restrict outFog);
+};
 
 #endif
 

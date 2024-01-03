@@ -17,6 +17,7 @@
 
 #include "path.h"
 #include "winutil.h"
+#include "utils/xstring.h"
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
@@ -25,8 +26,9 @@
 
 
 char IniName[MAX_PATH];
+wchar_t IniNameW[MAX_PATH];
 
-char* _hack_alternateModulePath;
+std::string _hack_alternateModulePathUtf8;
 
 
 static char vPath[MAX_PATH*2], *szPath;
@@ -53,14 +55,13 @@ void GetINIPath()
 
 			//use an alternate path
 			useModulePath = false;
-			static char userpath[MAX_PATH];
-			SHGetFolderPath(NULL,CSIDL_LOCAL_APPDATA,NULL,0,userpath);
-			_snprintf(vPath,MAX_PATH,"%s\\%s",userpath,"DeSmuME");
-			szPath = vPath;
-			_hack_alternateModulePath = szPath;
+			static wchar_t userpath[MAX_PATH];
+			SHGetFolderPathW(NULL,CSIDL_LOCAL_APPDATA,NULL,0,userpath);
+			std::wstring blah = (std::wstring)userpath + L"\\DeSmuME";
+			_hack_alternateModulePathUtf8 = wcstombs(blah);
 
 			//not so sure about this.. but lets go for it.
-			SetCurrentDirectory(userpath);
+			SetCurrentDirectoryW(blah.c_str());
 		}
 	}
 
@@ -86,6 +87,21 @@ void GetINIPath()
 	}
 
 	FCEUD_MakePathDirs(IniName);
+	wcscpy(IniNameW,mbstowcs(IniName).c_str()); //careful to use locale C-style mbstowcs to get IniName (which is with locale encoding) to unicode
+
+	//write BOM to get unicode
+	FILE* test = fopen(IniName,"rb");
+	if(test)
+		fclose(test);
+	else
+	{
+		test = fopen(IniName,"wb");
+		if(test)
+		{
+			fputs("\xFF\xFE",test);
+			fclose(test);
+		}
+	}
 }
 
 void PreventScreensaver()

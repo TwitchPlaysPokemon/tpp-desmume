@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2017 DeSmuME team
+	Copyright (C) 2017-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 
 #import <Cocoa/Cocoa.h>
 #import <OpenGL/OpenGL.h>
-#include <libkern/OSAtomic.h>
+#include "../utilities.h"
 
 #import "DisplayViewCALayer.h"
 #import "../cocoa_GPU.h"
@@ -44,45 +44,63 @@ class MacOGLDisplayView;
 
 @end
 
-class MacOGLClientFetchObject : public OGLClientFetchObject
+class MacOGLClientSharedData : public OGLClientSharedData
 {
 protected:
-	NSOpenGLContext *_nsContext;
-	CGLContextObj _context;
-	
-	OSSpinLock _spinlockTexFetch[2];
+	apple_unfairlock_t _unfairlockTexFetch[2];
 	
 public:
-	void operator delete(void *ptr);
-	MacOGLClientFetchObject();
-	
-	NSOpenGLContext* GetNSContext() const;
-	CGLContextObj GetContext() const;
-	
-	virtual void Init();
-	virtual void SetFetchBuffers(const NDSDisplayInfo &currentDisplayInfo);
-	virtual void FetchFromBufferIndex(const u8 index);
+	MacOGLClientSharedData();
+	~MacOGLClientSharedData();
 	
 	virtual GLuint GetFetchTexture(const NDSDisplayID displayID);
 	virtual void SetFetchTexture(const NDSDisplayID displayID, GLuint texID);
 };
 
-class MacOGLDisplayPresenter : public OGLVideoOutput, public MacDisplayPresenterInterface
+class MacOGLClientFetchObject : public MacGPUFetchObjectDisplayLink
+{
+protected:
+	NSOpenGLContext *_nsContext;
+	CGLContextObj _context;
+	
+	// GPUClientFetchObject methods
+	virtual void _FetchNativeDisplayByID(const NDSDisplayID displayID, const u8 bufferIndex);
+	virtual void _FetchCustomDisplayByID(const NDSDisplayID displayID, const u8 bufferIndex);
+	
+public:
+	void operator delete(void *ptr);
+	MacOGLClientFetchObject();
+	~MacOGLClientFetchObject();
+	
+	NSOpenGLContext* GetNSContext() const;
+	CGLContextObj GetContext() const;
+	
+	void FetchNativeDisplayToSrcClone(const NDSDisplayID displayID, const u8 bufferIndex, bool needsLock);
+	void FetchCustomDisplayToSrcClone(const NDSDisplayID displayID, const u8 bufferIndex, bool needsLock);
+	
+	// GPUClientFetchObject methods
+	virtual void Init();
+	virtual void SetFetchBuffers(const NDSDisplayInfo &currentDisplayInfo);
+	virtual void FetchFromBufferIndex(const u8 index);
+};
+
+class MacOGLDisplayPresenter : public OGLVideoOutput
 {
 private:
-	void __InstanceInit(MacClientSharedObject *sharedObject);
+	void __InstanceInit(MacOGLClientFetchObject *fetchObject);
 	
 protected:
 	NSOpenGLContext *_nsContext;
 	NSOpenGLPixelFormat *_nsPixelFormat;
 	CGLContextObj _context;
 	CGLPixelFormatObj _pixelFormat;
-	OSSpinLock _spinlockProcessedInfo;
+	apple_unfairlock_t _unfairlockProcessedInfo;
 	
 public:
 	void operator delete(void *ptr);
 	MacOGLDisplayPresenter();
-	MacOGLDisplayPresenter(MacClientSharedObject *sharedObject);
+	MacOGLDisplayPresenter(MacOGLClientFetchObject *fetchObject);
+	~MacOGLDisplayPresenter();
 	
 	virtual void Init();
 	
@@ -115,14 +133,14 @@ public:
 class MacOGLDisplayView : public MacDisplayLayeredView
 {
 private:
-	void __InstanceInit(MacClientSharedObject *sharedObject);
+	void __InstanceInit(MacOGLClientFetchObject *fetchObject);
 	
 protected:
-	OSSpinLock _spinlockViewNeedsFlush;
+	apple_unfairlock_t _unfairlockViewNeedsFlush;
 		
 public:
 	MacOGLDisplayView();
-	MacOGLDisplayView(MacClientSharedObject *sharedObject);
+	MacOGLDisplayView(MacOGLClientFetchObject *fetchObject);
 	virtual ~MacOGLDisplayView();
 	
 	virtual bool GetViewNeedsFlush();

@@ -30,10 +30,14 @@
 
 
 
-u16 keyboard_cfg[NB_KEYS];
-u16 joypad_cfg[NB_KEYS];
+u32 keyboard_cfg[NB_KEYS];
+u32 joypad_cfg[NB_KEYS];
+
+static_assert(sizeof(keyboard_cfg) == sizeof(joypad_cfg), "");
+
 u16 nbr_joy;
 mouse_status mouse;
+static int fullscreen;
 
 static SDL_Joystick **open_joysticks = NULL;
 
@@ -61,7 +65,7 @@ const char *key_names[NB_KEYS] =
  */
  
 /* Default joypad configuration */
-const u16 default_joypad_cfg[NB_KEYS] =
+const u32 default_joypad_cfg[NB_KEYS] =
   { 0x0201,  // A
     0x0200,  // B
     0x0205,  // select
@@ -80,14 +84,14 @@ const u16 default_joypad_cfg[NB_KEYS] =
   };
 
 /* Load default joystick and keyboard configurations */
-void load_default_config(const u16 kbCfg[])
+void load_default_config(const u32 kbCfg[])
 {
   memcpy(keyboard_cfg, kbCfg, sizeof(keyboard_cfg));
   memcpy(joypad_cfg, default_joypad_cfg, sizeof(joypad_cfg));
 }
 
 /* Set all buttons at once */
-static void set_joy_keys(const u16 joyCfg[])
+static void set_joy_keys(const u32 joyCfg[])
 {
   memcpy(joypad_cfg, joyCfg, sizeof(joypad_cfg));
 }
@@ -123,7 +127,7 @@ BOOL init_joy( void) {
       for (i = 0; i < nbr_joy; i++)
         {
           SDL_Joystick * joy = SDL_JoystickOpen(i);
-          printf("Joystick %d %s\n", i, SDL_JoystickName(i));
+          printf("Joystick %d %s\n", i, SDL_JoystickNameForIndex(i));
           printf("Axes: %d\n", SDL_JoystickNumAxes(joy));
           printf("Buttons: %d\n", SDL_JoystickNumButtons(joy));
           printf("Trackballs: %d\n", SDL_JoystickNumBalls(joy));
@@ -170,7 +174,7 @@ u16 lookup_joy_key (u16 keyval) {
 }
 
 /* Return keypad vector with given key set to 1 */
-u16 lookup_key (u16 keyval) {
+u32 lookup_key (u32 keyval) {
   int i;
   u16 Key = 0;
 
@@ -259,7 +263,7 @@ u16 get_set_joy_key(int index) {
 
 static signed long
 screen_to_touch_range( signed long scr, float size_ratio) {
-  return (signed long)((float)scr * size_ratio);
+  return (signed long)((float)scr / size_ratio);
 }
 
 /* Set mouse coordinates */
@@ -272,12 +276,12 @@ static void set_mouse_coord(signed long x,signed long y)
 }
 
 // Adapted from Windows port
-bool allowUpAndDown = false;
-static buttonstruct<int> cardinalHeldTime = {0};
+static bool allowUpAndDown = false;
+static buttonstruct<int> cardinalHeldTime = {};
 
 static void RunAntipodalRestriction(const buttonstruct<bool>& pad)
 {
-	if(allowUpAndDown)
+	if (allowUpAndDown)
 		return;
 
 	pad.U ? (cardinalHeldTime.U++) : (cardinalHeldTime.U=0);
@@ -287,20 +291,22 @@ static void RunAntipodalRestriction(const buttonstruct<bool>& pad)
 }
 static void ApplyAntipodalRestriction(buttonstruct<bool>& pad)
 {
-	if(allowUpAndDown)
+	if (allowUpAndDown)
 		return;
 
 	// give preference to whichever direction was most recently pressed
-	if(pad.U && pad.D)
-		if(cardinalHeldTime.U < cardinalHeldTime.D)
+	if (pad.U && pad.D) {
+		if (cardinalHeldTime.U < cardinalHeldTime.D)
 			pad.D = false;
 		else
 			pad.U = false;
-	if(pad.L && pad.R)
-		if(cardinalHeldTime.L < cardinalHeldTime.R)
+	}
+	if (pad.L && pad.R) {
+		if (cardinalHeldTime.L < cardinalHeldTime.R)
 			pad.R = false;
 		else
 			pad.L = false;
+	}
 }
 
 /* Update NDS keypad */
@@ -466,7 +472,7 @@ process_joystick_events( u16 *keypad) {
     }
 }
 
-u16 shift_pressed;
+static u16 shift_pressed;
 
 void
 process_ctrls_event( SDL_Event& event,
@@ -476,36 +482,42 @@ process_ctrls_event( SDL_Event& event,
   if ( !do_process_joystick_events( &cfg->keypad, &event)) {
     switch (event.type)
     {
-      case SDL_VIDEORESIZE:
-        cfg->resize_cb( event.resize.w, event.resize.h, cfg->screen_texture);
-        break;
-
-      case SDL_ACTIVEEVENT:
-        if (cfg->auto_pause && (event.active.state & SDL_APPINPUTFOCUS )) {
-          if (event.active.gain) {
-            cfg->focused = 1;
-            SPU_Pause(0);
-            driver->AddLine("Auto pause disabled");
-          } else {
-            cfg->focused = 0;
-            SPU_Pause(1);
-          }
+      case SDL_WINDOWEVENT:
+        switch (event.window.event) {
+          case SDL_WINDOWEVENT_RESIZED:
+            cfg->resize_cb(event.window.data1, event.window.data2, cfg->screen_texture);
+            break;
+          case SDL_WINDOWEVENT_FOCUS_GAINED:
+            if (cfg->auto_pause) {
+              cfg->focused = 1;
+              SPU_Pause(0);
+              driver->AddLine("Auto pause disabled");
+            }
+            break;
+          case SDL_WINDOWEVENT_FOCUS_LOST:
+            if (cfg->auto_pause) {
+              cfg->focused = 0;
+              SPU_Pause(1);
+            }
+            break;
         }
         break;
 
       case SDL_KEYDOWN:
-        switch(event.key.keysym.sym){
-            case SDLK_LSHIFT:
-                shift_pressed |= 1;
-                break;
-            case SDLK_RSHIFT:
-                shift_pressed |= 2;
-                break;
-            default:
-                key = lookup_key(event.key.keysym.sym);
-                ADD_KEY( cfg->keypad, key );
-                break;
+        if ((event.key.keysym.sym == SDLK_RETURN) && (event.key.keysym.mod & KMOD_ALT)) {
+            SDL_SetWindowFullscreen(cfg->window, fullscreen ? 0 : SDL_WINDOW_FULLSCREEN);
+            fullscreen = !fullscreen;
+            break;
         }
+
+        if (event.key.keysym.sym == SDLK_LSHIFT) {
+            shift_pressed |= 1;
+        } else if (event.key.keysym.sym == SDLK_RSHIFT) {
+            shift_pressed |= 2;
+        }
+
+        key = lookup_key(event.key.keysym.sym);
+        ADD_KEY( cfg->keypad, key );
         break;
 
       case SDL_KEYUP:
@@ -552,6 +564,7 @@ process_ctrls_event( SDL_Event& event,
             case SDLK_F10:
                 int prevexec;
                 prevexec = execute;
+		emu_halt(EMUHALT_REASON_USER_REQUESTED_HALT, NDSErrorTag_None);
                 execute = FALSE;
                 SPU_Pause(1);
                 if(!shift_pressed){
@@ -570,13 +583,12 @@ process_ctrls_event( SDL_Event& event,
         break;
 
       case SDL_MOUSEBUTTONDOWN:
-        if(event.button.button==1)
-          mouse.down = TRUE;
-                                            
+        if(event.button.button==1 && !mouse.down)
+          mouse.down = 1;
+        break;
+
       case SDL_MOUSEMOTION:
-        if(!mouse.down)
-          break;
-        else {
+	{
           signed long scaled_x =
             screen_to_touch_range( event.button.x,
                                      cfg->nds_screen_size_ratio);
@@ -584,14 +596,18 @@ process_ctrls_event( SDL_Event& event,
             screen_to_touch_range( event.button.y,
                                      cfg->nds_screen_size_ratio);
 
-          if( scaled_y >= 192)
+          if(!cfg->horizontal && scaled_y >= 192)
             set_mouse_coord( scaled_x, scaled_y - 192);
+          else if(cfg->horizontal && scaled_x >= 256)
+            set_mouse_coord( scaled_x - 256, scaled_y);
         }
         break;
 
       case SDL_MOUSEBUTTONUP:
-        if(mouse.down) mouse.click = TRUE;
-        mouse.down = FALSE;
+        if(mouse.down) {
+		mouse.click = 1;
+		if(mouse.down > 1) mouse.down = 0;
+	}
         break;
 
       case SDL_QUIT:

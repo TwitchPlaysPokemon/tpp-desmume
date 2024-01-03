@@ -1,6 +1,6 @@
  /*
 	Copyright (C) 2007 Pascal Giard (evilynux)
-	Copyright (C) 2006-2019 DeSmuME team
+	Copyright (C) 2006-2021 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -26,8 +26,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <gtk/gtk.h>
+#include <gio/gapplication.h>
 #include <gdk/gdkkeysyms.h>
 #include <SDL.h>
+#include <X11/Xlib.h>
+#include <vector>
 
 #include "types.h"
 #include "firmware.h"
@@ -66,26 +69,21 @@
 	#include "gdbstub.h"
 #endif
 
-#if defined(HAVE_LIBOSMESA) || defined(HAVE_GL_GLX)
-	#define HAVE_OPENGL
-#endif
+#define HAVE_OPENGL
 
 #ifdef HAVE_OPENGL
 	#include <GL/gl.h>
-	#include <GL/glu.h>
 	#include "OGLRender.h"
 	#include "OGLRender_3_2.h"
 #endif
 
-#if defined(HAVE_GL_GLX)
-	#include "glx_3Demu.h"
-#elif defined(HAVE_LIBOSMESA)
+#if defined(HAVE_LIBOSMESA)
 	#include "osmesa_3Demu.h"
+#else
+	#include "sdl_3Demu.h"
 #endif
 
 #include "config.h"
-
-#include "DeSmuME.xpm"
 
 #undef GPOINTER_TO_INT
 #define GPOINTER_TO_INT(p) ((gint)  (glong) (p))
@@ -102,6 +100,11 @@ extern int _scanline_filter_a, _scanline_filter_b, _scanline_filter_c, _scanline
 VideoFilter* video;
 
 desmume::config::Config config;
+
+#ifdef GDB_STUB
+gdbstub_handle_t arm9_gdb_stub = NULL;
+gdbstub_handle_t arm7_gdb_stub = NULL;
+#endif
 
 enum {
     MAIN_BG_0 = 0,
@@ -120,394 +123,151 @@ gboolean EmuLoop(gpointer data);
 
 static AVOutX264 avout_x264;
 static AVOutFlac avout_flac;
-static void RecordAV_x264();
-static void RecordAV_flac();
-static void RecordAV_stop();
+static void RecordAV_x264(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void RecordAV_flac(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void RecordAV_stop(GSimpleAction *action, GVariant *parameter, gpointer user_data);
 static void RedrawScreen();
 
-static void DoQuit();
-static void RecordMovieDialog();
-static void PlayMovieDialog();
-static void StopMovie();
-static void OpenNdsDialog();
-static void SaveStateDialog();
-static void LoadStateDialog();
-void Launch();
-void Pause();
+static void DoQuit(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void RecordMovieDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void PlayMovieDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void StopMovie(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void OpenNdsDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void OpenRecent(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void SaveStateDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void LoadStateDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ExportBackupMemoryDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ImportBackupMemoryDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+void Launch(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+void Pause(GSimpleAction *action, GVariant *parameter, gpointer user_data);
 static void ResetSaveStateTimes();
 static void LoadSaveStateInfo();
-static void Printscreen();
-static void Reset();
-static void SetAudioVolume();
-static void SetFirmwareLanguage();
-static void Edit_Controls();
-static void Edit_Joystick_Controls();
-static void MenuSave(GtkMenuItem *item, gpointer slot);
-static void MenuLoad(GtkMenuItem *item, gpointer slot);
-static void About();
-static void ToggleMenuVisible(GtkToggleAction *action);
-static void ToggleStatusbarVisible(GtkToggleAction *action);
-static void ToggleToolbarVisible(GtkToggleAction *action);
-static void ToggleFullscreen (GtkToggleAction *action);
-static void ToggleAudio (GtkToggleAction *action);
+static void Printscreen(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Reset(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void SetAudioVolume(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void SetFirmwareLanguage(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Edit_Controls(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Edit_Joystick_Controls(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void MenuSave(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void changesavetype(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void MenuLoad(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void About(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleMenuVisible(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleStatusbarVisible(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleToolbarVisible(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleFullscreen(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleAudio(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Modify_SPUMode(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Modify_SPUInterpolation(GSimpleAction *action, GVariant *parameter, gpointer user_data);
 #ifdef FAKE_MIC
-static void ToggleMicNoise (GtkToggleAction *action);
+static void ToggleMicNoise(GSimpleAction *action, GVariant *parameter, gpointer user_data);
 #endif
-static void ToggleFpsLimiter (GtkToggleAction *action);
-static void ToggleAutoFrameskip (GtkToggleAction *action);
-static void ToggleSwapScreens(GtkToggleAction *action);
-static void ToggleGap (GtkToggleAction *action);
-static void SetRotation(GtkAction *action, GtkRadioAction *current);
-static void SetWinSize(GtkAction *action, GtkRadioAction *current);
-static void SetOrientation(GtkAction *action, GtkRadioAction *current);
-static void ToggleLayerVisibility(GtkToggleAction* action, gpointer data);
-static void ToggleHudDisplay(GtkToggleAction* action, gpointer data);
+static void ToggleFpsLimiter(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleAutoFrameskip(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Modify_Frameskip(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleSwapScreens(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleGap(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void SetRotation(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void SetWinsize(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Modify_PriInterpolation(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void Modify_Interpolation(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void SetOrientation(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void ToggleLayerVisibility(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+#ifdef HAVE_LIBAGG
+static void HudFps(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void HudInput(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void HudGraphicalInput(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void HudFrameCounter(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void HudLagCounter(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void HudRtc(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void HudMic(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+static void HudEditor(GSimpleAction *action, GVariant *parameter, gpointer user_data);
+#endif
 #ifdef DESMUME_GTK_FIRMWARE_BROKEN
-static void SelectFirmwareFile();
+static void SelectFirmwareFile(GSimpleAction *action, GVariant *parameter, gpointer user_data);
 #endif
 #ifdef HAVE_JIT
-static void EmulationSettingsDialog();
+static void EmulationSettingsDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
 static void ToggleJIT();
 static void JITMaxBlockSizeChanged(GtkAdjustment* adj,void *);
 #endif
-static void GraphicsSettingsDialog();
+static void GraphicsSettingsDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data);
 
-
-static const char *ui_description =
-"<ui>"
-"  <menubar name='MainMenu'>"
-"    <menu action='FileMenu'>"
-"      <menuitem action='open'/>"
-"      <menu action='RecentMenu'/>"
-"      <separator/>"
-"      <menuitem action='run'/>"
-"      <menuitem action='pause'/>"
-"      <menuitem action='reset'/>"
-"      <separator/>"
-"      <menuitem action='savestateto'/>"
-"      <menuitem action='loadstatefrom'/>"
-"      <menu action='SavestateMenu'>"
-"        <menuitem action='savestate1'/>"
-"        <menuitem action='savestate2'/>"
-"        <menuitem action='savestate3'/>"
-"        <menuitem action='savestate4'/>"
-"        <menuitem action='savestate5'/>"
-"        <menuitem action='savestate6'/>"
-"        <menuitem action='savestate7'/>"
-"        <menuitem action='savestate8'/>"
-"        <menuitem action='savestate9'/>"
-"        <menuitem action='savestate10'/>"
-"      </menu>"
-"      <menu action='LoadstateMenu'>"
-"        <menuitem action='loadstate1'/>"
-"        <menuitem action='loadstate2'/>"
-"        <menuitem action='loadstate3'/>"
-"        <menuitem action='loadstate4'/>"
-"        <menuitem action='loadstate5'/>"
-"        <menuitem action='loadstate6'/>"
-"        <menuitem action='loadstate7'/>"
-"        <menuitem action='loadstate8'/>"
-"        <menuitem action='loadstate9'/>"
-"        <menuitem action='loadstate10'/>"
-"      </menu>"
-#ifdef GTK_DESMUME_FIRMWARE_BROKEN
-"      <menuitem action='loadfirmware'/>"
-#endif
-"      <separator/>"
-"      <menuitem action='recordmovie'/>"
-"      <menuitem action='playmovie'/>"
-"      <menuitem action='stopmovie'/>"
-"      <separator/>"
-"      <menu action='RecordAVMenu'>"
-"        <menuitem action='record_x264'/>"
-"        <menuitem action='record_flac'/>"
-"        <menuitem action='record_stop'/>"
-"      </menu>"
-"      <menuitem action='printscreen'/>"
-"      <separator/>"
-"      <menuitem action='quit'/>"
-"    </menu>"
-"    <menu action='ViewMenu'>"
-"      <menu action='OrientationMenu'>"
-"        <menuitem action='orient_vertical'/>"
-"        <menuitem action='orient_horizontal'/>"
-"        <menuitem action='orient_single'/>"
-"        <separator/>"
-"        <menuitem action='orient_swapscreens'/>"
-"      </menu>"
-"      <menu action='RotationMenu'>"
-"        <menuitem action='rotate_0'/>"
-"        <menuitem action='rotate_90'/>"
-"        <menuitem action='rotate_180'/>"
-"        <menuitem action='rotate_270'/>"
-"      </menu>"
-"      <menu action='WinsizeMenu'>"
-"        <menuitem action='winsize_half'/>"
-"        <menuitem action='winsize_1'/>"
-"        <menuitem action='winsize_1half'/>"
-"        <menuitem action='winsize_2'/>"
-"        <menuitem action='winsize_2half'/>"
-"        <menuitem action='winsize_3'/>"
-"        <menuitem action='winsize_4'/>"
-"        <menuitem action='winsize_5'/>"
-"        <menuitem action='winsize_scale'/>"
-"        <separator/>"
-"        <menuitem action='fullscreen'/>"
-"      </menu>"
-"      <menuitem action='gap'/>"
-"      <menu action='PriInterpolationMenu'>"
-"        <menuitem action='pri_interp_none'/>"
-"        <menuitem action='pri_interp_lq2x'/>"
-"        <menuitem action='pri_interp_lq2xs'/>"
-"        <menuitem action='pri_interp_hq2x'/>"
-"        <menuitem action='pri_interp_hq2xs'/>"
-"        <menuitem action='pri_interp_hq3x'/>"
-"        <menuitem action='pri_interp_hq3xs'/>"
-"        <menuitem action='pri_interp_hq4x'/>"
-"        <menuitem action='pri_interp_hq4xs'/>"
-"        <menuitem action='pri_interp_2xsai'/>"
-"        <menuitem action='pri_interp_super2xsai'/>"
-"        <menuitem action='pri_interp_supereagle'/>"
-"        <menuitem action='pri_interp_scanline'/>"
-"        <menuitem action='pri_interp_bilinear'/>"
-"        <menuitem action='pri_interp_nearest2x'/>"
-"        <menuitem action='pri_interp_nearest_1point5x'/>"
-"        <menuitem action='pri_interp_nearestplus_1point5x'/>"
-"        <menuitem action='pri_interp_epx'/>"
-"        <menuitem action='pri_interp_epxplus'/>"
-"        <menuitem action='pri_interp_epx_1point5x'/>"
-"        <menuitem action='pri_interp_epxplus_1point5x'/>"
-"        <menuitem action='pri_interp_2xbrz'/>"
-"        <menuitem action='pri_interp_3xbrz'/>"
-"        <menuitem action='pri_interp_4xbrz'/>"
-"        <menuitem action='pri_interp_5xbrz'/>"
-"      </menu>"
-"      <menu action='InterpolationMenu'>"
-"        <menuitem action='interp_fast'/>"
-"        <menuitem action='interp_nearest'/>"
-"        <menuitem action='interp_good'/>"
-"        <menuitem action='interp_bilinear'/>"
-"        <menuitem action='interp_best'/>"
-"      </menu>"
-"      <menu action='HudMenu'>"
-#ifdef HAVE_LIBAGG
-"        <menuitem action='hud_fps'/>"
-"        <menuitem action='hud_input'/>"
-"        <menuitem action='hud_graphicalinput'/>"
-"        <menuitem action='hud_framecounter'/>"
-"        <menuitem action='hud_lagcounter'/>"
-"        <menuitem action='hud_rtc'/>"
-"        <menuitem action='hud_mic'/>"
-"        <separator/>"
-"        <menuitem action='hud_editor'/>"
-#else
-"        <menuitem action='hud_notsupported'/>"
-#endif
-"      </menu>"
-"      <separator/>"
-"      <menuitem action='view_menu'/>"
-"      <menuitem action='view_toolbar'/>"
-"      <menuitem action='view_statusbar'/>"
-"    </menu>"
-"    <menu action='ConfigMenu'>"
-"      <menu action='FrameskipMenu'>"
-"        <menuitem action='enablefpslimiter'/>"
-"        <separator/>"
-"        <menuitem action='frameskipA'/>"
-"        <separator/>"
-"        <menuitem action='frameskip0'/>"
-"        <menuitem action='frameskip1'/>"
-"        <menuitem action='frameskip2'/>"
-"        <menuitem action='frameskip3'/>"
-"        <menuitem action='frameskip4'/>"
-"        <menuitem action='frameskip5'/>"
-"        <menuitem action='frameskip6'/>"
-"        <menuitem action='frameskip7'/>"
-"        <menuitem action='frameskip8'/>"
-"        <menuitem action='frameskip9'/>"
-"      </menu>"
-#ifdef HAVE_JIT
-"      <menuitem action='emulationsettings'/>"
-#endif
-"      <menuitem action='graphicssettings'/>"
-"      <menuitem action='enableaudio'/>"
-#ifdef FAKE_MIC
-"      <menuitem action='micnoise'/>"
-#endif
-"      <menu action='SPUModeMenu'>"
-"        <menuitem action='SPUModeDualASync'/>"
-"        <menuitem action='SPUModeSyncN'/>"
-"        <menuitem action='SPUModeSyncZ'/>"
-#ifdef HAVE_LIBSOUNDTOUCH
-"        <menuitem action='SPUModeSyncP'/>"
-#endif
-"      </menu>"
-"      <menu action='SPUInterpolationMenu'>"
-"        <menuitem action='SPUInterpolationNone'/>"
-"        <menuitem action='SPUInterpolationLinear'/>"
-"        <menuitem action='SPUInterpolationCosine'/>"
-"      </menu>"
-"      <menu action='CheatMenu'>"
-"        <menuitem action='cheatsearch'/>"
-"        <menuitem action='cheatlist'/>"
-"      </menu>"
-"      <menu action='ConfigSaveMenu'>"
-"        <menuitem action='save_t0'/>"
-"        <menuitem action='save_t1'/>"
-"        <menuitem action='save_t2'/>"
-"        <menuitem action='save_t3'/>"
-"        <menuitem action='save_t4'/>"
-"        <menuitem action='save_t5'/>"
-"        <menuitem action='save_t6'/>"
-"      </menu>"
-"      <menuitem action='setaudiovolume'/>"
-"      <menuitem action='setfirmwarelanguage'/>"
-"      <menuitem action='editctrls'/>"
-"      <menuitem action='editjoyctrls'/>"
-"    </menu>"
-"    <menu action='ToolsMenu'>"
-"      <menuitem action='ioregs'/>"
-"      <separator/>"
-"      <menu action='LayersMenu'>"
-"        <menuitem action='layermainbg0'/>"
-"        <menuitem action='layermainbg1'/>"
-"        <menuitem action='layermainbg2'/>"
-"        <menuitem action='layermainbg3'/>"
-"        <menuitem action='layermainobj'/>"
-"        <menuitem action='layersubbg0'/>"
-"        <menuitem action='layersubbg1'/>"
-"        <menuitem action='layersubbg2'/>"
-"        <menuitem action='layersubbg3'/>"
-"        <menuitem action='layersubobj'/>"
-"      </menu>"
-"    </menu>"
-"    <menu action='HelpMenu'>"
-"      <menuitem action='about'/>"
-"    </menu>"
-"  </menubar>"
-"  <toolbar name='ToolBar'>"
-"    <toolitem action='open'/>"
-"    <toolitem action='run'/>"
-"    <toolitem action='pause'/>"
-"    <toolitem action='quit'/>"
-"  </toolbar>"
-"</ui>";
-  
-static const GtkActionEntry action_entries[] = {
-    { "FileMenu", NULL, "_File" },
-      { "open",          "gtk-open",    "_Open",         "<Ctrl>o",  NULL,   OpenNdsDialog },
-      { "RecentMenu", NULL, "Open _recent" },
-      { "run",        "gtk-media-play",   "_Run",          "Pause",  NULL,   Launch },
-      { "pause",      "gtk-media-pause",  "_Pause",        "Pause",  NULL,   Pause },
-      { "reset",      "gtk-refresh",      "Re_set",        NULL,       NULL,   Reset },
-      { "savestateto",    NULL,         "Save state _to ...",         NULL,  NULL,   SaveStateDialog },
-      { "loadstatefrom",  NULL,         "Load state _from ...",         NULL,  NULL,   LoadStateDialog },
-      { "recordmovie",  NULL,         "Record movie _to ...",         NULL,  NULL,   RecordMovieDialog },
-      { "playmovie",  NULL,         "Play movie _from ...",         NULL,  NULL,   PlayMovieDialog },
-      { "stopmovie",  NULL,         "Stop movie", NULL,  NULL,   StopMovie },
-      { "RecordAVMenu", NULL, "Record _video/audio" },
-        { "record_x264", "gtk-media-record", "Record lossless H._264 (video only)...", NULL, NULL, RecordAV_x264 },
-        { "record_flac", "gtk-media-record", "Record _flac (audio only)...", NULL, NULL, RecordAV_flac },
-        { "record_stop", "gtk-media-stop", "_Stop recording", NULL, NULL, RecordAV_stop },
-      { "SavestateMenu", NULL, "_Save state" },
-      { "LoadstateMenu", NULL, "_Load state" },
+static const GActionEntry app_entries[] = {
+    // File
+    { "open",          OpenNdsDialog },
+    { "recent",        OpenRecent, "s" },
+    { "run",           Launch },
+    { "pause",         Pause },
+    { "reset",         Reset },
+    { "save_state_to",   SaveStateDialog },
+    { "load_state_from", LoadStateDialog },
+    { "savestate",     MenuSave, "u" },
+    { "loadstate",     MenuLoad, "u" },
+    { "importbackup",  ImportBackupMemoryDialog },
+    { "exportbackup",  ExportBackupMemoryDialog },
+    { "recordmovie",   RecordMovieDialog },
+    { "playmovie",     PlayMovieDialog },
+    { "stopmovie",     StopMovie },
+    { "record_x264",   RecordAV_x264 },
+    { "record_flac",   RecordAV_flac },
+    { "record_stop",   RecordAV_stop },
 #ifdef DESMUME_GTK_FIRMWARE_BROKEN
-      { "loadfirmware","gtk-open",        "Load Firm_ware file", "<Ctrl>l",  NULL, SelectFirmwareFile },
+    { "loadfirmware",  SelectFirmwareFile },
 #endif
-      { "printscreen","gtk-media-record", "Take a _screenshot",    "<Ctrl>s",  NULL,   Printscreen },
-      { "quit",       "gtk-quit",         "_Quit",         "<Ctrl>q",  NULL,   DoQuit },
+    { "printscreen",   Printscreen },
+    { "quit",          DoQuit },
 
-    { "ViewMenu", NULL, "_View" },
-      { "RotationMenu", NULL, "_Rotation" },
-      { "OrientationMenu", NULL, "LCDs _Layout" },
-      { "WinsizeMenu", NULL, "_Window Size" },
-      { "PriInterpolationMenu", NULL, "Video _Filter" },
-      { "InterpolationMenu", NULL, "S_econdary Video Filter" },
-      { "HudMenu", NULL, "_HUD" },
-#ifndef HAVE_LIBAGG
-      { "hud_notsupported", NULL, "HUD support not compiled" },
+    // View
+    { "orient",         SetOrientation,         "s",  "\"vertical\"" },
+    { "swapscreens",    ToggleSwapScreens,      NULL, "true" },
+    { "rotate",         SetRotation,            "s",  "\"0\"" },
+    { "winsize",        SetWinsize,             "s",  "\"scale\"" },
+    { "fullscreen",     ToggleFullscreen,       NULL, "false" },
+    { "gap",            ToggleGap,              NULL, "false" },
+    { "pri_interpolation", Modify_PriInterpolation, "s", "\"none\"" },
+    { "interpolation",  Modify_Interpolation,   "s",  "\"nearest\"" },
+    { "view_menu",      ToggleMenuVisible,      NULL, "true" },
+    { "view_toolbar",   ToggleToolbarVisible,   NULL, "true" },
+    { "view_statusbar", ToggleStatusbarVisible, NULL, "true" },
+#ifdef HAVE_LIBAGG
+    { "hud_fps",        HudFps,                 NULL, "false" },
+    { "hud_input",      HudInput,               NULL, "false" },
+    { "hud_graphicalinput", HudGraphicalInput,  NULL, "false" },
+    { "hud_framecounter", HudFrameCounter,      NULL, "false" },
+    { "hud_lagcounter", HudLagCounter,          NULL, "false" },
+    { "hud_rtc",        HudRtc,                 NULL, "false" },
+    { "hud_mic",        HudMic,                 NULL, "false" },
+    { "hud_editor",     HudEditor,              NULL, "false" },
 #endif
 
-    { "ConfigMenu", NULL, "_Config" },
-      { "FrameskipMenu", NULL, "_Frameskip" },
-#ifdef HAVE_JIT
-	  { "emulationsettings",NULL,"Em_ulation Settings",NULL,NULL,EmulationSettingsDialog},
-#endif
-	  { "graphicssettings",NULL,"_Graphics Settings",NULL,NULL, GraphicsSettingsDialog},
-	  { "SPUModeMenu", NULL, "Audio _Synchronization" },
-      { "SPUInterpolationMenu", NULL, "Audio _Interpolation" },
-      { "CheatMenu", NULL, "_Cheat" },
-        { "cheatsearch",     NULL,      "_Search",        NULL,       NULL,   CheatSearch },
-        { "cheatlist",       NULL,      "_List",        NULL,       NULL,   CheatList },
-      { "ConfigSaveMenu", NULL, "_Saves" },
-      { "setaudiovolume", NULL, "Set audio _volume", NULL, NULL, SetAudioVolume },
-      { "setfirmwarelanguage", NULL, "Set firmware _language", NULL, NULL, SetFirmwareLanguage },
-      { "editctrls",  NULL,        "_Edit controls",NULL,    NULL,   Edit_Controls },
-      { "editjoyctrls",  NULL,     "Edit _Joystick controls",NULL,       NULL,   Edit_Joystick_Controls },
-
-    { "ToolsMenu", NULL, "_Tools" },
-      { "LayersMenu", NULL, "View _Layers" },
-
-    { "HelpMenu", NULL, "_Help" },
-      { "about",      "gtk-about",        "_About",        NULL,       NULL,   About }
-};
-
-static const GtkToggleActionEntry toggle_entries[] = {
-    { "enableaudio", NULL, "_Enable audio", NULL, NULL, G_CALLBACK(ToggleAudio), TRUE},
+    // Config
+    { "enablefpslimiter",  ToggleFpsLimiter,    NULL, "true" },
+    { "frameskipA",        ToggleAutoFrameskip, NULL, "true" },
+    { "frameskip",         Modify_Frameskip,    "s",  "\"0\"" },
+    { "enableaudio",       ToggleAudio,         NULL, "true" },
 #ifdef FAKE_MIC
-    { "micnoise", NULL, "Fake mic _noise", NULL, NULL, G_CALLBACK(ToggleMicNoise), FALSE},
+    { "micnoise",          ToggleMicNoise,      NULL, "false" },
 #endif
-    { "enablefpslimiter", NULL, "_Limit framerate", NULL, NULL, G_CALLBACK(ToggleFpsLimiter), TRUE},
-    { "frameskipA", NULL, "_Auto-minimize skipping", NULL, NULL, G_CALLBACK(ToggleAutoFrameskip), TRUE},
-    { "gap", NULL, "Screen _Gap", NULL, NULL, G_CALLBACK(ToggleGap), FALSE},
-    { "view_menu", NULL, "Show _menu", NULL, NULL, G_CALLBACK(ToggleMenuVisible), TRUE},
-    { "view_toolbar", NULL, "Show _toolbar", NULL, NULL, G_CALLBACK(ToggleToolbarVisible), TRUE},
-    { "view_statusbar", NULL, "Show _statusbar", NULL, NULL, G_CALLBACK(ToggleStatusbarVisible), TRUE},
-    { "orient_swapscreens", NULL, "S_wap screens", "space", NULL, G_CALLBACK(ToggleSwapScreens), FALSE},
-    { "fullscreen", NULL, "_Fullscreen", "F11", NULL, G_CALLBACK(ToggleFullscreen), FALSE},
-};
+#ifdef HAVE_JIT
+    { "emulationsettings",   EmulationSettingsDialog },
+#endif
+    { "graphics_settings",   GraphicsSettingsDialog },
+    { "spu_mode",            Modify_SPUMode,          "s", "\"dual-async\"" },
+    { "spu_interpolation",   Modify_SPUInterpolation, "s", "\"linear\"" },
+    { "cheatsearch",         CheatSearch },
+    { "cheatlist",           CheatList },
+    { "savetype",            changesavetype,          "s", "\"autodetect\"" },
+    { "setaudiovolume",      SetAudioVolume },
+    { "setfirmwarelanguage", SetFirmwareLanguage },
+    { "editctrls",           Edit_Controls },
+    { "editjoyctrls",        Edit_Joystick_Controls },
 
-static const GtkRadioActionEntry pri_interpolation_entries[] = {
-    { "pri_interp_none", NULL, VideoFilterAttributesList[VideoFilterTypeID_None].typeString, NULL, NULL, VideoFilterTypeID_None},
-    { "pri_interp_lq2x", NULL, VideoFilterAttributesList[VideoFilterTypeID_LQ2X].typeString, NULL, NULL, VideoFilterTypeID_LQ2X},
-    { "pri_interp_lq2xs", NULL, VideoFilterAttributesList[VideoFilterTypeID_LQ2XS].typeString, NULL, NULL, VideoFilterTypeID_LQ2XS},
-    { "pri_interp_hq2x", NULL, VideoFilterAttributesList[VideoFilterTypeID_HQ2X].typeString, NULL, NULL, VideoFilterTypeID_HQ2X},
-    { "pri_interp_hq2xs", NULL, VideoFilterAttributesList[VideoFilterTypeID_HQ2XS].typeString, NULL, NULL, VideoFilterTypeID_HQ2XS},
-    { "pri_interp_hq3x", NULL, VideoFilterAttributesList[VideoFilterTypeID_HQ3X].typeString, NULL, NULL, VideoFilterTypeID_HQ3X},
-    { "pri_interp_hq3xs", NULL, VideoFilterAttributesList[VideoFilterTypeID_HQ3XS].typeString, NULL, NULL, VideoFilterTypeID_HQ3XS},
-    { "pri_interp_hq4x", NULL, VideoFilterAttributesList[VideoFilterTypeID_HQ4X].typeString, NULL, NULL, VideoFilterTypeID_HQ4X},
-    { "pri_interp_hq4xs", NULL, VideoFilterAttributesList[VideoFilterTypeID_HQ4XS].typeString, NULL, NULL, VideoFilterTypeID_HQ4XS},
-    { "pri_interp_2xsai", NULL, VideoFilterAttributesList[VideoFilterTypeID_2xSaI].typeString, NULL, NULL, VideoFilterTypeID_2xSaI},
-    { "pri_interp_super2xsai", NULL, VideoFilterAttributesList[VideoFilterTypeID_Super2xSaI].typeString, NULL, NULL, VideoFilterTypeID_Super2xSaI},
-    { "pri_interp_supereagle", NULL, VideoFilterAttributesList[VideoFilterTypeID_SuperEagle].typeString, NULL, NULL, VideoFilterTypeID_SuperEagle},
-    { "pri_interp_scanline", NULL, VideoFilterAttributesList[VideoFilterTypeID_Scanline].typeString, NULL, NULL, VideoFilterTypeID_Scanline},
-    { "pri_interp_bilinear", NULL, VideoFilterAttributesList[VideoFilterTypeID_Bilinear].typeString, NULL, NULL, VideoFilterTypeID_Bilinear},
-    { "pri_interp_nearest2x", NULL, VideoFilterAttributesList[VideoFilterTypeID_Nearest2X].typeString, NULL, NULL, VideoFilterTypeID_Nearest2X},
-    { "pri_interp_nearest_1point5x", NULL, VideoFilterAttributesList[VideoFilterTypeID_Nearest1_5X].typeString, NULL, NULL, VideoFilterTypeID_Nearest1_5X},
-    { "pri_interp_nearestplus_1point5x", NULL, VideoFilterAttributesList[VideoFilterTypeID_NearestPlus1_5X].typeString, NULL, NULL, VideoFilterTypeID_NearestPlus1_5X},
-    { "pri_interp_epx", NULL, VideoFilterAttributesList[VideoFilterTypeID_EPX].typeString, NULL, NULL, VideoFilterTypeID_EPX},
-    { "pri_interp_epxplus", NULL, VideoFilterAttributesList[VideoFilterTypeID_EPXPlus].typeString, NULL, NULL, VideoFilterTypeID_EPXPlus},
-    { "pri_interp_epx_1point5x", NULL, VideoFilterAttributesList[VideoFilterTypeID_EPX1_5X].typeString, NULL, NULL, VideoFilterTypeID_EPX1_5X},
-    { "pri_interp_epxplus_1point5x", NULL, VideoFilterAttributesList[VideoFilterTypeID_EPXPlus1_5X].typeString, NULL, NULL, VideoFilterTypeID_EPXPlus1_5X},
-    { "pri_interp_2xbrz", NULL, VideoFilterAttributesList[VideoFilterTypeID_2xBRZ].typeString, NULL, NULL, VideoFilterTypeID_2xBRZ},
-    { "pri_interp_3xbrz", NULL, VideoFilterAttributesList[VideoFilterTypeID_3xBRZ].typeString, NULL, NULL, VideoFilterTypeID_3xBRZ},
-    { "pri_interp_4xbrz", NULL, VideoFilterAttributesList[VideoFilterTypeID_4xBRZ].typeString, NULL, NULL, VideoFilterTypeID_4xBRZ},
-    { "pri_interp_5xbrz", NULL, VideoFilterAttributesList[VideoFilterTypeID_5xBRZ].typeString, NULL, NULL, VideoFilterTypeID_5xBRZ},
-};
+    // Tools
+    // Populated in desmume_gtk_menu_tools().
 
-static const GtkRadioActionEntry interpolation_entries[] = {
-    { "interp_fast", NULL, "_Fast", NULL, NULL, CAIRO_FILTER_FAST },
-    { "interp_nearest", NULL, "_Nearest-neighbor", NULL, NULL, CAIRO_FILTER_NEAREST },
-    { "interp_good", NULL, "_Good", NULL, NULL, CAIRO_FILTER_GOOD },
-    { "interp_bilinear", NULL, "_Bilinear", NULL, NULL, CAIRO_FILTER_BILINEAR },
-    { "interp_best", NULL, "B_est", NULL, NULL, CAIRO_FILTER_BEST },
-};
-
-static const GtkRadioActionEntry rotation_entries[] = {
-    { "rotate_0",   "gtk-orientation-portrait",          "_0",  NULL, NULL, 0 },
-    { "rotate_90",  "gtk-orientation-landscape",         "_90", NULL, NULL, 90 },
-    { "rotate_180", "gtk-orientation-reverse-portrait",  "_180",NULL, NULL, 180 },
-    { "rotate_270", "gtk-orientation-reverse-landscape", "_270",NULL, NULL, 270 },
+    // Help
+    { "about",         About },
 };
 
 enum winsize_enum {
@@ -524,30 +284,12 @@ enum winsize_enum {
 
 static winsize_enum winsize_current;
 
-static const GtkRadioActionEntry winsize_entries[] = {
-	{ "winsize_half", NULL, "0_.5x", NULL, NULL, WINSIZE_HALF },
-	{ "winsize_1", NULL, "_1x", NULL, NULL, WINSIZE_1 },
-	{ "winsize_1half", NULL, "1.5x", NULL, NULL, WINSIZE_1HALF },
-	{ "winsize_2", NULL, "_2x", NULL, NULL, WINSIZE_2 },
-	{ "winsize_2half", NULL, "2.5x", NULL, NULL, WINSIZE_2HALF },
-	{ "winsize_3", NULL, "_3x", NULL, NULL, WINSIZE_3 },
-	{ "winsize_4", NULL, "_4x", NULL, NULL, WINSIZE_4 },
-	{ "winsize_5", NULL, "_5x", NULL, NULL, WINSIZE_5 },
-	{ "winsize_scale", NULL, "_Scale to window", NULL, NULL, WINSIZE_SCALE },
-};
-
 /* When adding modes here remember to add the relevent entry to screen_size */
 enum orientation_enum {
     ORIENT_VERTICAL = 0,
     ORIENT_HORIZONTAL = 1,
     ORIENT_SINGLE = 2,
     ORIENT_N
-};
-
-static const GtkRadioActionEntry orientation_entries[] = {
-    { "orient_vertical",   NULL, "_Vertical",   "<Ctrl>1", NULL, ORIENT_VERTICAL },
-    { "orient_horizontal", NULL, "_Horizontal", "<Ctrl>2", NULL, ORIENT_HORIZONTAL },
-    { "orient_single",     NULL, "_Single screen", "<Ctrl>0", NULL, ORIENT_SINGLE },
 };
 
 struct screen_size_t {
@@ -568,57 +310,6 @@ enum spumode_enum {
     SPUMODE_SYNCP = 3
 };
 
-static const GtkRadioActionEntry spumode_entries[] = {
-    { "SPUModeSyncN", NULL, "Synchronous (N)", NULL, NULL, SPUMODE_SYNCN},
-    { "SPUModeSyncZ", NULL, "Synchronous (Z)", NULL, NULL, SPUMODE_SYNCZ},
-#ifdef HAVE_LIBSOUNDTOUCH
-    { "SPUModeSyncP", NULL, "Synchronous (P)", NULL, NULL, SPUMODE_SYNCP},
-#endif
-    { "SPUModeDualASync", NULL, "Dual Asynchronous", NULL, NULL, SPUMODE_DUALASYNC}
-};
-
-static const GtkRadioActionEntry spuinterpolation_entries[] = {
-    { "SPUInterpolationNone", NULL, "_None", NULL, NULL, SPUInterpolation_None },
-    { "SPUInterpolationLinear", NULL, "_Linear", NULL, NULL, SPUInterpolation_Linear },
-    { "SPUInterpolationCosine", NULL, "_Cosine", NULL, NULL, SPUInterpolation_Cosine }
-};
-
-enum frameskip_enum {
-    FRAMESKIP_0 = 0,
-    FRAMESKIP_1 = 1,
-    FRAMESKIP_2 = 2,
-    FRAMESKIP_3 = 3,
-    FRAMESKIP_4 = 4,
-    FRAMESKIP_5 = 5,
-    FRAMESKIP_6 = 6,
-    FRAMESKIP_7 = 7,
-    FRAMESKIP_8 = 8,
-    FRAMESKIP_9 = 9,
-};
-
-static const GtkRadioActionEntry frameskip_entries[] = {
-    { "frameskip0", NULL, "_0 (never skip)", NULL, NULL, FRAMESKIP_0},
-    { "frameskip1", NULL, "_1", NULL, NULL, FRAMESKIP_1},
-    { "frameskip2", NULL, "_2", NULL, NULL, FRAMESKIP_2},
-    { "frameskip3", NULL, "_3", NULL, NULL, FRAMESKIP_3},
-    { "frameskip4", NULL, "_4", NULL, NULL, FRAMESKIP_4},
-    { "frameskip5", NULL, "_5", NULL, NULL, FRAMESKIP_5},
-    { "frameskip6", NULL, "_6", NULL, NULL, FRAMESKIP_6},
-    { "frameskip7", NULL, "_7", NULL, NULL, FRAMESKIP_7},
-    { "frameskip8", NULL, "_8", NULL, NULL, FRAMESKIP_8},
-    { "frameskip9", NULL, "_9", NULL, NULL, FRAMESKIP_9},
-};
-
-static const GtkRadioActionEntry savet_entries[] = {
-    { "save_t0", NULL, "_0 Autodetect",     NULL, NULL, 0},
-    { "save_t1", NULL, "_1 EEPROM 4kbit",   NULL, NULL, 1},
-    { "save_t2", NULL, "_2 EEPROM 64kbit",  NULL, NULL, 2},
-    { "save_t3", NULL, "_3 EEPROM 512kbit", NULL, NULL, 3},
-    { "save_t4", NULL, "_4 FRAM 256kbit",   NULL, NULL, 4},
-    { "save_t5", NULL, "_5 FLASH 2mbit",    NULL, NULL, 5},
-    { "save_t6", NULL, "_6 FLASH 4mbit",    NULL, NULL, 6}
-};
-
 SoundInterface_struct *SNDCoreList[] = {
 &SNDDummy,
 &SNDSDL,
@@ -633,22 +324,24 @@ GPU3DInterface *core3DList[] = {
 #endif
 };
 
-static const u16 gtk_kb_cfg[NB_KEYS] = {
-    GDK_x,         // A
-    GDK_z,         // B
-    GDK_Shift_R,   // select
-    GDK_Return,    // start
-    GDK_Right,     // Right
-    GDK_Left,      // Left
-    GDK_Up,        // Up
-    GDK_Down,      // Down       
-    GDK_w,         // R
-    GDK_q,         // L
-    GDK_s,         // X
-    GDK_a,         // Y
-    GDK_p,         // DEBUG
-    GDK_o,         // BOOST
-    GDK_BackSpace, // Lid
+int multisampleSizes[] = {0, 2, 4, 8, 16, 32};
+
+static const u32 gtk_kb_cfg[NB_KEYS] = {
+    GDK_KEY_x,         // A
+    GDK_KEY_z,         // B
+    GDK_KEY_Shift_R,   // select
+    GDK_KEY_Return,    // start
+    GDK_KEY_Right,     // Right
+    GDK_KEY_Left,      // Left
+    GDK_KEY_Up,        // Up
+    GDK_KEY_Down,      // Down
+    GDK_KEY_w,         // R
+    GDK_KEY_q,         // L
+    GDK_KEY_s,         // X
+    GDK_KEY_a,         // Y
+    GDK_KEY_p,         // DEBUG
+    GDK_KEY_o,         // BOOST
+    GDK_KEY_BackSpace, // Lid
 };
 
 GKeyFile *keyfile;
@@ -660,8 +353,7 @@ struct modify_key_ctx {
 };
 
 static u16 keys_latch = 0;
-static u16 gdk_shift_pressed = 0;
-u16 Keypad_Temp[NB_KEYS];
+u32 Keypad_Temp[NB_KEYS];
 
 class configured_features : public CommandLine
 {
@@ -810,11 +502,13 @@ uint autoFrameskipMax = 0;
 bool autoframeskip = true;
 cairo_filter_t Interpolation = CAIRO_FILTER_NEAREST;
 
+static GtkApplication *pApp;
 static GtkWidget *pWindow;
+static GtkWidget *pToolBar;
 static GtkWidget *pStatusBar;
 static GtkWidget *pDrawingArea;
-static GtkActionGroup * action_group;
-static GtkUIManager *ui_manager;
+static GtkWidget *pContentBox;
+static GtkMenu *pPopupMenu;
 
 struct nds_screen_t {
     guint gap_size;
@@ -827,7 +521,7 @@ struct nds_screen_t {
 
 struct nds_screen_t nds_screen;
 
-static BOOL regMainLoop = FALSE;
+static guint regMainLoop = 0;
 
 static inline void UpdateStatusBar (const char *message)
 {
@@ -838,10 +532,8 @@ static inline void UpdateStatusBar (const char *message)
     gtk_statusbar_push(GTK_STATUSBAR(pStatusBar), pStatusBar_Ctx, message);
 }
 
-static void About()
+static void About(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    GdkPixbuf * pixbuf = gdk_pixbuf_new_from_xpm_data(DeSmuME_xpm);
-
     static const gchar *authors[] = {
     	"yopyop (original author)",
     	"DeSmuME team",
@@ -852,69 +544,66 @@ static void About()
             "program-name", "DeSmuME",
             "version", EMU_DESMUME_VERSION_STRING() + 1, // skip space
             "website", "http://desmume.org",
-            "logo", pixbuf,
+            "logo-icon-name", "org.desmume.DeSmuME",
             "comments", "Nintendo DS emulator based on work by Yopyop",
             "authors", authors,
             NULL);
-
-    g_object_unref(pixbuf);
 }
 
-static void ToggleMenuVisible(GtkToggleAction *action)
+static void ToggleMenuVisible(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    GtkWidget *pMenuBar = gtk_ui_manager_get_widget (ui_manager, "/MainMenu");
-
-    config.view_menu = gtk_toggle_action_get_active(action);
-    if (config.view_menu)
-      gtk_widget_show(pMenuBar);
-    else
-      gtk_widget_hide(pMenuBar);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    config.view_menu = value;
+    gtk_application_window_set_show_menubar(GTK_APPLICATION_WINDOW(pWindow), config.view_menu);
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
-static void ToggleToolbarVisible(GtkToggleAction *action)
+static void ToggleToolbarVisible(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    GtkWidget *pToolBar = gtk_ui_manager_get_widget (ui_manager, "/ToolBar");
-
-    config.view_toolbar = gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    config.view_toolbar = value;
     if (config.view_toolbar)
       gtk_widget_show(pToolBar);
     else
       gtk_widget_hide(pToolBar);
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
-static void ToggleStatusbarVisible(GtkToggleAction *action)
+static void ToggleStatusbarVisible(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    config.view_statusbar = gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    config.view_statusbar = value;
     if (config.view_statusbar)
       gtk_widget_show(pStatusBar);
     else
       gtk_widget_hide(pStatusBar);
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
-static void ToggleFullscreen(GtkToggleAction *action)
+static void ToggleFullscreen(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-  GtkWidget *pMenuBar = gtk_ui_manager_get_widget (ui_manager, "/MainMenu");
-  GtkWidget *pToolBar = gtk_ui_manager_get_widget (ui_manager, "/ToolBar");
-  config.window_fullscreen = gtk_toggle_action_get_active(action);
+  GVariant *variant = g_action_get_state(G_ACTION(action));
+  gboolean fullscreen = !g_variant_get_boolean(variant);
+  config.window_fullscreen = fullscreen;
+  printf("ToggleFullscreen -> %d\n", fullscreen);
+  g_simple_action_set_state(action, g_variant_new_boolean(fullscreen));
   if (config.window_fullscreen)
   {
-    GdkColor black = {0, 0, 0, 0};
-    gtk_widget_modify_bg(pDrawingArea, GTK_STATE_NORMAL, &black);
-
-    gtk_widget_hide(pMenuBar);
+    gtk_application_window_set_show_menubar(GTK_APPLICATION_WINDOW(pWindow), FALSE);
     gtk_widget_hide(pToolBar);
     gtk_widget_hide(pStatusBar);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_menu"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_toolbar"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_statusbar"), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "view_menu")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "view_toolbar")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "view_statusbar")), FALSE);
     gtk_window_fullscreen(GTK_WINDOW(pWindow));
   }
   else
   {
-    gtk_widget_modify_bg(pDrawingArea, GTK_STATE_NORMAL, NULL);
-
     if (config.view_menu) {
-      gtk_widget_show(pMenuBar);
+      gtk_application_window_set_show_menubar(GTK_APPLICATION_WINDOW(pWindow), TRUE);
     }
     if (config.view_toolbar) {
       gtk_widget_show(pToolBar);
@@ -922,9 +611,9 @@ static void ToggleFullscreen(GtkToggleAction *action)
     if (config.view_statusbar) {
       gtk_widget_show(pStatusBar);
     }
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_menu"), TRUE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_toolbar"), TRUE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_statusbar"), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "view_menu")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "view_toolbar")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "view_statusbar")), TRUE);
     gtk_window_unfullscreen(GTK_WINDOW(pWindow));
   }
 }
@@ -937,56 +626,59 @@ static int Open(const char *filename)
     res = NDS_LoadROM( filename );
     if(res > 0) {
         LoadSaveStateInfo();
-        gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "cheatlist"), TRUE);
+        g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "cheatlist")), TRUE);
     }
     return res;
 }
 
-void Launch()
+void Launch(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkWidget *pause;
     desmume_resume();
 
     if(!regMainLoop) {
-        g_idle_add_full(EMULOOP_PRIO, &EmuLoop, pWindow, NULL);
-        regMainLoop = TRUE;
+        regMainLoop = g_idle_add_full(EMULOOP_PRIO, &EmuLoop, pWindow, NULL);
     }
 
     UpdateStatusBar("Running ...");
 
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "pause"), TRUE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "run"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "reset"), TRUE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "printscreen"), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "pause")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "run")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "reset")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "printscreen")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "exportbackup")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "importbackup")), TRUE);
 
-    pause = gtk_bin_get_child(GTK_BIN(gtk_ui_manager_get_widget(ui_manager, "/ToolBar/pause")));
-    gtk_widget_grab_focus(pause);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "savestate")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "loadstate")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "save_state_to")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "load_state_from")), TRUE);
+
+    //pause = gtk_bin_get_child(GTK_BIN(gtk_ui_manager_get_widget(ui_manager, "/ToolBar/pause")));
+    //gtk_widget_grab_focus(pause);
 }
 
-void Pause()
+
+void Pause(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkWidget *run;
     desmume_pause();
     UpdateStatusBar("Paused");
 
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "pause"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "run"), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "pause")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "run")), TRUE);
 
-    run = gtk_bin_get_child(GTK_BIN(gtk_ui_manager_get_widget(ui_manager, "/ToolBar/run")));
-    gtk_widget_grab_focus(run);
+    //run = gtk_bin_get_child(GTK_BIN(gtk_ui_manager_get_widget(ui_manager, "/ToolBar/run")));
+    //gtk_widget_grab_focus(run);
 }
 
-static void LoadStateDialog()
+static void LoadStateDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkFileFilter *pFilter_ds, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileChooserNative *pFileSelection;
 
     if (desmume_running())
-        Pause();
-
-    pParent = GTK_WIDGET(pWindow);
+        Pause(NULL, NULL, NULL);
 
     pFilter_ds = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_ds, "*.ds*");
@@ -997,26 +689,22 @@ static void LoadStateDialog()
     gtk_file_filter_set_name(pFilter_any, "All files");
 
     /* Creating the selection window */
-    pFileSelection = gtk_file_chooser_dialog_new("Load State From ...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Load State From ...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_OPEN,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_OPEN, GTK_RESPONSE_OK,
-            NULL);
-
-    /* Only the dialog window is accepting events: */
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
+            "_Open", "_Cancel");
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_ds);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
 
     /* Showing the window */
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
 
         if(savestate_load(sPath) == false ) {
-            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pFileSelection),
+            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
                     GTK_DIALOG_MODAL,
                     GTK_MESSAGE_ERROR,
                     GTK_BUTTONS_OK,
@@ -1024,28 +712,22 @@ static void LoadStateDialog()
             gtk_dialog_run(GTK_DIALOG(pDialog));
             gtk_widget_destroy(pDialog);
         } else {
-            gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "run"), TRUE);
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "run")), TRUE);
+            RedrawScreen();
         }
 
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 }
 
-static void RecordMovieDialog()
+static void RecordMovieDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
  GtkFileFilter *pFilter_dsm, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileChooserNative *pFileSelection;
 
     if (desmume_running())
-        Pause();
-
-    pParent = GTK_WIDGET(pWindow);
+        Pause(NULL, NULL, NULL);
 
     pFilter_dsm = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_dsm, "*.dsm*");
@@ -1056,49 +738,39 @@ static void RecordMovieDialog()
     gtk_file_filter_set_name(pFilter_any, "All files");
 
     /* Creating the selection window */
-    pFileSelection = gtk_file_chooser_dialog_new("Save Movie To ...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Save Movie To ...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_SAVE,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_SAVE, GTK_RESPONSE_OK,
-            NULL);
+            "_Save", "_Cancel");
     gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (pFileSelection), TRUE);
-
-    /* Only the dialog window is accepting events: */
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_dsm);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
 
     /* Showing the window */
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
+
         FCEUI_SaveMovie(sPath,L"",START_BLANK,"", FCEUI_MovieGetRTCDefault());
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 }
 
-static void StopMovie()
+static void StopMovie(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
 	FCEUI_StopMovie();
 }
 
-static void PlayMovieDialog()
+static void PlayMovieDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
    GtkFileFilter *pFilter_dsm, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileChooserNative *pFileSelection;
 
     if (desmume_running())
-        Pause();
-
-    pParent = GTK_WIDGET(pWindow);
+        Pause(NULL, NULL, NULL);
 
     pFilter_dsm = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_dsm, "*.dsm*");
@@ -1109,46 +781,143 @@ static void PlayMovieDialog()
     gtk_file_filter_set_name(pFilter_any, "All files");
 
     /* Creating the selection window */
-    pFileSelection = gtk_file_chooser_dialog_new("Play movie from...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Play movie from...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_OPEN,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_OPEN, GTK_RESPONSE_OK,
-            NULL);
+            "_Open", "_Cancel");
     gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (pFileSelection), TRUE);
-
-    /* Only the dialog window is accepting events: */
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_dsm);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
 
     /* Showing the window */
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
 
 		FCEUI_LoadMovie(sPath,true,false,-1);
 
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 }
 
-static void SaveStateDialog()
+static void ImportBackupMemoryDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    GtkFileFilter *pFilter_ds, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileFilter *pFilter_raw, *pFilter_ar, *pFilter_any;
+    GtkFileChooserNative *pFileSelection;
 
     if (desmume_running())
-        Pause();
+        Pause(NULL, NULL, NULL);
 
-    pParent = GTK_WIDGET(pWindow);
+    pFilter_raw = gtk_file_filter_new();
+    gtk_file_filter_add_pattern(pFilter_raw, "*.sav");
+    gtk_file_filter_set_name(pFilter_raw, "Raw/No$GBA Save format (*.sav)");
+
+    pFilter_ar = gtk_file_filter_new();
+    gtk_file_filter_add_pattern(pFilter_ar, "*.duc");
+    gtk_file_filter_add_pattern(pFilter_ar, "*.dss");
+    gtk_file_filter_set_name(pFilter_ar, "Action Replay DS Save (*.duc,*.dss)");
+
+    pFilter_any = gtk_file_filter_new();
+    gtk_file_filter_add_pattern(pFilter_any, "*.sav");
+    gtk_file_filter_add_pattern(pFilter_any, "*.duc");
+    gtk_file_filter_add_pattern(pFilter_any, "*.dss");
+    gtk_file_filter_set_name(pFilter_any, "All supported types");
+
+    /* Creating the selection window */
+    pFileSelection = gtk_file_chooser_native_new("Import Backup Memory From ...",
+            GTK_WINDOW(pWindow),
+            GTK_FILE_CHOOSER_ACTION_OPEN,
+            "_Open", "_Cancel");
+
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_raw);
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_ar);
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
+
+    /* Showing the window */
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
+
+        if(MMU_new.backupDevice.importData(sPath) == false ) {
+            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
+                    GTK_DIALOG_MODAL,
+                    GTK_MESSAGE_ERROR,
+                    GTK_BUTTONS_OK,
+                    "Unable to import:\n%s", sPath);
+            gtk_dialog_run(GTK_DIALOG(pDialog));
+            gtk_widget_destroy(pDialog);
+        }
+
+        g_free(sPath);
+    }
+    g_object_unref(pFileSelection);
+    Launch(NULL, NULL, NULL);
+}
+
+static void ExportBackupMemoryDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+    GtkFileFilter *pFilter_raw, *pFilter_ar, *pFilter_any;
+    GtkFileChooserNative *pFileSelection;
+
+    if (desmume_running())
+        Pause(NULL, NULL, NULL);
+
+    pFilter_raw = gtk_file_filter_new();
+    gtk_file_filter_add_pattern(pFilter_raw, "*.sav");
+    gtk_file_filter_set_name(pFilter_raw, "Raw/No$GBA Save format (*.sav)");
+
+    pFilter_any = gtk_file_filter_new();
+    gtk_file_filter_add_pattern(pFilter_any, "*.sav");
+    gtk_file_filter_set_name(pFilter_any, "All supported types");
+
+    /* Creating the selection window */
+    pFileSelection = gtk_file_chooser_native_new("Export Backup Memory To ...",
+            GTK_WINDOW(pWindow),
+            GTK_FILE_CHOOSER_ACTION_SAVE,
+            "_Save", "_Cancel");
+    gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (pFileSelection), TRUE);
+
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_raw);
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
+
+    /* Showing the window */
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
+
+        if(! g_str_has_suffix(sPath, ".sav"))
+        {
+            sPath = g_strjoin(NULL, sPath, ".sav", NULL);
+        }
+
+        if(MMU_new.backupDevice.exportData(sPath) == false ) {
+            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
+                    GTK_DIALOG_MODAL,
+                    GTK_MESSAGE_ERROR,
+                    GTK_BUTTONS_OK,
+                    "Unable to export:\n%s", sPath);
+            gtk_dialog_run(GTK_DIALOG(pDialog));
+            gtk_widget_destroy(pDialog);
+        }
+
+        g_free(sPath);
+    }
+    g_object_unref(pFileSelection);
+    Launch(NULL, NULL, NULL);
+}
+
+static void SaveStateDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+    GtkFileFilter *pFilter_ds, *pFilter_any;
+    GtkFileChooserNative *pFileSelection;
+
+    if (desmume_running())
+        Pause(NULL, NULL, NULL);
 
     pFilter_ds = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_ds, "*.ds*");
@@ -1159,27 +928,24 @@ static void SaveStateDialog()
     gtk_file_filter_set_name(pFilter_any, "All files");
 
     /* Creating the selection window */
-    pFileSelection = gtk_file_chooser_dialog_new("Save State To ...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Save State To ...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_SAVE,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_SAVE, GTK_RESPONSE_OK,
-            NULL);
+            "_Save", "_Cancel");
+    gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(pFileSelection), "save.ds");
     gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (pFileSelection), TRUE);
-
-    /* Only the dialog window is accepting events: */
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_ds);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
 
     /* Showing the window */
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
 
         if(savestate_save(sPath) == false ) {
-            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pFileSelection),
+            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
                     GTK_DIALOG_MODAL,
                     GTK_MESSAGE_ERROR,
                     GTK_BUTTONS_OK,
@@ -1187,28 +953,21 @@ static void SaveStateDialog()
             gtk_dialog_run(GTK_DIALOG(pDialog));
             gtk_widget_destroy(pDialog);
         } else {
-            gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "run"), TRUE);
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "run")), TRUE);
         }
 
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 }
 
-static void RecordAV_x264()
+static void RecordAV_x264(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkFileFilter *pFilter_mkv, *pFilter_mp4, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileChooserNative *pFileSelection;
 
     if (desmume_running())
-        Pause();
-
-    pParent = GTK_WIDGET(pWindow);
+        Pause(NULL, NULL, NULL);
 
     pFilter_mkv = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_mkv, "*.mkv");
@@ -1223,30 +982,26 @@ static void RecordAV_x264()
     gtk_file_filter_set_name(pFilter_any, "All files");
 
     /* Creating the selection window */
-    pFileSelection = gtk_file_chooser_dialog_new("Save video...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Save video...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_SAVE,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_SAVE, GTK_RESPONSE_OK,
-            NULL);
+            "_Save", "_Cancel");
     gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (pFileSelection), TRUE);
-
-    /* Only the dialog window is accepting events: */
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_mkv);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_mp4);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
 
     /* Showing the window */
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
 
         if(avout_x264.begin(sPath)) {
-            gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "record_x264"), FALSE);
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "record_x264")), FALSE);
         } else {
-            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pFileSelection),
+            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
                     GTK_DIALOG_MODAL,
                     GTK_MESSAGE_ERROR,
                     GTK_BUTTONS_OK,
@@ -1256,24 +1011,17 @@ static void RecordAV_x264()
         }
 
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 }
 
-static void RecordAV_flac()
+static void RecordAV_flac(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkFileFilter *pFilter_flac, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileChooserNative *pFileSelection;
 
     if (desmume_running())
-        Pause();
-
-    pParent = GTK_WIDGET(pWindow);
+        Pause(NULL, NULL, NULL);
 
     pFilter_flac = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_flac, "*.flac");
@@ -1284,29 +1032,25 @@ static void RecordAV_flac()
     gtk_file_filter_set_name(pFilter_any, "All files");
 
     /* Creating the selection window */
-    pFileSelection = gtk_file_chooser_dialog_new("Save audio...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Save audio...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_SAVE,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_SAVE, GTK_RESPONSE_OK,
-            NULL);
+            "_Save", "_Cancel");
     gtk_file_chooser_set_do_overwrite_confirmation (GTK_FILE_CHOOSER (pFileSelection), TRUE);
-
-    /* Only the dialog window is accepting events: */
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_flac);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
 
     /* Showing the window */
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
 
         if(avout_flac.begin(sPath)) {
-            gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "record_flac"), FALSE);
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "record_flac")), FALSE);
         } else {
-            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pFileSelection),
+            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
                     GTK_DIALOG_MODAL,
                     GTK_MESSAGE_ERROR,
                     GTK_BUTTONS_OK,
@@ -1316,31 +1060,24 @@ static void RecordAV_flac()
         }
 
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 }
 
-static void RecordAV_stop() {
+static void RecordAV_stop(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
 	avout_x264.end();
 	avout_flac.end();
-	gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "record_x264"), TRUE);
-	gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "record_flac"), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "record_x264")), TRUE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "record_flac")), TRUE);
 }
 
-static void OpenNdsDialog()
+static void OpenNdsDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkFileFilter *pFilter_nds, *pFilter_dsgba, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileChooserNative *pFileSelection;
 
     if (desmume_running())
-        Pause();
-
-    pParent = GTK_WIDGET(pWindow);
+        Pause(NULL, NULL, NULL);
 
     pFilter_nds = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_nds, "*.[nN][dD][sS]");
@@ -1361,14 +1098,10 @@ static void OpenNdsDialog()
     gtk_file_filter_set_name(pFilter_any, "All files");
 
     /* Creating the selection window */
-    pFileSelection = gtk_file_chooser_dialog_new("Open...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Open...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_OPEN,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_OPEN, GTK_RESPONSE_OK,
-            NULL);
-    /* Only the dialog window is accepting events: */
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
+            "_Open", "_Cancel");
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_nds);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_dsgba);
@@ -1377,11 +1110,13 @@ static void OpenNdsDialog()
     gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(pFileSelection), g_get_home_dir());
 
     /* Showing the window */
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
+
         if(Open((const char*)sPath) < 0) {
-            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pFileSelection),
+            GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
                     GTK_DIALOG_MODAL,
                     GTK_MESSAGE_ERROR,
                     GTK_BUTTONS_OK,
@@ -1403,33 +1138,30 @@ static void OpenNdsDialog()
 
             g_free(uri);
             g_free(recentData.app_exec);
-            gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "run"), TRUE);
-            Launch();
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "run")), TRUE);
+            Launch(NULL, NULL, NULL);
         }
 
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 }
 
-static void OpenRecent(GtkRecentChooser *chooser, gpointer user_data)
+static void OpenRecent(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkRecentManager *recent_manager = gtk_recent_manager_get_default();
-    gchar *uri, *romname;
+    gchar *romname;
     int ret;
 
     if (desmume_running())
-        Pause();
+        Pause(NULL, NULL, NULL);
 
-    uri = gtk_recent_chooser_get_current_uri(chooser);
+    const char *uri = g_variant_get_string(parameter, NULL);
     romname = g_filename_from_uri(uri, NULL, NULL);
     ret = Open(romname);
     if (ret > 0) {
-        gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "run"), TRUE);
-        Launch();
+        g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "run")), TRUE);
+        Launch(NULL, NULL, NULL);
     } else {
         gtk_recent_manager_remove_item(recent_manager, uri, NULL);
         GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
@@ -1441,18 +1173,17 @@ static void OpenRecent(GtkRecentChooser *chooser, gpointer user_data)
         gtk_widget_destroy(pDialog);
     }
 
-    g_free(uri);
     g_free(romname);
 }
 
-static void Reset()
+static void Reset(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     bool shouldBeRunning = desmume_running();
-    Pause();
+    Pause(NULL, NULL, NULL);
     NDS_Reset();
     RedrawScreen();
     if (shouldBeRunning) {
-        Launch();
+        Launch(NULL, NULL, NULL);
     }
 }
 
@@ -1490,48 +1221,86 @@ static void UpdateDrawingAreaAspect()
 	}
 }
 
-static void ToggleGap(GtkToggleAction* action)
+static void ToggleGap(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    config.view_gap = gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    config.view_gap = value;
     nds_screen.gap_size = config.view_gap ? GAP_SIZE : 0;
     UpdateDrawingAreaAspect();
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
-static void SetRotation(GtkAction *action, GtkRadioAction *current)
+static void SetRotation(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    nds_screen.rotation_angle = gtk_radio_action_get_current_value(current);
+    const char *string = g_variant_get_string(parameter, NULL);
+    nds_screen.rotation_angle = g_ascii_strtoll(string, NULL, 10);
     config.view_rot = nds_screen.rotation_angle;
     UpdateDrawingAreaAspect();
+    g_simple_action_set_state(action, parameter);
 }
 
-static void SetWinsize(GtkAction *action, GtkRadioAction *current)
+static void SetWinsize(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-	winsize_current = (winsize_enum) gtk_radio_action_get_current_value(current);
-	config.window_scale = winsize_current;
-	if (config.window_fullscreen) {
-		gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "fullscreen"), FALSE);
-	}
-	gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "fullscreen"), winsize_current == WINSIZE_SCALE);
-	UpdateDrawingAreaAspect();
+    const char *string = g_variant_get_string(parameter, NULL);
+    winsize_enum winsize;
+    if (strcmp(string, "scale") == 0)
+        winsize = WINSIZE_SCALE;
+    else if (strcmp(string, "0.5") == 0)
+        winsize = WINSIZE_HALF;
+    else if (strcmp(string, "1") == 0)
+        winsize = WINSIZE_1;
+    else if (strcmp(string, "1.5") == 0)
+        winsize = WINSIZE_1HALF;
+    else if (strcmp(string, "2") == 0)
+        winsize = WINSIZE_2;
+    else if (strcmp(string, "2.5") == 0)
+        winsize = WINSIZE_2HALF;
+    else if (strcmp(string, "3") == 0)
+        winsize = WINSIZE_3;
+    else if (strcmp(string, "4") == 0)
+        winsize = WINSIZE_4;
+    else if (strcmp(string, "5") == 0)
+        winsize = WINSIZE_5;
+    winsize_current = winsize;
+    config.window_scale = winsize_current;
+    if (config.window_fullscreen) {
+        g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "fullscreen")), FALSE);
+    }
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(pApp), "fullscreen")), winsize_current == WINSIZE_SCALE);
+    UpdateDrawingAreaAspect();
+    g_simple_action_set_state(action, parameter);
 }
 
-static void SetOrientation(GtkAction *action, GtkRadioAction *current)
+static void SetOrientation(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    nds_screen.orientation = (orientation_enum)gtk_radio_action_get_current_value(current);
+    const char *string = g_variant_get_string(parameter, NULL);
+	orientation_enum orient=ORIENT_VERTICAL;
+	if(strcmp(string, "vertical") == 0)
+		orient = ORIENT_VERTICAL;
+	else if(strcmp(string, "horizontal") == 0)
+		orient = ORIENT_HORIZONTAL;
+	else if(strcmp(string, "single") == 0)
+		orient = ORIENT_SINGLE;
+    nds_screen.orientation = orient;
 #ifdef HAVE_LIBAGG
     osd->singleScreen = nds_screen.orientation == ORIENT_SINGLE;
 #endif
     config.view_orient = nds_screen.orientation;
     UpdateDrawingAreaAspect();
+    g_simple_action_set_state(action, parameter);
 }
 
-static void ToggleSwapScreens(GtkToggleAction *action) {
-    nds_screen.swap = gtk_toggle_action_get_active(action);
+static void ToggleSwapScreens(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    nds_screen.swap = value;
 #ifdef HAVE_LIBAGG
     osd->swapScreens = nds_screen.swap;
 #endif
     config.view_swap = nds_screen.swap;
     RedrawScreen();
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
 static int ConfigureDrawingArea(GtkWidget *widget, GdkEventConfigure *event, gpointer data)
@@ -1541,7 +1310,7 @@ static int ConfigureDrawingArea(GtkWidget *widget, GdkEventConfigure *event, gpo
 
 static inline void gpu_screen_to_rgb(u32* dst)
 {
-    ColorspaceConvertBuffer555To8888Opaque<false, false>((const uint16_t *)GPU->GetDisplayInfo().masterNativeBuffer, dst, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * 2);
+    ColorspaceConvertBuffer555To8888Opaque<false, false, BESwapDst>(GPU->GetDisplayInfo().masterNativeBuffer16, dst, GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * 2);
 }
 
 static inline void drawScreen(cairo_t* cr, u32* buf, gint w, gint h) {
@@ -1633,7 +1402,8 @@ static gboolean ExposeDrawingArea (GtkWidget *widget, GdkEventExpose *event, gpo
 	hratio = MIN(hratio, vratio);
 	vratio = hratio;
 
-	cairo_t* cr = gdk_cairo_create(window);
+	GdkDrawingContext *context = gdk_window_begin_draw_frame(window, gdk_window_get_clip_region(window));
+	cairo_t* cr = gdk_drawing_context_get_cairo_context(context);
 
 	// Scale to window size at center of area
 	cairo_translate(cr, daW / 2, daH / 2);
@@ -1659,14 +1429,14 @@ static gboolean ExposeDrawingArea (GtkWidget *widget, GdkEventExpose *event, gpo
 	cairo_matrix_scale(&nds_screen.touch_matrix, (double)dstScale / 2, (double)dstScale / 2);
 	cairo_matrix_invert(&nds_screen.touch_matrix);
 
-	cairo_destroy(cr);
+	gdk_window_end_draw_frame(window, context);
 	draw_count++;
 
 	return TRUE;
 }
 
 static void RedrawScreen() {
-	ColorspaceConvertBuffer555To8888Opaque<true, false>((const uint16_t *)GPU->GetDisplayInfo().masterNativeBuffer, (uint32_t *)video->GetSrcBufferPtr(), GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * 2);
+	ColorspaceConvertBuffer555To8888Opaque<true, false, BESwapDst>(GPU->GetDisplayInfo().masterNativeBuffer16, (uint32_t *)video->GetSrcBufferPtr(), GPU_FRAMEBUFFER_NATIVE_WIDTH * GPU_FRAMEBUFFER_NATIVE_HEIGHT * 2);
 #ifdef HAVE_LIBAGG
 	aggDraw.hud->attach((u8*)video->GetSrcBufferPtr(), 256, 384, 1024);
 	osd->update();
@@ -1765,7 +1535,7 @@ static gboolean Stylus_Move(GtkWidget *w, GdkEventMotion *e, gpointer data)
 
     if(click) {
         if(e->is_hint)
-            gdk_window_get_pointer(w->window, &x, &y, &state);
+            gdk_window_get_device_position(gtk_widget_get_window(w), e->device, &x, &y, &state);
         else {
             x= (gint)e->x;
             y= (gint)e->y;
@@ -1795,13 +1565,11 @@ static gboolean Stylus_Press(GtkWidget * w, GdkEventButton * e,
     gint x, y;
 
     if (e->button == 3) {
-        GtkWidget * pMenu = gtk_menu_item_get_submenu ( GTK_MENU_ITEM(
-                    gtk_ui_manager_get_widget (ui_manager, "/MainMenu/ViewMenu")));
-        gtk_menu_popup(GTK_MENU(pMenu), NULL, NULL, NULL, NULL, 3, e->time);
+        gtk_menu_popup_at_pointer(pPopupMenu, (GdkEvent *) e);
     }
 
     if (e->button == 1) {
-        gdk_window_get_pointer(w->window, &x, &y, &state);
+        gdk_window_get_device_position(gtk_widget_get_window(w), e->device, &x, &y, &state);
 
         if(state & GDK_BUTTON1_MASK) {
 #ifdef HAVE_LIBAGG
@@ -1830,9 +1598,9 @@ static gboolean Stylus_Release(GtkWidget *w, GdkEventButton *e, gpointer data)
 static void loadgame(int num){
    if (desmume_running())
    {   
-       Pause();
+       Pause(NULL, NULL, NULL);
        loadstate_slot(num);
-       Launch();
+       Launch(NULL, NULL, NULL);
    }
    else
        loadstate_slot(num);
@@ -1842,9 +1610,9 @@ static void loadgame(int num){
 static void savegame(int num){
    if (desmume_running())
    {   
-       Pause();
+       Pause(NULL, NULL, NULL);
        savestate_slot(num);
-       Launch();
+       Launch(NULL, NULL, NULL);
    }
    else
        savestate_slot(num);
@@ -1852,33 +1620,18 @@ static void savegame(int num){
    RedrawScreen();
 }
 
-static void MenuLoad(GtkMenuItem *item, gpointer slot)
+static void MenuLoad(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    loadgame(GPOINTER_TO_INT(slot));
+    loadgame(g_variant_get_uint32(parameter));
 }
 
-static void MenuSave(GtkMenuItem *item, gpointer slot)
+static void MenuSave(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    savegame(GPOINTER_TO_INT(slot));
+    savegame(g_variant_get_uint32(parameter));
 }
 
 static gint Key_Press(GtkWidget *w, GdkEventKey *e, gpointer data)
 {
-  if (e->keyval == GDK_Shift_L){
-      gdk_shift_pressed |= 1;
-      return 1;
-  }
-  if (e->keyval == GDK_Shift_R){
-      gdk_shift_pressed |= 2;
-      return 1;
-  }
-  if( e->keyval >= GDK_F1 && e->keyval <= GDK_F10 ){
-      if(!gdk_shift_pressed)
-          loadgame((e->keyval - GDK_F1 + 1) % 10);
-      else
-          savegame((e->keyval - GDK_F1 + 1) % 10);
-      return 1;
-  }
   guint mask;
   mask = gtk_accelerator_get_default_mod_mask ();
   if( (e->state & mask) == 0){
@@ -1900,14 +1653,6 @@ static gint Key_Press(GtkWidget *w, GdkEventKey *e, gpointer data)
 
 static gint Key_Release(GtkWidget *w, GdkEventKey *e, gpointer data)
 {
-  if (e->keyval == GDK_Shift_L){
-      gdk_shift_pressed &= ~1;
-      return 1;
-  }
-  if (e->keyval == GDK_Shift_R){
-      gdk_shift_pressed &= ~2;
-      return 1;
-  }
   u16 Key = lookup_key(e->keyval);
   RM_KEY( keys_latch, Key );
   return 1;
@@ -1916,31 +1661,42 @@ static gint Key_Release(GtkWidget *w, GdkEventKey *e, gpointer data)
 
 /////////////////////////////// SET AUDIO VOLUME //////////////////////////////////////
 
-static void CallbackSetAudioVolume(GtkWidget *hscale, gpointer data)
+static int ConvertSDLVolumeToSPU(int sdl_volume)
 {
-	SNDSDLSetAudioVolume(gtk_range_get_value(GTK_RANGE(hscale)));
-	config.audio_volume = SNDSDLGetAudioVolume();
+	int tmp = sdl_volume * 100;
+	if (tmp % SDL_MIX_MAXVOLUME == 0)
+	{
+		return tmp/SDL_MIX_MAXVOLUME;
+	}
+	return (tmp/SDL_MIX_MAXVOLUME)+1;
 }
 
-static void SetAudioVolume()
+static void CallbackSetAudioVolume(GtkWidget *scale, gpointer data)
+{
+	SPU_SetVolume(gtk_range_get_value(GTK_RANGE(scale)));
+	config.audio_volume = ConvertSDLVolumeToSPU(SNDSDLGetAudioVolume());
+}
+
+static void SetAudioVolume(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
 	GtkWidget *dialog = NULL;
-	GtkWidget *hscale = NULL;
-	int audio_volume = SNDSDLGetAudioVolume();
-	dialog = gtk_dialog_new_with_buttons("Set audio volume", GTK_WINDOW(pWindow), GTK_DIALOG_MODAL, GTK_STOCK_OK, GTK_RESPONSE_OK, GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL);
-	hscale = gtk_hscale_new_with_range(0, SDL_MIX_MAXVOLUME, 1);
-	gtk_range_set_value(GTK_RANGE(hscale), SNDSDLGetAudioVolume());
-	g_signal_connect(G_OBJECT(hscale), "value-changed", G_CALLBACK(CallbackSetAudioVolume), NULL);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), hscale, TRUE, FALSE, 0);
-	gtk_widget_show_all(GTK_DIALOG(dialog)->vbox);
+	GtkWidget *scale = NULL;
+	int audio_volume = ConvertSDLVolumeToSPU(SNDSDLGetAudioVolume());
+	dialog = gtk_dialog_new_with_buttons("Set audio volume", GTK_WINDOW(pWindow), GTK_DIALOG_MODAL, "_OK", GTK_RESPONSE_OK, "_Cancel", GTK_RESPONSE_CANCEL, NULL);
+	scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 100, 1);
+	gtk_range_set_value(GTK_RANGE(scale), audio_volume);
+	g_signal_connect(G_OBJECT(scale), "value-changed", G_CALLBACK(CallbackSetAudioVolume), NULL);
+	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), scale, TRUE, FALSE, 0);
+	gtk_widget_show_all(gtk_dialog_get_content_area(GTK_DIALOG(dialog)));
 	switch(gtk_dialog_run(GTK_DIALOG(dialog)))
 	{
 		case GTK_RESPONSE_OK:
 			break;
 		case GTK_RESPONSE_CANCEL:
+		case GTK_RESPONSE_DELETE_EVENT:
 		case GTK_RESPONSE_NONE:
-			SNDSDLSetAudioVolume(audio_volume);
-			config.audio_volume = SNDSDLGetAudioVolume();
+			SPU_SetVolume(audio_volume);
+			config.audio_volume = audio_volume;
 			break;
 	}
 	gtk_widget_destroy(dialog);
@@ -1953,14 +1709,14 @@ static void CallbackSetFirmwareLanguage(GtkWidget *check_button, gpointer data)
 	gtk_widget_set_sensitive(GTK_WIDGET(data), gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button)));
 }
 
-static void SetFirmwareLanguage()
+static void SetFirmwareLanguage(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
 	GtkWidget *dialog = NULL;
 	GtkWidget *combo_box_text = NULL;
 	GtkWidget *check_button = NULL;
 	const char *languages[6] = {"Japanese", "English", "French", "German", "Italian", "Spanish"};
 	gchar *text = NULL;
-	dialog = gtk_dialog_new_with_buttons("Set firmware language", GTK_WINDOW(pWindow), GTK_DIALOG_MODAL, GTK_STOCK_OK, GTK_RESPONSE_OK, GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, NULL);
+	dialog = gtk_dialog_new_with_buttons("Set firmware language", GTK_WINDOW(pWindow), GTK_DIALOG_MODAL, "_OK", GTK_RESPONSE_OK, "_Cancel", GTK_RESPONSE_CANCEL, NULL);
 	combo_box_text = gtk_combo_box_text_new();
 	for(int index = 0; index < 6; index++)
 		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo_box_text), languages[index]);
@@ -1969,9 +1725,9 @@ static void SetFirmwareLanguage()
 	check_button = gtk_check_button_new_with_mnemonic("_Enable command line overriding");
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_button), config.command_line_overriding_firmware_language);
 	g_signal_connect(G_OBJECT(check_button), "toggled", G_CALLBACK(CallbackSetFirmwareLanguage), combo_box_text);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), check_button, TRUE, FALSE, 0);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), combo_box_text, TRUE, FALSE, 0);
-	gtk_widget_show_all(GTK_DIALOG(dialog)->vbox);
+	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), check_button, TRUE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), combo_box_text, TRUE, FALSE, 0);
+	gtk_widget_show_all(gtk_dialog_get_content_area(GTK_DIALOG(dialog)));
 	switch(gtk_dialog_run(GTK_DIALOG(dialog)))
 	{
 		case GTK_RESPONSE_OK:
@@ -2017,17 +1773,17 @@ static void Modify_Key(GtkWidget* widget, gpointer data)
     mkDialog = gtk_dialog_new_with_buttons(Title,
         GTK_WINDOW(pWindow),
         GTK_DIALOG_MODAL,
-        GTK_STOCK_OK,GTK_RESPONSE_OK,
-        GTK_STOCK_CANCEL,GTK_RESPONSE_CANCEL,
+        "_OK",GTK_RESPONSE_OK,
+        "_Cancel",GTK_RESPONSE_CANCEL,
         NULL);
 
     ctx.label = gtk_label_new(Title);
     g_free(Title);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(mkDialog)->vbox), ctx.label, TRUE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(mkDialog))), ctx.label, TRUE, FALSE, 0);
 
     g_signal_connect(G_OBJECT(mkDialog), "key_press_event", G_CALLBACK(AcceptNewInputKey), &ctx);
 
-    gtk_widget_show_all(GTK_DIALOG(mkDialog)->vbox);
+    gtk_widget_show_all(gtk_dialog_get_content_area(GTK_DIALOG(mkDialog)));
 
     switch(gtk_dialog_run(GTK_DIALOG(mkDialog))) {
     case GTK_RESPONSE_OK:
@@ -2046,7 +1802,7 @@ static void Modify_Key(GtkWidget* widget, gpointer data)
 
 }
 
-static void Edit_Controls()
+static void Edit_Controls(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkWidget *ecDialog;
     GtkWidget *ecKey;
@@ -2058,8 +1814,8 @@ static void Edit_Controls()
     ecDialog = gtk_dialog_new_with_buttons("Edit controls",
                         GTK_WINDOW(pWindow),
                         GTK_DIALOG_MODAL,
-                        GTK_STOCK_OK,GTK_RESPONSE_OK,
-                        GTK_STOCK_CANCEL,GTK_RESPONSE_CANCEL,
+                        "_OK",GTK_RESPONSE_OK,
+                        "_Cancel",GTK_RESPONSE_CANCEL,
                         NULL);
 
     for(i = 0; i < NB_KEYS; i++) {
@@ -2067,10 +1823,10 @@ static void Edit_Controls()
         ecKey = gtk_button_new_with_label(Key_Label);
         g_free(Key_Label);
         g_signal_connect(G_OBJECT(ecKey), "clicked", G_CALLBACK(Modify_Key), GINT_TO_POINTER(i));
-        gtk_box_pack_start(GTK_BOX(GTK_DIALOG(ecDialog)->vbox), ecKey,TRUE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(ecDialog))), ecKey,TRUE, FALSE, 0);
     }
 
-    gtk_widget_show_all(GTK_DIALOG(ecDialog)->vbox);
+    gtk_widget_show_all(gtk_dialog_get_content_area(GTK_DIALOG(ecDialog)));
 
     switch (gtk_dialog_run(GTK_DIALOG(ecDialog))) {
     case GTK_RESPONSE_OK:
@@ -2112,14 +1868,14 @@ static void Modify_JoyKey(GtkWidget* widget, gpointer data)
     mkDialog = gtk_dialog_new_with_buttons(Title,
         GTK_WINDOW(pWindow),
         GTK_DIALOG_MODAL,
-        GTK_STOCK_OK,GTK_RESPONSE_OK,
-        GTK_STOCK_CANCEL,GTK_RESPONSE_CANCEL,
+        "_OK",GTK_RESPONSE_OK,
+        "_Cancel",GTK_RESPONSE_CANCEL,
         NULL);
 
     ctx.label = gtk_label_new(Title);
     g_free(Title);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(mkDialog)->vbox), ctx.label, TRUE, FALSE, 0);
-    gtk_widget_show_all(GTK_DIALOG(mkDialog)->vbox);
+    gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(mkDialog))), ctx.label, TRUE, FALSE, 0);
+    gtk_widget_show_all(gtk_dialog_get_content_area(GTK_DIALOG(mkDialog)));
 
     g_signal_connect(G_OBJECT(mkDialog), "focus_in_event", G_CALLBACK(AcceptNewJoyKey), &ctx);
    
@@ -2142,76 +1898,53 @@ static void Modify_JoyKey(GtkWidget* widget, gpointer data)
 
 #ifdef HAVE_JIT
 
-static void EmulationSettingsDialog(){
-	GtkWidget *esDialog;
-	GtkWidget *esKey;
+static void EmulationSettingsDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+    GtkDialog *dialog;
+    GtkCheckButton *use_dynarec;
+    GtkAdjustment *block_size;
 
-	esDialog=gtk_dialog_new_with_buttons("Emulation Settings",
-			GTK_WINDOW(pWindow),
-			GTK_DIALOG_MODAL,
-			GTK_STOCK_OK,GTK_RESPONSE_OK,
-			GTK_STOCK_CANCEL,GTK_RESPONSE_CANCEL,
-			NULL);
+    GtkBuilder *builder = gtk_builder_new_from_resource("/org/desmume/DeSmuME/emulation_settings.ui");
+    dialog = GTK_DIALOG(gtk_builder_get_object(builder, "dialog"));
+    use_dynarec = GTK_CHECK_BUTTON(gtk_builder_get_object(builder, "use-dynarec"));
+    block_size = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "block-size"));
+    g_object_unref(builder);
 
-    esKey=gtk_label_new("CPU Mode:\n");
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(esDialog)->vbox), esKey,TRUE, FALSE, 0);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(use_dynarec), config.use_jit);
+    g_signal_connect(G_OBJECT(use_dynarec), "clicked", G_CALLBACK(ToggleJIT), GINT_TO_POINTER(0));
 
-	esKey=gtk_check_button_new_with_label("Use dynamic recompiler");
-	gtk_toggle_button_set_active((GtkToggleButton*)esKey,config.use_jit);
-	g_signal_connect(G_OBJECT(esKey),"clicked",G_CALLBACK(ToggleJIT),GINT_TO_POINTER(0));
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(esDialog)->vbox), esKey,TRUE, FALSE, 0);
+    gtk_adjustment_set_value(block_size, config.jit_max_block_size);
+    g_signal_connect(G_OBJECT(block_size), "value_changed", G_CALLBACK(JITMaxBlockSizeChanged), NULL);
 
-    esKey=gtk_label_new("Block Size (1 - accuracy, 100 - fastest):");
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(esDialog)->vbox), esKey,TRUE, FALSE, 0);
+    bool prev_use_jit = config.use_jit;
+    int prev_jit_max_block_size = config.jit_max_block_size;
 
-    GtkAdjustment* JITBlockSizeAdjustment=(GtkAdjustment*)gtk_adjustment_new(config.jit_max_block_size,1,100,1,5,0);
-    esKey=gtk_hscale_new(JITBlockSizeAdjustment);
-    gtk_scale_set_digits((GtkScale*)esKey,0);
-    g_signal_connect(G_OBJECT(JITBlockSizeAdjustment),"value_changed",G_CALLBACK(JITMaxBlockSizeChanged),NULL);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(esDialog)->vbox), esKey,TRUE, FALSE, 0);
-
-    esKey=gtk_label_new(
-    		"Enabling this will get you 0-50% speedups. It is optional because it\n"
-    		"may still contain small small bugs, due mostly merely to newness, \n"
-    		"which can safely be fixed in time. Furthermore, you may have to \n"
-    		"tune the block size to prevent some games from breaking.\n"
-    		"\n"
-    		"This should not be assumed to be deterministic."
-    		);
-    gtk_box_pack_start(GTK_BOX(GTK_DIALOG(esDialog)->vbox), esKey,TRUE, FALSE, 0);
-
-	gtk_widget_show_all(GTK_DIALOG(esDialog)->vbox);
-
-	bool prev_use_jit=config.use_jit;
-	int prev_jit_max_block_size=config.jit_max_block_size;
-
-	switch (gtk_dialog_run(GTK_DIALOG(esDialog))) {
-	case GTK_RESPONSE_OK:
-		CommonSettings.jit_max_block_size=config.jit_max_block_size;
-		arm_jit_sync();
-		arm_jit_reset(CommonSettings.use_jit=config.use_jit);
-		break;
-	case GTK_RESPONSE_CANCEL:
-	case GTK_RESPONSE_NONE:
-		config.use_jit=prev_use_jit;
-		config.jit_max_block_size=prev_jit_max_block_size;
-		break;
-	}
-	gtk_widget_destroy(esDialog);
+    switch (gtk_dialog_run(dialog)) {
+    case GTK_RESPONSE_OK:
+        CommonSettings.jit_max_block_size = config.jit_max_block_size;
+        arm_jit_sync();
+        arm_jit_reset(CommonSettings.use_jit = config.use_jit);
+        break;
+    case GTK_RESPONSE_CANCEL:
+    case GTK_RESPONSE_NONE:
+        config.use_jit = prev_use_jit;
+        config.jit_max_block_size = prev_jit_max_block_size;
+        break;
+    }
+    gtk_widget_destroy(GTK_WIDGET(dialog));
 
 }
 
-static void JITMaxBlockSizeChanged(GtkAdjustment* adj,void * nullPtr){
-	config.jit_max_block_size=(int)adj->value;
+static void JITMaxBlockSizeChanged(GtkAdjustment* adj, gpointer data) {
+    config.jit_max_block_size = (int)gtk_adjustment_get_value(adj);
 }
 
-static void ToggleJIT(){
-	config.use_jit=!config.use_jit;
+static void ToggleJIT() {
+    config.use_jit = !config.use_jit;
 }
 
 #endif
 
-static void Edit_Joystick_Controls()
+static void Edit_Joystick_Controls(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkWidget *ecDialog;
     GtkWidget *ecKey;
@@ -2223,8 +1956,8 @@ static void Edit_Joystick_Controls()
     ecDialog = gtk_dialog_new_with_buttons("Edit controls",
                         GTK_WINDOW(pWindow),
                         GTK_DIALOG_MODAL,
-                        GTK_STOCK_OK,GTK_RESPONSE_OK,
-                        GTK_STOCK_CANCEL,GTK_RESPONSE_CANCEL,
+                        "_OK",GTK_RESPONSE_OK,
+                        "_Cancel",GTK_RESPONSE_CANCEL,
                         NULL);
 
     for(i = 0; i < NB_KEYS; i++) {
@@ -2232,14 +1965,14 @@ static void Edit_Joystick_Controls()
         ecKey = gtk_button_new_with_label(Key_Label);
         g_free(Key_Label);
         g_signal_connect(G_OBJECT(ecKey), "clicked", G_CALLBACK(Modify_JoyKey), GINT_TO_POINTER(i));
-        gtk_box_pack_start(GTK_BOX(GTK_DIALOG(ecDialog)->vbox), ecKey,TRUE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(ecDialog))), ecKey,TRUE, FALSE, 0);
     }
 
-    gtk_widget_show_all(GTK_DIALOG(ecDialog)->vbox);
+    gtk_widget_show_all(gtk_dialog_get_content_area(GTK_DIALOG(ecDialog)));
 
     switch (gtk_dialog_run(GTK_DIALOG(ecDialog))) {
     case GTK_RESPONSE_OK:
-        memcpy(&joypad_cfg, &Keypad_Temp, sizeof(keyboard_cfg));
+        memcpy(&joypad_cfg, &Keypad_Temp, sizeof(joypad_cfg));
         desmume_config_update_joykeys(keyfile);
         break;
     case GTK_RESPONSE_CANCEL:
@@ -2251,101 +1984,57 @@ static void Edit_Joystick_Controls()
 }
 
 
-static void GraphicsSettingsDialog() {
-	GtkWidget *gsDialog;
-	GtkWidget *gsKey, *coreCombo, *wTable, *wPosterize, *wScale, *wSmoothing, *wMultisample, *wHCInterpolate;
+static void GraphicsSettingsDialog(GSimpleAction *action, GVariant *parameter, gpointer user_data) {
+	GtkDialog *dialog;
+	GtkGrid *wGrid;
+	GtkComboBox *coreCombo, *wScale, *wMultisample;
+	GtkToggleButton *wPosterize, *wSmoothing, *wHCInterpolate;
 
-	gsDialog = gtk_dialog_new_with_buttons("Graphics Settings",
-			GTK_WINDOW(pWindow),
-			GTK_DIALOG_MODAL,
-			GTK_STOCK_OK,
-			GTK_RESPONSE_OK,
-			GTK_STOCK_CANCEL,
-			GTK_RESPONSE_CANCEL,
-			NULL);
+	GtkBuilder *builder = gtk_builder_new_from_resource("/org/desmume/DeSmuME/graphics.ui");
+	dialog = GTK_DIALOG(gtk_builder_get_object(builder, "dialog"));
+	wGrid = GTK_GRID(gtk_builder_get_object(builder, "graphics_grid"));
+	coreCombo = GTK_COMBO_BOX(gtk_builder_get_object(builder, "core_combo"));
+	wScale = GTK_COMBO_BOX(gtk_builder_get_object(builder, "scale"));
+	wMultisample = GTK_COMBO_BOX(gtk_builder_get_object(builder, "multisample"));
+	wPosterize = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "posterize"));
+	wSmoothing = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "smoothing"));
+	wHCInterpolate = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "hc_interpolate"));
+	g_object_unref(builder);
 
-
-	wTable = gtk_table_new(2 ,2, TRUE);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(gsDialog)->vbox), wTable, TRUE, FALSE, 0);
-
-	// 3D Core
-	gsKey = gtk_label_new("3D Core:");
-	gtk_misc_set_alignment(GTK_MISC(gsKey), 0.0, 0.5);
-	gtk_table_attach(GTK_TABLE(wTable), gsKey, 0, 1, 0, 1,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 5, 0);
-
-	coreCombo = gtk_combo_box_text_new();
-	gtk_combo_box_text_insert_text(GTK_COMBO_BOX_TEXT(coreCombo), 0, "Null");
-	gtk_combo_box_text_insert_text(GTK_COMBO_BOX_TEXT(coreCombo), 1, "SoftRasterizer");
-#ifdef HAVE_OPENGL
-	gtk_combo_box_text_insert_text(GTK_COMBO_BOX_TEXT(coreCombo), 2, "OpenGL");
+#ifndef HAVE_OPENGL
+	gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(coreCombo), 2);
+	gtk_grid_remove_row(wGrid, 4);
 #endif
-	gtk_combo_box_set_active(GTK_COMBO_BOX(coreCombo), cur3DCore);
-	gtk_table_attach(GTK_TABLE(wTable), coreCombo, 1, 2, 0, 1,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 5, 0);
-
-
-	// 3D Texture Upscaling
-	gsKey = gtk_label_new("3D Texture Upscaling:");
-	gtk_misc_set_alignment(GTK_MISC(gsKey), 0.0, 0.5);
-	gtk_table_attach(GTK_TABLE(wTable), gsKey, 0, 1, 1, 2,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 5, 0);
-
-	wScale = gtk_combo_box_text_new();
-	gtk_combo_box_text_insert_text(GTK_COMBO_BOX_TEXT(wScale), 0, "x1");
-	gtk_combo_box_text_insert_text(GTK_COMBO_BOX_TEXT(wScale), 1, "x2");
-	gtk_combo_box_text_insert_text(GTK_COMBO_BOX_TEXT(wScale), 2, "x4");
+	gtk_combo_box_set_active(coreCombo, cur3DCore);
 
 	// The shift it work for scale up to 4. For scaling more than 4, a mapping function is required
-	gtk_combo_box_set_active(GTK_COMBO_BOX(wScale), CommonSettings.GFX3D_Renderer_TextureScalingFactor >> 1);
-	gtk_table_attach(GTK_TABLE(wTable), wScale, 1, 2, 1, 2,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 5, 0);
-
+	gtk_combo_box_set_active(wScale, CommonSettings.GFX3D_Renderer_TextureScalingFactor >> 1);
 
 	// 3D Texture Deposterization
-	wPosterize = gtk_check_button_new_with_label("3D Texture Deposterization");
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wPosterize), CommonSettings.GFX3D_Renderer_TextureDeposterize);
-	gtk_table_attach(GTK_TABLE(wTable), wPosterize, 0, 1, 2, 3,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 0, 0);
-
+	gtk_toggle_button_set_active(wPosterize, CommonSettings.GFX3D_Renderer_TextureDeposterize);
 
 	// 3D Texture Smoothing
-	wSmoothing = gtk_check_button_new_with_label("3D Texture Smoothing");
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wSmoothing), CommonSettings.GFX3D_Renderer_TextureSmoothing);
-	gtk_table_attach(GTK_TABLE(wTable), wSmoothing, 0, 1, 3, 4,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 0, 0);
-
+	gtk_toggle_button_set_active(wSmoothing, CommonSettings.GFX3D_Renderer_TextureSmoothing);
 
 #ifdef HAVE_OPENGL
 	// OpenGL Multisample
-	wMultisample = gtk_check_button_new_with_label("Multisample Antialiasing (OpenGL)");
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wMultisample), (CommonSettings.GFX3D_Renderer_MultisampleSize > 0) ? TRUE : FALSE);
-	gtk_table_attach(GTK_TABLE(wTable), wMultisample, 1, 2, 2, 3,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 10, 0);
+	int currentMultisample = CommonSettings.GFX3D_Renderer_MultisampleSize;
+	int currentActive = 0;
+	// find smallest option that is larger than current value, i.e. round up to power of 2
+	while (multisampleSizes[currentActive] < currentMultisample && currentActive < 5) { currentActive++; }
+	gtk_combo_box_set_active(wMultisample, currentActive);
 #endif
 
 	// SoftRasterizer High Color Interpolation
-	wHCInterpolate = gtk_check_button_new_with_label("High Resolution Color Interpolation (SoftRasterizer)");
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(wHCInterpolate), CommonSettings.GFX3D_HighResolutionInterpolateColor);
-	gtk_table_attach(GTK_TABLE(wTable), wHCInterpolate, 1, 2, 3, 4,
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL),
-			static_cast<GtkAttachOptions>(GTK_EXPAND | GTK_FILL), 10, 0);
+	gtk_toggle_button_set_active(wHCInterpolate, CommonSettings.GFX3D_HighResolutionInterpolateColor);
 
+	gtk_widget_show_all(gtk_dialog_get_content_area(dialog));
 
-	gtk_widget_show_all(GTK_DIALOG(gsDialog)->vbox);
-
-    switch (gtk_dialog_run(GTK_DIALOG(gsDialog))) {
+    switch (gtk_dialog_run(dialog)) {
     case GTK_RESPONSE_OK:
     // Start: OK Response block
     {
-    	int sel3DCore = gtk_combo_box_get_active(GTK_COMBO_BOX(coreCombo));
+    	int sel3DCore = gtk_combo_box_get_active(coreCombo);
 
     	// Change only if needed
 		if (sel3DCore != cur3DCore)
@@ -2354,15 +2043,15 @@ static void GraphicsSettingsDialog() {
 			{
 #if !defined(HAVE_OPENGL)
 				sel3DCore = RENDERID_SOFTRASTERIZER;
-#elif defined(HAVE_GL_GLX)
-				if (!is_glx_initialized())
-				{
-					init_glx_3Demu();
-				}
 #elif defined(HAVE_LIBOSMESA)
 				if (!is_osmesa_initialized())
 				{
 					init_osmesa_3Demu();
+				}
+#else
+				if (!is_sdl_initialized())
+				{
+					init_sdl_3Demu();
 				}
 #endif
 			}
@@ -2381,7 +2070,7 @@ static void GraphicsSettingsDialog() {
 
 		size_t scale = 1;
 
-		switch (gtk_combo_box_get_active(GTK_COMBO_BOX(wScale))){
+		switch (gtk_combo_box_get_active(wScale)){
 		case 1:
 			scale = 2;
 			break;
@@ -2391,13 +2080,15 @@ static void GraphicsSettingsDialog() {
 		default:
 			break;
 		}
-		CommonSettings.GFX3D_Renderer_TextureDeposterize = config.textureDeposterize = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(wPosterize));
-		CommonSettings.GFX3D_Renderer_TextureSmoothing = config.textureSmoothing = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(wSmoothing));
+		CommonSettings.GFX3D_Renderer_TextureDeposterize = config.textureDeposterize = gtk_toggle_button_get_active(wPosterize);
+		CommonSettings.GFX3D_Renderer_TextureSmoothing = config.textureSmoothing = gtk_toggle_button_get_active(wSmoothing);
 		CommonSettings.GFX3D_Renderer_TextureScalingFactor = config.textureUpscale = scale;
-		CommonSettings.GFX3D_HighResolutionInterpolateColor = config.highColorInterpolation = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(wHCInterpolate));
+		CommonSettings.GFX3D_HighResolutionInterpolateColor = config.highColorInterpolation = gtk_toggle_button_get_active(wHCInterpolate);
 #ifdef HAVE_OPENGL
-		config.multisampling = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(wMultisample));
-		CommonSettings.GFX3D_Renderer_MultisampleSize = (config.multisampling) ? 4 : 0;
+		int selectedMultisample = gtk_combo_box_get_active(wMultisample);
+		config.multisamplingSize = multisampleSizes[selectedMultisample];
+		config.multisampling = selectedMultisample != 0;
+		CommonSettings.GFX3D_Renderer_MultisampleSize = multisampleSizes[selectedMultisample];
 #endif
     }
     // End: OK Response Block
@@ -2407,20 +2098,21 @@ static void GraphicsSettingsDialog() {
         break;
     }
 
-	gtk_widget_destroy(gsDialog);
+	gtk_widget_destroy(GTK_WIDGET(dialog));
 
 }
 
-static void ToggleLayerVisibility(GtkToggleAction* action, gpointer data)
+static void ToggleLayerVisibility(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    guint Layer = GPOINTER_TO_UINT(data);
-    gboolean active;
+    guint Layer = GPOINTER_TO_UINT(user_data);
 
     // FIXME: make it work after resume
     if (!desmume_running())
         return;
 
-    active = gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean active = !g_variant_get_boolean(variant);
+    g_simple_action_set_state(action, g_variant_new_boolean(active));
 
     switch (Layer) {
     case MAIN_BG_0:
@@ -2442,7 +2134,7 @@ static void ToggleLayerVisibility(GtkToggleAction* action, gpointer data)
     }
 }
 
-static void Printscreen()
+static void Printscreen(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GdkPixbuf *screenshot;
     const gchar *dir;
@@ -2505,17 +2197,13 @@ static void Printscreen()
 }
 
 #ifdef DESMUME_GTK_FIRMWARE_BROKEN
-static void SelectFirmwareFile()
+static void SelectFirmwareFile(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     GtkFileFilter *pFilter_nds, *pFilter_bin, *pFilter_any;
-    GtkWidget *pFileSelection;
-    GtkWidget *pParent;
-    gchar *sPath;
+    GtkFileChooserNative *pFileSelection;
 
     BOOL oldState = desmume_running();
-    Pause();
-
-    pParent = GTK_WIDGET(pWindow);
+    Pause(NULL, NULL, NULL);
 
     pFilter_nds = gtk_file_filter_new();
     gtk_file_filter_add_pattern(pFilter_nds, "*.nds");
@@ -2529,52 +2217,126 @@ static void SelectFirmwareFile()
     gtk_file_filter_add_pattern(pFilter_any, "*");
     gtk_file_filter_set_name(pFilter_any, "All files");
 
-    pFileSelection = gtk_file_chooser_dialog_new("Load firmware...",
-            GTK_WINDOW(pParent),
+    pFileSelection = gtk_file_chooser_native_new("Load firmware...",
+            GTK_WINDOW(pWindow),
             GTK_FILE_CHOOSER_ACTION_OPEN,
-            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-            GTK_STOCK_OPEN, GTK_RESPONSE_OK,
-            NULL);
-    gtk_window_set_modal(GTK_WINDOW(pFileSelection), TRUE);
+            "_Open", "_Cancel");
 
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_nds);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_bin);
     gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(pFileSelection), pFilter_any);
 
-    switch(gtk_dialog_run(GTK_DIALOG(pFileSelection))) {
-    case GTK_RESPONSE_OK:
-        sPath = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(pFileSelection));
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(pFileSelection));
+    if (response == GTK_RESPONSE_ACCEPT) {
+        GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(pFileSelection));
+        gchar *sPath = g_file_get_path(file);
+
         CommonSettings.UseExtFirmware = true;
         strncpy(CommonSettings.ExtFirmwarePath, (const char*)sPath, g_utf8_strlen(sPath, -1));
         g_free(sPath);
-        break;
-    default:
-        break;
     }
-    gtk_widget_destroy(pFileSelection);
+    g_object_unref(pFileSelection);
 
-    if(oldState) Launch();
+    if(oldState) Launch(NULL, NULL, NULL);
 }
 #endif
 
-static void Modify_PriInterpolation(GtkAction *action, GtkRadioAction *current)
+static void Modify_PriInterpolation(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    uint filter = gtk_radio_action_get_current_value(current) ;
-    video->ChangeFilterByID((VideoFilterTypeID)filter);
+    std::string string = g_variant_get_string(parameter, NULL);
+    VideoFilterTypeID filter;
+    if (string == "none")
+        filter = VideoFilterTypeID_None;
+    else if (string == "lq2x")
+        filter = VideoFilterTypeID_LQ2X;
+    else if (string == "lq2xs")
+        filter = VideoFilterTypeID_LQ2XS;
+    else if (string == "hq2x")
+        filter = VideoFilterTypeID_HQ2X;
+    else if (string == "hq2xs")
+        filter = VideoFilterTypeID_HQ2XS;
+    else if (string == "hq3x")
+        filter = VideoFilterTypeID_HQ3X;
+    else if (string == "hq3xs")
+        filter = VideoFilterTypeID_HQ3XS;
+    else if (string == "hq4x")
+        filter = VideoFilterTypeID_HQ4X;
+    else if (string == "hq4xs")
+        filter = VideoFilterTypeID_HQ4XS;
+    else if (string == "2xsai")
+        filter = VideoFilterTypeID_2xSaI;
+    else if (string == "super2xsai")
+        filter = VideoFilterTypeID_Super2xSaI;
+    else if (string == "supereagle")
+        filter = VideoFilterTypeID_SuperEagle;
+    else if (string == "scanline")
+        filter = VideoFilterTypeID_Scanline;
+    else if (string == "bilinear")
+        filter = VideoFilterTypeID_Bilinear;
+    else if (string == "nearest2x")
+        filter = VideoFilterTypeID_Nearest2X;
+    else if (string == "nearest_1point5x")
+        filter = VideoFilterTypeID_Nearest1_5X;
+    else if (string == "nearestplus_1point5x")
+        filter = VideoFilterTypeID_NearestPlus1_5X;
+    else if (string == "epx")
+        filter = VideoFilterTypeID_EPX;
+    else if (string == "epxplus")
+        filter = VideoFilterTypeID_EPXPlus;
+    else if (string == "epx_1point5x")
+        filter = VideoFilterTypeID_EPX1_5X;
+    else if (string == "epxplus_1point5x")
+        filter = VideoFilterTypeID_EPXPlus1_5X;
+    else if (string == "2xbrz")
+        filter = VideoFilterTypeID_2xBRZ;
+    else if (string == "3xbrz")
+        filter = VideoFilterTypeID_3xBRZ;
+    else if (string == "4xbrz")
+        filter = VideoFilterTypeID_4xBRZ;
+    else if (string == "5xbrz")
+        filter = VideoFilterTypeID_5xBRZ;
+    video->ChangeFilterByID(filter);
     config.view_filter = filter;
     RedrawScreen();
+    g_simple_action_set_state(action, parameter);
 }
 
-static void Modify_Interpolation(GtkAction *action, GtkRadioAction *current)
+static void Modify_Interpolation(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    Interpolation = (cairo_filter_t)gtk_radio_action_get_current_value(current);
+    std::string string = g_variant_get_string(parameter, NULL);
+    cairo_filter_t filter;
+    if (string == "fast")
+        filter = CAIRO_FILTER_FAST;
+    else if (string == "good")
+        filter = CAIRO_FILTER_GOOD;
+    else if (string == "best")
+        filter = CAIRO_FILTER_BEST;
+    else if (string == "nearest")
+        filter = CAIRO_FILTER_NEAREST;
+    else if (string == "bilinear")
+        filter = CAIRO_FILTER_BILINEAR;
+    else if (string == "gaussian")
+        filter = CAIRO_FILTER_GAUSSIAN;
+    Interpolation = filter;
     config.view_cairoFilter = Interpolation;
     RedrawScreen();
+    g_simple_action_set_state(action, parameter);
 }
 
-static void Modify_SPUMode(GtkAction *action, GtkRadioAction *current)
+static void Modify_SPUMode(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    const uint mode = gtk_radio_action_get_current_value(current);
+    const char *string = g_variant_get_string(parameter, NULL);
+    spumode_enum mode;
+    if (strcmp(string, "dual-async") == 0)
+        mode = SPUMODE_DUALASYNC;
+    else if (strcmp(string, "sync-n") == 0)
+        mode = SPUMODE_SYNCN;
+    else if (strcmp(string, "sync-z") == 0)
+        mode = SPUMODE_SYNCZ;
+#ifdef HAVE_LIBSOUNDTOUCH
+    else if (strcmp(string, "sync-p") == 0)
+        mode = SPUMODE_SYNCP;
+#endif
 
     switch (mode) {
     case SPUMODE_SYNCN:
@@ -2593,20 +2355,36 @@ static void Modify_SPUMode(GtkAction *action, GtkRadioAction *current)
         break;
     }
     config.audio_sync = SPUMode;
+    g_simple_action_set_state(action, parameter);
 }
 
-static void Modify_SPUInterpolation(GtkAction *action, GtkRadioAction *current)
+static void Modify_SPUInterpolation(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    CommonSettings.spuInterpolationMode = (SPUInterpolationMode)gtk_radio_action_get_current_value(current);
+    const char *string = g_variant_get_string(parameter, NULL);
+    SPUInterpolationMode mode;
+    if (strcmp(string, "none") == 0)
+        mode = SPUInterpolation_None;
+    else if (strcmp(string, "linear") == 0)
+        mode = SPUInterpolation_Linear;
+    else if (strcmp(string, "cosine") == 0)
+        mode = SPUInterpolation_Cosine;
+    CommonSettings.spuInterpolationMode = mode;
+    config.audio_interpolation = CommonSettings.spuInterpolationMode;
+    g_simple_action_set_state(action, parameter);
 }
 
-static void Modify_Frameskip(GtkAction *action, GtkRadioAction *current)
+static void Modify_Frameskip(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    autoFrameskipMax = gtk_radio_action_get_current_value(current) ;
+    const char *string = g_variant_get_string(parameter, NULL);
+    autoFrameskipMax = g_ascii_strtoll(string, NULL, 10);
     config.frameskip = autoFrameskipMax;
     if (!autoframeskip) {
         Frameskip = autoFrameskipMax;
     }
+    char buf[255];
+    snprintf(buf, sizeof buf, "Frameskip value is set to %s", string);
+    driver->AddLine(buf);
+    g_simple_action_set_state(action, parameter);
 }
 
 /////////////////////////////// TOOLS MANAGEMENT ///////////////////////////////
@@ -2616,9 +2394,9 @@ extern const int dTools_list_size;
 
 BOOL *dTools_running;
 
-static void Start_dTool(GtkWidget *widget, gpointer data)
+static void Start_dTool(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    int tool = GPOINTER_TO_INT(data);
+    int tool = g_variant_get_uint32(parameter);
 
     if(dTools_running == NULL || dTools_running[tool])
         return;
@@ -2672,17 +2450,20 @@ public:
 	}
 };
 
-static void DoQuit()
+static void DoQuit(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     emu_halt(EMUHALT_REASON_USER_REQUESTED_HALT, NDSErrorTag_None);
-    gtk_main_quit();
+    if (regMainLoop) {
+        g_source_remove(regMainLoop);
+        regMainLoop = 0;
+    }
+    gtk_window_close(GTK_WINDOW(pWindow));
 }
 
 
 gboolean EmuLoop(gpointer data)
 {
     static Uint32 fps_SecStart, next_fps_SecStart, fps_FrameCount, skipped_frames;
-    static int last_tick;
     static unsigned next_frame_time;
     static int frame_mod3;
     unsigned int i;
@@ -2694,7 +2475,10 @@ gboolean EmuLoop(gpointer data)
       frame_mod3 = 0;
       gtk_window_set_title(GTK_WINDOW(pWindow), "DeSmuME - Paused");
       fps_SecStart = 0;
-      regMainLoop = FALSE;
+      if (regMainLoop) {
+          g_source_remove(regMainLoop);
+          regMainLoop = 0;
+      }
       RedrawScreen();
       return FALSE;
     }
@@ -2753,7 +2537,7 @@ gboolean EmuLoop(gpointer data)
     desmume_cycle();    /* Emule ! */
 
     _updateDTools();
-        avout_x264.updateVideo((const uint16_t *)GPU->GetDisplayInfo().masterNativeBuffer);
+        avout_x264.updateVideo(GPU->GetDisplayInfo().masterNativeBuffer16);
 	RedrawScreen();
 
     if (!config.fpslimiter || keys_latch & KEYMASK_(KEY_BOOST - 1)) {
@@ -2824,30 +2608,25 @@ gboolean EmuLoop(gpointer data)
     return TRUE;
 }
 
-static void desmume_try_adding_ui(GtkUIManager *self, const char *ui_descr){
-    GError *error;
-    error = NULL;
-    if (!gtk_ui_manager_add_ui_from_string (self, ui_descr, -1, &error))
-      {
-        g_message ("building menus failed: %s", error->message);
-        g_error_free (error);
-        exit (EXIT_FAILURE);
-      }
-}
-
-static void dui_set_accel_group(gpointer action, gpointer group) {
-        gtk_action_set_accel_group((GtkAction *)action, (GtkAccelGroup *)group);
-}
+GMenuModel *savestates_menu;
+GMenuModel *loadstates_menu;
 
 // The following functions are adapted from the Windows port:
 //     UpdateSaveStateMenu, ResetSaveStateTimes, LoadSaveStateInfo
 static void UpdateSaveStateMenu(int pos, char* txt)
 {
-	char name[64];
-        snprintf(name, sizeof(name), "savestate%d", (pos == 0) ? 10 : pos);
-	gtk_action_set_label(gtk_action_group_get_action(action_group, name), txt);
-        snprintf(name, sizeof(name), "loadstate%d", (pos == 0) ? 10 : pos);
-	gtk_action_set_label(gtk_action_group_get_action(action_group, name), txt);
+    GMenuItem *item;
+    gint position = ((pos == 0) ? 10 : pos) - 1;
+
+    item = g_menu_item_new_from_model(savestates_menu, position);
+    g_menu_item_set_label(item, txt);
+    g_menu_remove(G_MENU(savestates_menu), position);
+    g_menu_insert_item(G_MENU(savestates_menu), position, item);
+
+    item = g_menu_item_new_from_model(loadstates_menu, position);
+    g_menu_item_set_label(item, txt);
+    g_menu_remove(G_MENU(loadstates_menu), position);
+    g_menu_insert_item(G_MENU(loadstates_menu), position, item);
 }
 
 static void ResetSaveStateTimes()
@@ -2874,59 +2653,50 @@ static void LoadSaveStateInfo()
 	}
 }
 
-static void desmume_gtk_menu_file_saveload_slot (GtkActionGroup *ag)
+static void changesavetype(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    for(guint i = 1; i <= 10; i++){
-        GtkAction *act;
-        char label[64], name[64], accel[64];
-
-        snprintf(label, sizeof(label), "_%d", i % 10);
-
-        // Note: GTK+ doesn't handle Shift correctly, so the actual action is
-        // done in Key_Press. The accelerators here are simply visual cues.
-
-        snprintf(name, sizeof(name), "savestate%d", i);
-        snprintf(accel, sizeof(accel), "<Shift>F%d", i);
-        act = gtk_action_new(name, label, NULL, NULL);
-        g_signal_connect(G_OBJECT(act), "activate", G_CALLBACK(MenuSave), GUINT_TO_POINTER(i % 10));
-        gtk_action_group_add_action_with_accel(ag, GTK_ACTION(act), accel);
-
-        snprintf(name, sizeof(name), "loadstate%d", i);
-        snprintf(accel, sizeof(accel), "F%d", i);
-        act = gtk_action_new(name, label, NULL, NULL);
-        g_signal_connect(G_OBJECT(act), "activate", G_CALLBACK(MenuLoad), GUINT_TO_POINTER(i % 10));
-        gtk_action_group_add_action_with_accel(ag, GTK_ACTION(act), accel);
-    }
+    const char *string = g_variant_get_string(parameter, NULL);
+    int savetype;
+    if (strcmp(string, "autodetect") == 0)
+        savetype = 0;
+    else if (strcmp(string, "eeprom-4k") == 0)
+        savetype = 1;
+    else if (strcmp(string, "eeprom-64k") == 0)
+        savetype = 2;
+    else if (strcmp(string, "eeprom-512k") == 0)
+        savetype = 3;
+    else if (strcmp(string, "fram-256k") == 0)
+        savetype = 4;
+    else if (strcmp(string, "flash-2m") == 0)
+        savetype = 5;
+    else if (strcmp(string, "flash-4m") == 0)
+        savetype = 6;
+    backup_setManualBackupType(savetype);
+    config.savetype=savetype;
+    g_simple_action_set_state(action, parameter);
 }
 
-static void changesavetype(GtkAction *action, GtkRadioAction *current)
+static void desmume_gtk_menu_tool_layers(GtkApplication *app)
 {
-    backup_setManualBackupType( gtk_radio_action_get_current_value(current));
-}
-
-static void desmume_gtk_menu_tool_layers (GtkActionGroup *ag)
-{
-    const char *Layers_Menu[10][2] = {
-        {"layermainbg0","_0 Main BG 0"},
-        {"layermainbg1","_1 Main BG 1"},
-        {"layermainbg2","_2 Main BG 2"},
-        {"layermainbg3","_3 Main BG 3"},
-        {"layermainobj","_4 Main OBJ"},
-        {"layersubbg0", "_5 SUB BG 0"},
-        {"layersubbg1", "_6 SUB BG 1"},
-        {"layersubbg2", "_7 SUB BG 2"},
-        {"layersubbg3", "_8 SUB BG 3"},
-        {"layersubobj", "_9 SUB OBJ"}
+    const char *Layers_Menu[10][3] = {
+        {"0", "layermainbg0","_0 Main BG 0"},
+        {"1", "layermainbg1","_1 Main BG 1"},
+        {"2", "layermainbg2","_2 Main BG 2"},
+        {"3", "layermainbg3","_3 Main BG 3"},
+        {"4", "layermainobj","_4 Main OBJ"},
+        {"5", "layersubbg0", "_5 SUB BG 0"},
+        {"6", "layersubbg1", "_6 SUB BG 1"},
+        {"7", "layersubbg2", "_7 SUB BG 2"},
+        {"8", "layersubbg3", "_8 SUB BG 3"},
+        {"9", "layersubobj", "_9 SUB OBJ"}
     };
-    guint i;
 
-    GtkToggleAction *act;
-    for(i = 0; i< 10; i++){
-        act = gtk_toggle_action_new(Layers_Menu[i][0],Layers_Menu[i][1],NULL,NULL);
-        gtk_toggle_action_set_active(act, TRUE);
-        g_signal_connect(G_OBJECT(act), "activate", G_CALLBACK(ToggleLayerVisibility), GUINT_TO_POINTER(i));
-        gtk_action_group_add_action_with_accel(ag, GTK_ACTION(act), NULL);
+    std::vector<GActionEntry> entries;
+    for (int i = 0; i < 10; i++) {
+        GActionEntry entry = {Layers_Menu[i][1], ToggleLayerVisibility, NULL, "true", NULL};
+        entries.push_back(entry);
     }
+    g_action_map_add_action_entries(G_ACTION_MAP(app), entries.data(), entries.size(), NULL);
 }
 
 #ifdef HAVE_LIBAGG
@@ -2941,13 +2711,8 @@ enum hud_display_enum {
     HUD_DISPLAY_EDITOR,
 };
 
-static void ToggleHudDisplay(GtkToggleAction* action, gpointer data)
+static void ToggleHudDisplay(hud_display_enum hudId, gboolean active)
 {
-    guint hudId = GPOINTER_TO_UINT(data);
-    gboolean active;
-
-    active = gtk_toggle_action_get_active(action);
-
     switch (hudId) {
     case HUD_DISPLAY_FPS:
         CommonSettings.hud.FpsDisplay = active;
@@ -2987,40 +2752,54 @@ static void ToggleHudDisplay(GtkToggleAction* action, gpointer data)
     RedrawScreen();
 }
 
-static void desmume_gtk_menu_view_hud (GtkActionGroup *ag)
+#define HudMacro(func_name, enum_value) \
+static void func_name(GSimpleAction *action, GVariant *parameter, gpointer user_data) \
+{ \
+    GVariant *variant = g_action_get_state(G_ACTION(action)); \
+    gboolean value = !g_variant_get_boolean(variant); \
+    g_simple_action_set_state(action, g_variant_new_boolean(value)); \
+    ToggleHudDisplay(enum_value, value); \
+}
+
+HudMacro(HudFps, HUD_DISPLAY_FPS)
+HudMacro(HudInput, HUD_DISPLAY_INPUT)
+HudMacro(HudGraphicalInput, HUD_DISPLAY_GINPUT)
+HudMacro(HudFrameCounter, HUD_DISPLAY_FCOUNTER)
+HudMacro(HudLagCounter, HUD_DISPLAY_LCOUNTER)
+HudMacro(HudRtc, HUD_DISPLAY_RTC)
+HudMacro(HudMic, HUD_DISPLAY_MIC)
+HudMacro(HudEditor, HUD_DISPLAY_EDITOR)
+
+static void desmume_gtk_menu_view_hud(GtkApplication *app)
 {
     const struct {
         const gchar* name;
-        const gchar* label;
-        guint id;
         bool active;
         bool& setting;
     } hud_menu[] = {
-        { "hud_fps","Display _fps", HUD_DISPLAY_FPS, config.hud_fps, CommonSettings.hud.FpsDisplay },
-        { "hud_input","Display _Input", HUD_DISPLAY_INPUT, config.hud_input, CommonSettings.hud.ShowInputDisplay },
-        { "hud_graphicalinput","Display _Graphical Input", HUD_DISPLAY_GINPUT, config.hud_graphicalInput, CommonSettings.hud.ShowGraphicalInputDisplay },
-        { "hud_framecounter","Display Frame _Counter", HUD_DISPLAY_FCOUNTER, config.hud_frameCounter, CommonSettings.hud.FrameCounterDisplay },
-        { "hud_lagcounter","Display _Lag Counter", HUD_DISPLAY_LCOUNTER, config.hud_lagCounter, CommonSettings.hud.ShowLagFrameCounter },
-        { "hud_rtc","Display _RTC", HUD_DISPLAY_RTC, config.hud_rtc, CommonSettings.hud.ShowRTC },
-        { "hud_mic","Display _Mic", HUD_DISPLAY_MIC, config.hud_mic, CommonSettings.hud.ShowMicrophone },
-        { "hud_editor","_Editor Mode", HUD_DISPLAY_EDITOR, false, HudEditorMode },
+        { "hud_fps", config.hud_fps, CommonSettings.hud.FpsDisplay },
+        { "hud_input", config.hud_input, CommonSettings.hud.ShowInputDisplay },
+        { "hud_graphicalinput", config.hud_graphicalInput, CommonSettings.hud.ShowGraphicalInputDisplay },
+        { "hud_framecounter", config.hud_frameCounter, CommonSettings.hud.FrameCounterDisplay },
+        { "hud_lagcounter", config.hud_lagCounter, CommonSettings.hud.ShowLagFrameCounter },
+        { "hud_rtc", config.hud_rtc, CommonSettings.hud.ShowRTC },
+        { "hud_mic", config.hud_mic, CommonSettings.hud.ShowMicrophone },
     };
     guint i;
 
-    GtkToggleAction *act;
     for(i = 0; i < sizeof(hud_menu) / sizeof(hud_menu[0]); i++){
-        act = gtk_toggle_action_new(hud_menu[i].name, hud_menu[i].label, NULL, NULL);
-        gtk_toggle_action_set_active(act, hud_menu[i].active ? TRUE : FALSE);
+        GSimpleAction *action = G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), hud_menu[i].name));
+        g_simple_action_set_state(action, g_variant_new_boolean(hud_menu[i].active ? TRUE : FALSE));
         hud_menu[i].setting = hud_menu[i].active;
-        g_signal_connect(G_OBJECT(act), "activate", G_CALLBACK(ToggleHudDisplay), GUINT_TO_POINTER(hud_menu[i].id));
-        gtk_action_group_add_action_with_accel(ag, GTK_ACTION(act), NULL);
     }
 }
 #endif
 
-static void ToggleAudio (GtkToggleAction *action)
+static void ToggleAudio(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    config.audio_enabled = gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    config.audio_enabled = value;
     if (config.audio_enabled) {
         SPU_ChangeSoundCore(SNDCORE_SDL, 735 * 4);
         driver->AddLine("Audio enabled");
@@ -3029,12 +2808,14 @@ static void ToggleAudio (GtkToggleAction *action)
         driver->AddLine("Audio disabled");
     }
     RedrawScreen();
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
 #ifdef FAKE_MIC
-static void ToggleMicNoise (GtkToggleAction *action)
+static void ToggleMicNoise(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    BOOL doNoise = (BOOL)gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean doNoise = !g_variant_get_boolean(variant);
 
     Mic_DoNoise(doNoise);
     if (doNoise)
@@ -3042,23 +2823,29 @@ static void ToggleMicNoise (GtkToggleAction *action)
     else
        driver->AddLine("Fake mic disabled");
     RedrawScreen();
+    g_simple_action_set_state(action, g_variant_new_boolean(doNoise));
 }
 #endif
 
-static void ToggleFpsLimiter (GtkToggleAction *action)
+static void ToggleFpsLimiter(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    config.fpslimiter = (BOOL)gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    config.fpslimiter = value;
 
     if (config.fpslimiter)
        driver->AddLine("Fps limiter enabled");
     else
        driver->AddLine("Fps limiter disabled");
     RedrawScreen();
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
-static void ToggleAutoFrameskip (GtkToggleAction *action)
+static void ToggleAutoFrameskip(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
-    config.autoframeskip = (BOOL)gtk_toggle_action_get_active(action);
+    GVariant *variant = g_action_get_state(G_ACTION(action));
+    gboolean value = !g_variant_get_boolean(variant);
+    config.autoframeskip = value;
 
     if (config.autoframeskip) {
         autoframeskip = true;
@@ -3070,40 +2857,39 @@ static void ToggleAutoFrameskip (GtkToggleAction *action)
         driver->AddLine("Auto frameskip disabled");
     }
     RedrawScreen();
+    g_simple_action_set_state(action, g_variant_new_boolean(value));
 }
 
-static void desmume_gtk_menu_tools (GtkActionGroup *ag)
+static void desmume_gtk_menu_tools(GtkApplication *app)
 {
-    gint i;
-    for(i = 0; i < dTools_list_size; i++) {
-        GtkAction *act;
-        act = gtk_action_new(dTools_list[i]->shortname, dTools_list[i]->name, NULL, NULL);
-        g_signal_connect(G_OBJECT(act), "activate", G_CALLBACK(Start_dTool), GINT_TO_POINTER(i));
-        gtk_action_group_add_action(ag, GTK_ACTION(act));
+    std::vector<GActionEntry> entries;
+    std::vector<std::string> names;
+    for (int i = 0; i < dTools_list_size; i++) {
+        names.push_back(std::to_string(i));
+        GActionEntry entry = {dTools_list[i]->shortname, Start_dTool, "u", names.back().c_str(), NULL};
+        entries.push_back(entry);
     }
+    g_action_map_add_action_entries(G_ACTION_MAP(app), entries.data(), entries.size(), NULL);
 }
 
 static gboolean timeout_exit_cb(gpointer data)
 {
-    DoQuit();
+    DoQuit(NULL, NULL, NULL);
     INFO("Quit after %d seconds timeout\n", GPOINTER_TO_INT(data));
 
     return FALSE;
 }
 
-static int
-common_gtk_main( class configured_features *my_config)
+static void
+common_gtk_main(GApplication *app, gpointer user_data)
 {
+    configured_features *my_config = static_cast<configured_features*>(user_data);
+
 	config.load();
 
     driver = new GtkDriver();
 
-    SDL_TimerID limiter_timer = NULL;
-
-    GtkAccelGroup * accel_group;
-    GtkWidget *pVBox;
-    GtkWidget *pMenuBar;
-    GtkWidget *pToolBar;
+    SDL_TimerID limiter_timer = 0;
 
     /* use any language set on the command line */
     if ( my_config->firmware_language != -1) {
@@ -3172,10 +2958,12 @@ common_gtk_main( class configured_features *my_config)
 
     /* FIXME: SDL_INIT_VIDEO is needed for joystick support to work!?
      * Perhaps it needs a "window" to catch events...? */
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");
     if(SDL_Init(SDL_INIT_TIMER|SDL_INIT_VIDEO) == -1) {
         g_printerr("Error trying to initialize SDL: %s\n",
                     SDL_GetError());
-        return 1;
+        // TODO: return a non-zero exit status.
+        g_application_quit(app);
     }
     desmume_init( my_config->disable_sound || !config.audio_enabled);
 
@@ -3193,10 +2981,7 @@ common_gtk_main( class configured_features *my_config)
      */
 #ifdef GDB_STUB
     gdbstub_mutex_init();
-    
-    gdbstub_handle_t arm9_gdb_stub = NULL;
-    gdbstub_handle_t arm7_gdb_stub = NULL;
-    
+
     if ( my_config->arm9_gdb_port > 0) {
         arm9_gdb_stub = createStub_gdb( my_config->arm9_gdb_port,
                                          &NDS_ARM9,
@@ -3228,7 +3013,9 @@ common_gtk_main( class configured_features *my_config)
 #endif
 
     /* Initialize joysticks */
-    if(!init_joy()) return 1;
+    if(!init_joy())
+        // TODO: return a non-zero exit status.
+        g_application_quit(app);
 
     dTools_running = (BOOL*)malloc(sizeof(BOOL) * dTools_list_size);
     if (dTools_running != NULL) 
@@ -3242,84 +3029,224 @@ common_gtk_main( class configured_features *my_config)
     g_printerr("Using %d threads for video filter.\n", CommonSettings.num_cores);
     video = new VideoFilter(256, 384, VideoFilterTypeID_None, CommonSettings.num_cores);
 
-    /* Create the window */
-    pWindow = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(pWindow), "DeSmuME");
-    gtk_window_set_resizable(GTK_WINDOW (pWindow), TRUE);
-    gtk_window_set_icon(GTK_WINDOW (pWindow), gdk_pixbuf_new_from_xpm_data(DeSmuME_xpm));
+    /* Fetch the main elements from the window */
+    GtkBuilder *builder = gtk_builder_new_from_resource("/org/desmume/DeSmuME/main.ui");
+    pWindow = GTK_WIDGET(gtk_builder_get_object(builder, "window"));
+    pToolBar = GTK_WIDGET(gtk_builder_get_object(builder, "toolbar"));
+    pDrawingArea = GTK_WIDGET(gtk_builder_get_object(builder, "drawing-area"));
+    pStatusBar = GTK_WIDGET(gtk_builder_get_object(builder, "status-bar"));
+    pContentBox = GTK_WIDGET(gtk_builder_get_object(builder, "content-box"));
+    g_object_unref(builder);
+
+    /* Set colors for content box background and status bar text */
+    GdkRGBA color_black = { 0.0, 0.0, 0.0, 1.0 };
+    gtk_widget_override_background_color(pContentBox, GTK_STATE_FLAG_NORMAL, &color_black);
+
+    GdkRGBA color_soft_gray = { 0.8, 0.8, 0.8, 1.0 };
+    gtk_widget_override_color(pStatusBar, GTK_STATE_FLAG_NORMAL, &color_soft_gray);
+
+    gtk_application_add_window(GTK_APPLICATION(app), GTK_WINDOW(pWindow));
 
     g_signal_connect(G_OBJECT(pWindow), "destroy", G_CALLBACK(DoQuit), NULL);
     g_signal_connect(G_OBJECT(pWindow), "key_press_event", G_CALLBACK(Key_Press), NULL);
     g_signal_connect(G_OBJECT(pWindow), "key_release_event", G_CALLBACK(Key_Release), NULL);
 
-    /* Create the GtkVBox */
-    pVBox = gtk_vbox_new(FALSE, 0);
-    gtk_container_add(GTK_CONTAINER(pWindow), pVBox);
-
-    ui_manager = gtk_ui_manager_new ();
-    accel_group = gtk_accel_group_new();
-    action_group = gtk_action_group_new("dui");
-
-    gtk_action_group_add_actions(action_group, action_entries, G_N_ELEMENTS(action_entries), NULL);
-    gtk_action_group_add_toggle_actions(action_group, toggle_entries, G_N_ELEMENTS(toggle_entries), NULL);
     /* Update audio toggle status */
     if (my_config->disable_sound || !config.audio_enabled) {
-        GtkAction *action = gtk_action_group_get_action(action_group, "enableaudio");
-        if (action)
-            gtk_toggle_action_set_active((GtkToggleAction *)action, FALSE);
+        g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "enableaudio")), g_variant_new_boolean(FALSE));
     }
-    desmume_gtk_menu_tool_layers(action_group);
+    desmume_gtk_menu_tool_layers(GTK_APPLICATION(app));
 #ifdef HAVE_LIBAGG
-    desmume_gtk_menu_view_hud(action_group);
-#else
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "hud_notsupported"), FALSE);
+    desmume_gtk_menu_view_hud(GTK_APPLICATION(app));
 #endif
-    desmume_gtk_menu_file_saveload_slot(action_group);
-    desmume_gtk_menu_tools(action_group);
-    gtk_action_group_add_radio_actions(action_group, savet_entries, G_N_ELEMENTS(savet_entries), 
-            my_config->savetype, G_CALLBACK(changesavetype), NULL);
+    desmume_gtk_menu_tools(GTK_APPLICATION(app));
+    my_config->savetype=config.savetype;
+    std::string string;
+    switch (my_config->savetype) {
+        case 0:
+            string = "autodetect";
+            break;
+        case 1:
+            string = "eeprom-4k";
+            break;
+        case 2:
+            string = "eeprom-64k";
+            break;
+        case 3:
+            string = "eeprom-512k";
+            break;
+        case 4:
+            string = "fram-256k";
+            break;
+        case 5:
+            string = "flash-2m";
+            break;
+        case 6:
+            string = "flash-4m";
+            break;
+    }
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "savetype")), g_variant_new_string(string.c_str()));
 
     if (config.view_cairoFilter < CAIRO_FILTER_FAST || config.view_cairoFilter > CAIRO_FILTER_BILINEAR) {
     	config.view_cairoFilter = CAIRO_FILTER_NEAREST;
     }
     Interpolation = (cairo_filter_t)config.view_cairoFilter.get();
-    gtk_action_group_add_radio_actions(action_group, interpolation_entries, G_N_ELEMENTS(interpolation_entries), 
-            Interpolation, G_CALLBACK(Modify_Interpolation), NULL);
+    switch (Interpolation) {
+        case CAIRO_FILTER_FAST:
+            string = "fast";
+            break;
+        case CAIRO_FILTER_NEAREST:
+            string = "nearest";
+            break;
+        case CAIRO_FILTER_GOOD:
+            string = "good";
+            break;
+        case CAIRO_FILTER_BILINEAR:
+            string = "bilinear";
+            break;
+        case CAIRO_FILTER_BEST:
+            string = "best";
+            break;
+    }
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "interpolation")), g_variant_new_string(string.c_str()));
 
     if (config.view_filter < VideoFilterTypeID_None || config.view_filter >= VideoFilterTypeIDCount) {
         config.view_filter = VideoFilterTypeID_None;
     }
     video->ChangeFilterByID((VideoFilterTypeID)config.view_filter.get());
-    gtk_action_group_add_radio_actions(action_group, pri_interpolation_entries, G_N_ELEMENTS(pri_interpolation_entries), 
-            config.view_filter, G_CALLBACK(Modify_PriInterpolation), NULL);
+    switch (config.view_filter) {
+		case VideoFilterTypeID_None:
+			string = "none";
+			break;
+		case VideoFilterTypeID_LQ2X:
+			string = "lq2x";
+			break;
+		case VideoFilterTypeID_LQ2XS:
+			string = "lq2xs";
+			break;
+		case VideoFilterTypeID_HQ2X:
+			string = "hq2x";
+			break;
+		case VideoFilterTypeID_HQ2XS:
+			string = "hq2xs";
+			break;
+		case VideoFilterTypeID_HQ3X:
+			string = "hq3x";
+			break;
+		case VideoFilterTypeID_HQ3XS:
+			string = "hq3xs";
+			break;
+		case VideoFilterTypeID_HQ4X:
+			string = "hq4x";
+			break;
+		case VideoFilterTypeID_HQ4XS:
+			string = "hq4xs";
+			break;
+		case VideoFilterTypeID_2xSaI:
+			string = "2xsai";
+			break;
+		case VideoFilterTypeID_Super2xSaI:
+			string = "super2xsai";
+			break;
+		case VideoFilterTypeID_SuperEagle:
+			string = "supereagle";
+			break;
+		case VideoFilterTypeID_Scanline:
+			string = "scanline";
+			break;
+		case VideoFilterTypeID_Bilinear:
+			string = "bilinear";
+			break;
+		case VideoFilterTypeID_Nearest2X:
+			string = "nearest2x";
+			break;
+		case VideoFilterTypeID_Nearest1_5X:
+			string = "nearest_1point5x";
+			break;
+		case VideoFilterTypeID_NearestPlus1_5X:
+			string = "nearestplus_1point5x";
+			break;
+		case VideoFilterTypeID_EPX:
+			string = "epx";
+			break;
+		case VideoFilterTypeID_EPXPlus:
+			string = "epxplus";
+			break;
+		case VideoFilterTypeID_EPX1_5X:
+			string = "epx_1point5x";
+			break;
+		case VideoFilterTypeID_EPXPlus1_5X:
+			string = "epxplus_1point5x";
+			break;
+		case VideoFilterTypeID_2xBRZ:
+			string = "2xbrz";
+			break;
+		case VideoFilterTypeID_3xBRZ:
+			string = "3xbrz";
+			break;
+		case VideoFilterTypeID_4xBRZ:
+			string = "4xbrz";
+			break;
+		case VideoFilterTypeID_5xBRZ:
+			string = "5xbrz";
+			break;
+    }
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "pri_interpolation")), g_variant_new_string(string.c_str()));
 
     switch (config.audio_sync) {
+        case SPUMODE_SYNCN:
+        case SPUMODE_SYNCZ:
+#ifdef HAVE_LIBSOUNDTOUCH
+        case SPUMODE_SYNCP:
+#endif
+            SPUMode = config.audio_sync;
+            SPU_SetSynchMode(1, config.audio_sync-1);
+            break;
+
+        case SPUMODE_DUALASYNC:
+        default:
+            config.audio_sync = SPUMODE_DUALASYNC;
+            SPUMode = SPUMODE_DUALASYNC;
+            SPU_SetSynchMode(0, 0);
+            break;
+    }
+    switch (config.audio_sync) {
     case SPUMODE_SYNCN:
+        string = "sync-n";
+        break;
     case SPUMODE_SYNCZ:
+        string = "sync-z";
+        break;
 #ifdef HAVE_LIBSOUNDTOUCH
     case SPUMODE_SYNCP:
-#endif
-        SPUMode = config.audio_sync;
-        SPU_SetSynchMode(1, config.audio_sync-1);
+        string = "sync-p";
         break;
-
+#endif
     case SPUMODE_DUALASYNC:
     default:
-        config.audio_sync = SPUMODE_DUALASYNC;
-        SPUMode = SPUMODE_DUALASYNC;
-        SPU_SetSynchMode(0, 0);
+        string = "dual-async";
         break;
     }
-    gtk_action_group_add_radio_actions(action_group, spumode_entries, G_N_ELEMENTS(spumode_entries),
-            config.audio_sync, G_CALLBACK(Modify_SPUMode), NULL);
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "spu_mode")), g_variant_new_string(string.c_str()));
 
-    gtk_action_group_add_radio_actions(action_group, spuinterpolation_entries, G_N_ELEMENTS(spuinterpolation_entries),
-            CommonSettings.spuInterpolationMode, G_CALLBACK(Modify_SPUInterpolation), NULL);
+    CommonSettings.spuInterpolationMode = (SPUInterpolationMode)(config.audio_interpolation.get());
+    switch (CommonSettings.spuInterpolationMode) {
+        case SPUInterpolation_None:
+            string = "none";
+            break;
+        case SPUInterpolation_Linear:
+            string = "linear";
+            break;
+        case SPUInterpolation_Cosine:
+            string = "cosine";
+            break;
+    }
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "spu_interpolation")), g_variant_new_string(string.c_str()));
 
-    gtk_action_group_add_radio_actions(action_group, frameskip_entries, G_N_ELEMENTS(frameskip_entries), 
-            config.frameskip, G_CALLBACK(Modify_Frameskip), NULL);
+    string = std::to_string(config.frameskip);
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "frameskip")), g_variant_new_string(string.c_str()));
     autoFrameskipMax = config.frameskip;
-    gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "frameskipA"), config.autoframeskip);
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "frameskipA")), g_variant_new_boolean(config.autoframeskip));
     if (config.autoframeskip) {
         autoframeskip = true;
         Frameskip = 0;
@@ -3339,70 +3266,147 @@ common_gtk_main( class configured_features *my_config)
             break;
     }
     nds_screen.rotation_angle = config.view_rot;
-    gtk_action_group_add_radio_actions(action_group, rotation_entries, G_N_ELEMENTS(rotation_entries), 
-            nds_screen.rotation_angle, G_CALLBACK(SetRotation), NULL);
+    string = std::to_string(nds_screen.rotation_angle);
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "rotate")), g_variant_new_string(string.c_str()));
 
 
     if (config.window_scale < WINSIZE_SCALE || config.window_scale > WINSIZE_5) {
     	config.window_scale = WINSIZE_SCALE;
     }
     winsize_current = (winsize_enum)config.window_scale.get();
-    gtk_action_group_add_radio_actions(action_group, winsize_entries, G_N_ELEMENTS(winsize_entries), 
-            winsize_current, G_CALLBACK(SetWinsize), NULL);
+    switch (winsize_current) {
+        case WINSIZE_SCALE:
+            string = "scale";
+            break;
+        case WINSIZE_HALF:
+            string = "0.5";
+            break;
+        case WINSIZE_1:
+            string = "1";
+            break;
+        case WINSIZE_1HALF:
+            string = "1.5";
+            break;
+        case WINSIZE_2:
+            string = "2";
+            break;
+        case WINSIZE_2HALF:
+            string = "2.5";
+            break;
+        case WINSIZE_3:
+            string = "3";
+            break;
+        case WINSIZE_4:
+            string = "4";
+            break;
+        case WINSIZE_5:
+            string = "5";
+            break;
+    }
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "winsize")), g_variant_new_string(string.c_str()));
 
     if (config.view_orient < ORIENT_VERTICAL || config.view_orient > ORIENT_SINGLE) {
         config.view_orient = ORIENT_VERTICAL;
     }
     nds_screen.orientation = (orientation_enum)config.view_orient.get();
-    gtk_action_group_add_radio_actions(action_group, orientation_entries, G_N_ELEMENTS(orientation_entries), 
-            nds_screen.orientation, G_CALLBACK(SetOrientation), NULL);
-
-    {
-        GList * list = gtk_action_group_list_actions(action_group);
-        g_list_foreach(list, dui_set_accel_group, accel_group);
+    switch (nds_screen.orientation) {
+        case ORIENT_VERTICAL:
+            string = "vertical";
+            break;
+        case ORIENT_HORIZONTAL:
+            string = "horizontal";
+            break;
+        case ORIENT_SINGLE:
+            string = "single";
+            break;
     }
-    gtk_window_add_accel_group(GTK_WINDOW(pWindow), accel_group);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "pause"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "run"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "reset"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "printscreen"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "cheatlist"), FALSE);
-    gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "cheatsearch"), FALSE);
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "orient")), g_variant_new_string(string.c_str()));
+
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "pause")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "run")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "reset")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "printscreen")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "cheatlist")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "cheatsearch")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "importbackup")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "exportbackup")), FALSE);
+
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "savestate")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "loadstate")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "save_state_to")), FALSE);
+    g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "load_state_from")), FALSE);
 
     nds_screen.gap_size = config.view_gap ? GAP_SIZE : 0;
 
     nds_screen.swap = config.view_swap;
-    gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "orient_swapscreens"), config.view_swap);
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "swapscreens")), g_variant_new_boolean(config.view_swap));
 
-    gtk_ui_manager_insert_action_group (ui_manager, action_group, 0);
-    
-    accel_group = gtk_ui_manager_get_accel_group (ui_manager);
-    gtk_window_add_accel_group (GTK_WINDOW (pWindow), accel_group);
+    builder = gtk_builder_new_from_resource("/org/desmume/DeSmuME/menu.ui");
+    GMenuModel *menubar = G_MENU_MODEL(gtk_builder_get_object(builder, "menubar"));
+    GMenuModel *open_recent_menu = G_MENU_MODEL(gtk_builder_get_object(builder, "open_recent"));
+    savestates_menu = G_MENU_MODEL(gtk_builder_get_object(builder, "savestates"));
+    loadstates_menu = G_MENU_MODEL(gtk_builder_get_object(builder, "loadstates"));
+    GMenu *config_menu = G_MENU(gtk_builder_get_object(builder, "config"));
 
-    desmume_try_adding_ui(ui_manager, ui_description);
+#ifdef FAKE_MIC
+    GMenuItem *mic_noise = g_menu_item_new("Fake mic _noise", "app.micnoise");
+    g_menu_insert_item(config_menu, 3, mic_noise);
+#endif
 
-    pMenuBar = gtk_ui_manager_get_widget (ui_manager, "/MainMenu");
-    gtk_box_pack_start (GTK_BOX (pVBox), pMenuBar, FALSE, FALSE, 0);
-    pToolBar = gtk_ui_manager_get_widget (ui_manager, "/ToolBar");
-    gtk_box_pack_start (GTK_BOX(pVBox), pToolBar, FALSE, FALSE, 0);
+#ifdef HAVE_JIT
+    GMenuItem *emulation_settings = g_menu_item_new("Em_ulation Settings", "app.emulationsettings");
+    g_menu_insert_item(config_menu, 1, emulation_settings);
+#endif
 
-    {
-        GtkWidget * recentMenu = gtk_ui_manager_get_widget (ui_manager, "/MainMenu/FileMenu/RecentMenu");
-        GtkWidget * recentFiles = gtk_recent_chooser_menu_new();
-        GtkRecentFilter * recentFilter = gtk_recent_filter_new();
-        gtk_recent_filter_add_mime_type(recentFilter, "application/x-nintendo-ds-rom");
-        gtk_recent_chooser_set_filter(GTK_RECENT_CHOOSER(recentFiles), recentFilter);
-        gtk_menu_item_set_submenu(GTK_MENU_ITEM(recentMenu), recentFiles);
-        g_signal_connect(G_OBJECT(recentFiles), "item-activated", G_CALLBACK(OpenRecent), NULL);
-    }
+#ifdef HAVE_LIBSOUNDTOUCH
+    GMenu *audio_sync_menu = G_MENU(gtk_builder_get_object(builder, "audio-synchronisation"));
+    GMenuItem *sync_p = g_menu_item_new("Synchronous (_P)", "app.spu_mode(\"sync-p\")");
+    g_menu_append_item(audio_sync_menu, sync_p);
+#endif
 
-    /* Creating the place for showing DS screens */
-    pDrawingArea = gtk_drawing_area_new();
+    GMenu *view_menu = G_MENU(gtk_builder_get_object(builder, "view"));
+    GMenuModel *hud = G_MENU_MODEL(gtk_builder_get_object(builder,
+#ifdef HAVE_LIBAGG
+        "hud_supported"
+#else
+        "hud_unsupported"
+#endif
+    ));
+    g_menu_append_submenu(view_menu, "_HUD", hud);
+
+    gtk_application_set_menubar(GTK_APPLICATION(app), menubar);
+
+    GMenu *popup_menu = G_MENU(gtk_builder_get_object(builder, "popup"));
+    pPopupMenu = (GtkMenu *) gtk_menu_new_from_model(G_MENU_MODEL(popup_menu));
+    gtk_menu_attach_to_widget(pPopupMenu, pWindow, NULL);
+    g_object_unref(builder);
+
+    pApp = GTK_APPLICATION(app);
+
+    GtkRecentManager *manager = gtk_recent_manager_get_default();
+    GList *items = gtk_recent_manager_get_items(manager);
+    g_list_foreach(items, [](gpointer data, gpointer user_data) {
+        // TODO: Why is there no GTK_RECENT_INFO()?!
+        GtkRecentInfo *info = static_cast<GtkRecentInfo*>(data);
+        const char *mime = gtk_recent_info_get_mime_type(info);
+        if (strcmp(mime, "application/x-nintendo-ds-rom") != 0) {
+            gtk_recent_info_unref(info);
+            return;
+        }
+
+        const char *uri = gtk_recent_info_get_uri(info);
+        const char *name = gtk_recent_info_get_display_name(info);
+        // TODO: Is that enough?  Maybe allocate instead?
+        char action[1024];
+        sprintf(action, "app.recent(\"%s\")", uri);
+        g_menu_append(G_MENU(user_data), name, action);
+
+        gtk_recent_info_unref(info);
+    }, open_recent_menu);
+    g_list_free(items);
 
     /* This toggle action must not be set active before the pDrawingArea initialization to avoid a GTK warning */
-    gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "gap"), config.view_gap);
-
-    gtk_container_add (GTK_CONTAINER (pVBox), pDrawingArea);
+    g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "gap")), g_variant_new_boolean(config.view_gap));
 
     gtk_widget_set_events(pDrawingArea,
                           GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
@@ -3415,51 +3419,47 @@ common_gtk_main( class configured_features *my_config)
                      G_CALLBACK(Stylus_Release), NULL);
     g_signal_connect(G_OBJECT(pDrawingArea), "motion_notify_event",
                      G_CALLBACK(Stylus_Move), NULL);
-    g_signal_connect(G_OBJECT(pDrawingArea), "expose_event",
+    g_signal_connect(G_OBJECT(pDrawingArea), "draw",
                      G_CALLBACK(ExposeDrawingArea), NULL ) ;
     g_signal_connect(G_OBJECT(pDrawingArea), "configure_event",
                      G_CALLBACK(ConfigureDrawingArea), NULL ) ;
 
     /* Status bar */
-    pStatusBar = gtk_statusbar_new();
     UpdateStatusBar(EMU_DESMUME_NAME_AND_VERSION());
-    gtk_box_pack_end(GTK_BOX(pVBox), pStatusBar, FALSE, FALSE, 0);
 
     gtk_widget_show_all(pWindow);
 
 	if (winsize_current == WINSIZE_SCALE) {
 		if (config.window_fullscreen) {
-			gtk_widget_hide(pMenuBar);
+            gtk_application_window_set_show_menubar(GTK_APPLICATION_WINDOW(pWindow), FALSE);
 			gtk_widget_hide(pToolBar);
 			gtk_widget_hide(pStatusBar);
-			gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_menu"), FALSE);
-			gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_toolbar"), FALSE);
-			gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "view_statusbar"), FALSE);
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "view_menu")), FALSE);
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "view_toolbar")), FALSE);
+            g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "view_statusbar")), FALSE);
 			gtk_window_fullscreen(GTK_WINDOW(pWindow));
 		}
 	} else {
 		config.window_fullscreen = false;
-		gtk_action_set_sensitive(gtk_action_group_get_action(action_group, "fullscreen"), FALSE);
+        g_simple_action_set_enabled(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "fullscreen")), FALSE);
 	}
 	if (!config.view_menu) {
-		gtk_widget_hide(pMenuBar);
-		gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "view_menu"), FALSE);
+        gtk_application_window_set_show_menubar(GTK_APPLICATION_WINDOW(pWindow), FALSE);
+        g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "view_menu")), g_variant_new_boolean(FALSE));
 	}
 	if (!config.view_toolbar) {
 		gtk_widget_hide(pToolBar);
-		gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "view_toolbar"), FALSE);
+        g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "view_toolbar")), g_variant_new_boolean(FALSE));
 	}
 	if (!config.view_statusbar) {
 		gtk_widget_hide(pStatusBar);
-		gtk_toggle_action_set_active((GtkToggleAction*)gtk_action_group_get_action(action_group, "view_statusbar"), FALSE);
+        g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "view_statusbar")), g_variant_new_boolean(FALSE));
 	}
     UpdateDrawingAreaAspect();
 
     if (my_config->disable_limiter || !config.fpslimiter) {
         config.fpslimiter = false;
-        GtkAction *action = gtk_action_group_get_action(action_group, "enablefpslimiter");
-        if (action)
-            gtk_toggle_action_set_active((GtkToggleAction *)action, FALSE);
+        g_simple_action_set_state(G_SIMPLE_ACTION(g_action_map_lookup_action(G_ACTION_MAP(app), "enablefpslimiter")), g_variant_new_boolean(FALSE));
     }
 
 #if defined(HAVE_OPENGL) && defined(OGLRENDER_3_2_H)
@@ -3489,15 +3489,15 @@ common_gtk_main( class configured_features *my_config)
 	{
 #if !defined(HAVE_OPENGL)
 		core = RENDERID_SOFTRASTERIZER;
-#elif defined(HAVE_GL_GLX)
-		if (!is_glx_initialized())
-		{
-			init_glx_3Demu();
-		}
 #elif defined(HAVE_LIBOSMESA)
 		if (!is_osmesa_initialized())
 		{
 			init_osmesa_3Demu();
+		}
+#else
+		if (!is_sdl_initialized())
+		{
+			init_sdl_3Demu();
 		}
 #endif
 	}
@@ -3509,7 +3509,9 @@ common_gtk_main( class configured_features *my_config)
 	}
 
     CommonSettings.GFX3D_HighResolutionInterpolateColor = config.highColorInterpolation;
-	CommonSettings.GFX3D_Renderer_MultisampleSize = (config.multisampling) ? 4 : 0;
+	CommonSettings.GFX3D_Renderer_MultisampleSize = (config.multisamplingSize > 0)
+														? config.multisamplingSize
+														: config.multisampling ? 4 : 0;
     CommonSettings.GFX3D_Renderer_TextureDeposterize = config.textureDeposterize;
     CommonSettings.GFX3D_Renderer_TextureScalingFactor = (config.textureUpscale == 1 ||
     														config.textureUpscale == 2 ||
@@ -3531,7 +3533,7 @@ common_gtk_main( class configured_features *my_config)
               loadstate_slot(my_config->load_slot);
             }
 
-            Launch();
+            Launch(NULL, NULL, NULL);
         } else {
             GtkWidget *pDialog = gtk_message_dialog_new(GTK_WINDOW(pWindow),
                     GTK_DIALOG_MODAL,
@@ -3547,7 +3549,7 @@ common_gtk_main( class configured_features *my_config)
         g_timeout_add_seconds(my_config->timeout, timeout_exit_cb, GINT_TO_POINTER(my_config->timeout));
     }
 
-    SNDSDLSetAudioVolume(config.audio_volume);
+    SPU_SetVolume(config.audio_volume);
 
     /* Video filter parameters */
     video->SetFilterParameteri(VF_PARAM_SCANLINE_A, _scanline_filter_a);
@@ -3556,9 +3558,9 @@ common_gtk_main( class configured_features *my_config)
     video->SetFilterParameteri(VF_PARAM_SCANLINE_D, _scanline_filter_d);
 
 	RedrawScreen();
-    /* Main loop */
-    gtk_main();
+}
 
+static void Teardown() {
     delete video;
 
 	config.save();
@@ -3567,10 +3569,10 @@ common_gtk_main( class configured_features *my_config)
 
     desmume_free();
 
-#if defined(HAVE_GL_GLX)
-	deinit_glx_3Demu();
-#elif defined(HAVE_LIBOSMESA)
+#if defined(HAVE_LIBOSMESA)
 	deinit_osmesa_3Demu();
+#else
+	deinit_sdl_3Demu();
 #endif
 
     /* Unload joystick */
@@ -3589,10 +3591,19 @@ common_gtk_main( class configured_features *my_config)
 
     gdbstub_mutex_destroy();
 #endif
-
-    return EXIT_SUCCESS;
 }
 
+static void
+handle_open(GApplication *application,
+            GFile **files,
+            gint n_files,
+            const gchar *hint,
+            gpointer user_data)
+{
+    configured_features *my_config = static_cast<configured_features*>(user_data);
+    my_config->nds_file = g_file_get_path(files[0]);
+    common_gtk_main(application, user_data);
+}
 
 int main (int argc, char *argv[])
 {
@@ -3601,6 +3612,8 @@ int main (int argc, char *argv[])
   // The global menu screws up the window size...
   unsetenv("UBUNTU_MENUPROXY");
 
+  // this must be called as early as possible
+  NDS_Init();
 
   my_config.parse(argc, argv);
   init_configured_features( &my_config);
@@ -3611,7 +3624,13 @@ int main (int argc, char *argv[])
       fprintf(stderr, "Warning: X11 not thread-safe\n");
     }
 
-  gtk_init(&argc, &argv);
+  // TODO: pass G_APPLICATION_HANDLES_COMMAND_LINE instead.
+  GtkApplication *app = gtk_application_new("org.desmume.DeSmuME", G_APPLICATION_HANDLES_OPEN);
+  g_signal_connect (app, "activate", G_CALLBACK(common_gtk_main), &my_config);
+  g_signal_connect (app, "open", G_CALLBACK(handle_open), &my_config);
+  g_action_map_add_action_entries(G_ACTION_MAP(app),
+                                  app_entries, G_N_ELEMENTS(app_entries),
+                                  app);
 
   if ( !fill_configured_features( &my_config, argv)) {
     exit(0);
@@ -3623,23 +3642,7 @@ int main (int argc, char *argv[])
   arm_jit_sync();
   arm_jit_reset(CommonSettings.use_jit);
 #endif
-  return common_gtk_main( &my_config);
+  int ret = g_application_run(G_APPLICATION(app), argc, argv);
+  Teardown();
+  return ret;
 }
-
-#ifdef WIN32
-int WinMain (HINSTANCE hThisInstance, HINSTANCE hPrevInstance, LPSTR lpszArgument, int nFunsterStil)
-{
-  int argc = 0;
-  char *argv[] = NULL;
-
-  /*
-   * FIXME:
-   * Emulate the argc and argv main parameters. Could do this using
-   * CommandLineToArgvW and then convert the wide chars to thin chars.
-   * Or parse the wide chars directly and call common_gtk_main with a
-   * filled configuration structure.
-   */
-  main( argc, argv);
-}
-#endif
-

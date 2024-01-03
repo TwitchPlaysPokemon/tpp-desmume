@@ -59,8 +59,8 @@ AC_CHECK_LIB(zzip, zzip_open, [
 dnl - Check for X11
 AC_PATH_X
 
-dnl - Check for SDL
-AC_PATH_PROGS(SDLCONFIG, [sdl-config sdl11-config])
+dnl - Check for SDL2
+AC_PATH_PROGS(SDLCONFIG, [sdl2-config])
 if test ! "x$SDLCONFIG" = "x" ; then
   SDL_CFLAGS=`$SDLCONFIG --cflags`
   SDL_LIBS=`$SDLCONFIG --libs`
@@ -81,15 +81,9 @@ AM_CONDITIONAL([HAVE_GL], [test "${have_gl_h}" = "yes"])
 
 dnl - if --enable-osmesa is used, check for it
 AC_ARG_ENABLE([osmesa],
-               [AC_HELP_STRING([--enable-osmesa], [use off-screen mesa, overrides GLX])],
+               [AC_HELP_STRING([--enable-osmesa], [use off-screen mesa])],
                [osmesa=$enableval],
                [osmesa=no])
-
-dnl - GLX is the default renderer
-AC_ARG_ENABLE([glx],
-               [AC_HELP_STRING([--enable-glx], [use hw accelerated rendering])],
-               [glx=$enableval],
-               [glx=yes])
 
 if test "x$osmesa" = "xyes" ; then
 	AC_CHECK_LIB(dl, main)
@@ -100,20 +94,8 @@ if test "x$osmesa" = "xyes" ; then
 		OSMESA_LIBS="-lOSMesa"
 		AC_SUBST(OSMESA_LIBS)
 	])
-else
-  if test "x$glx" = "xyes" ; then
-	AC_CHECK_LIB(dl, main)
-	AC_CHECK_LIB([GL], main)
-	AC_CHECK_HEADERS([GL/glx.h], [
-	  useglx=yes
-	  AC_DEFINE(HAVE_GL_GLX)
-	  GLX_LIBS="-lX11"
-	  AC_SUBST(GLX_LIBS)
-	])
-  fi
 fi
 AM_CONDITIONAL([HAVE_LIBOSMESA],  [test "${useosmesa}" = "yes"])
-AM_CONDITIONAL([HAVE_GL_GLX],	  [test "${useglx}" = "yes"])
 
 dnl - make the usage of libagg for HUD rendering configurable
 AC_ARG_ENABLE([hud],
@@ -174,7 +156,7 @@ if test "x$glade" = "xyes" ; then
     AC_SUBST(LIBGLADE_LIBS)
 
     dnl uninstalled glade ui dir
-    AC_DEFINE_UNQUOTED(GLADEUI_UNINSTALLED_DIR,"`pwd`/src/gtk-glade/glade/",[path to glade ui dir])
+    AC_DEFINE_UNQUOTED(GLADEUI_UNINSTALLED_DIR,"`pwd`/gtk-glade/glade/",[path to glade ui dir])
     AC_SUBST(GLADEUI_UNINSTALLED_DIR)
 
     PKG_CHECK_MODULES(GTKGLEXT,
@@ -239,7 +221,7 @@ fi
 dnl - Determine which UIs to build
 UI_DIR="cli $UI_DIR"
 if test "x$HAVE_GTK" = "xyes"; then
-  UI_DIR="gtk $UI_DIR"
+  UI_DIR="gtk2 $UI_DIR"
 fi
 
 if test "x$HAVE_LIBGLADE" = "xyes"; then
@@ -382,8 +364,8 @@ dnl --- Finally, output all the makefiles
 AC_CONFIG_FILES([Makefile
                  cli/Makefile
                  cli/doc/Makefile
-                 gtk/Makefile
-                 gtk/doc/Makefile
+                 gtk2/Makefile
+                 gtk2/doc/Makefile
                  gtk-glade/Makefile
                  gtk-glade/doc/Makefile
 ])

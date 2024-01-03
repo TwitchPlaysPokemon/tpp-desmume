@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2006 yopyop
-	Copyright (C) 2008-2019 DeSmuME team
+	Copyright (C) 2008-2021 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -60,8 +60,18 @@
 #include "Database.h"
 #include "frontend/modules/Disassembler.h"
 
+#if defined(HOST_WINDOWS) && !defined(TARGET_INTERFACE)
+#include "display.h"
+extern HWND DisViewWnd[2];
+#endif
+
 #ifdef GDB_STUB
 #include "gdbstub.h"
+#define GDBSTUB_MUTEX_LOCK() gdbstub_mutex_lock()
+#define GDBSTUB_MUTEX_UNLOCK() gdbstub_mutex_unlock()
+#else
+#define GDBSTUB_MUTEX_LOCK() do {} while(0)
+#define GDBSTUB_MUTEX_UNLOCK() do {} while(0)
 #endif
 
 //int xxctr=0;
@@ -90,6 +100,9 @@ static NDSError _lastNDSError;
 GameInfo gameInfo;
 NDSSystem nds;
 CFIRMWARE *extFirmwareObj = NULL;
+
+std::vector<u32> memReadBreakPoints;
+std::vector<u32> memWriteBreakPoints;
 
 using std::min;
 using std::max;
@@ -168,14 +181,14 @@ int NDS_Init()
 	}
 	
 	armcpu_new(&NDS_ARM9,0);
-	NDS_ARM9.SetBaseMemoryInterface(&arm9_base_memory_iface);
-	NDS_ARM9.SetBaseMemoryInterfaceData(NULL);
-	NDS_ARM9.ResetMemoryInterfaceToBase();
+	armcpu_SetBaseMemoryInterface(&NDS_ARM9, &arm9_base_memory_iface);
+	armcpu_SetBaseMemoryInterfaceData(&NDS_ARM9, NULL);
+	armcpu_ResetMemoryInterfaceToBase(&NDS_ARM9);
 	
 	armcpu_new(&NDS_ARM7,1);
-	NDS_ARM7.SetBaseMemoryInterface(&arm7_base_memory_iface);
-	NDS_ARM7.SetBaseMemoryInterfaceData(NULL);
-	NDS_ARM7.ResetMemoryInterfaceToBase();
+	armcpu_SetBaseMemoryInterface(&NDS_ARM7, &arm7_base_memory_iface);
+	armcpu_SetBaseMemoryInterfaceData(&NDS_ARM7, NULL);
+	armcpu_ResetMemoryInterfaceToBase(&NDS_ARM7);
 	
 	delete GPU;
 	GPU = new GPUSubsystem;
@@ -622,7 +635,8 @@ bool GameInfo::isDSiEnhanced()
 
 bool GameInfo::isHomebrew()
 {
-	return ((header.ARM9src < 0x4000) && (T1ReadLong(header.logo, 0) != 0x51AEFF24) && (T1ReadLong(header.logo, 4) != 0x699AA221));
+	return ((header.ARM9src < 0x4000) && (T1ReadLong(header.logo, 0) != 0x51AEFF24) && (T1ReadLong(header.logo, 4) != 0x699AA221)) ||
+	       (!memcmp(header.gameCode, "####", 4)); // <- ndstool default signature
 }
 
 static int rom_init_path(const char *filename, const char *physicalName, const char *logicalFilename)
@@ -699,15 +713,17 @@ int NDS_LoadROM(const char *filename, const char *physicalName, const char *logi
 	//run crc over the whole buffer (chunk at a time, to avoid coding a streaming crc
 	gameInfo.reader->Seek(gameInfo.fROM, 0, SEEK_SET);
 	gameInfo.crc = 0;
+	
+	u8 fROMBuffer[4096];
 	bool first = true;
+	
 	for(;;) {
-		u8 buf[4096];
-		int read = gameInfo.reader->Read(gameInfo.fROM,buf,4096);
+		int read = gameInfo.reader->Read(gameInfo.fROM,fROMBuffer,4096);
 		if(read == 0) break;
 		if(first && read >= 512)
-			gameInfo.crcForCheatsDb = ~crc32(0, buf, 512);
+			gameInfo.crcForCheatsDb = ~crc32(0, fROMBuffer, 512);
 		first = false;
-		gameInfo.crc = crc32(gameInfo.crc, buf, read);
+		gameInfo.crc = crc32(gameInfo.crc, fROMBuffer, read);
 	}
 
 	gameInfo.chipID  = 0xC2;														// The Manufacturer ID is defined by JEDEC (C2h = Macronix)
@@ -1372,20 +1388,7 @@ static void execHardware_hblank()
 			GPU->SetWillFrameSkip(frameSkipper.ShouldSkip2D());
 		}
 		
-		switch (GPU->GetDisplayInfo().colorFormat)
-		{
-			case NDSColorFormat_BGR555_Rev:
-				GPU->RenderLine<NDSColorFormat_BGR555_Rev>(nds.VCount);
-				break;
-				
-			case NDSColorFormat_BGR666_Rev:
-				GPU->RenderLine<NDSColorFormat_BGR666_Rev>(nds.VCount);
-				break;
-				
-			case NDSColorFormat_BGR888_Rev:
-				GPU->RenderLine<NDSColorFormat_BGR888_Rev>(nds.VCount);
-				break;
-		}
+		GPU->RenderLine(nds.VCount);
 		
 		//trigger hblank dmas
 		//but notice, we do that just after we finished drawing the line
@@ -1451,8 +1454,11 @@ static void execHardware_hstart_vblankStart()
 
 			//for ARM7, cheats process when a vblank IRQ fires. necessary for AR compatibility and to stop cheats from breaking game boot-ups.
 			//note that how we process raw cheats is up to us. so we'll do it the same way we used to, elsewhere
-			if (i==1 && cheats)
+			if ( (i == 1) && (cheats != NULL) )
+			{
 				cheats->process(CHEAT_TYPE_AR);
+				CHEATS::ResetJitIfNeeded();
+			}
 		}
 	}
 
@@ -1911,6 +1917,34 @@ static /*donotinline*/ std::pair<s32,s32> armInnerLoop(
 	s32 timer = minarmtime<doarm9,doarm7>(arm9,arm7);
 	while(timer < s32next && !sequencer.reschedule && execute)
 	{
+		// breakpoint handling
+		#if defined(HOST_WINDOWS) && !defined(TARGET_INTERFACE)
+		const std::vector<u32> *breakpointList9 = NDS_ARM9.breakPoints;
+		for (int i = 0; i < breakpointList9->size(); ++i) {
+			if (NDS_ARM9.instruct_adr == (*breakpointList9)[i] && !NDS_ARM9.debugStep) {
+				emu_paused = true;
+				paused = true;
+				execute = false;
+				// update debug display
+				PostMessageA(DisViewWnd[0], WM_COMMAND, IDC_DISASMSEEK, NDS_ARM9.instruct_adr);
+				InvalidateRect(DisViewWnd[0], NULL, FALSE);
+				return std::make_pair(arm9, arm7);
+			}
+		}
+		const std::vector<u32> *breakpointList7 = NDS_ARM7.breakPoints;
+		for (int i = 0; i < breakpointList7->size(); ++i) {
+			if (NDS_ARM7.instruct_adr == (*breakpointList7)[i] && !NDS_ARM7.debugStep) {
+				emu_paused = true;
+				paused = true;
+				execute = false;
+				// update debug display
+				PostMessageA(DisViewWnd[1], WM_COMMAND, IDC_DISASMSEEK, NDS_ARM7.instruct_adr);
+				InvalidateRect(DisViewWnd[1], NULL, FALSE);
+				return std::make_pair(arm9, arm7);
+			}
+		}
+		#endif //HOST_WINDOWS
+
 		if(doarm9 && (!doarm7 || arm9 <= timer))
 		{
 			if(!(NDS_ARM9.freeze & CPU_FREEZE_WAIT_IRQ) && !nds.freezeBus)
@@ -1932,6 +1966,24 @@ static /*donotinline*/ std::pair<s32,s32> armInnerLoop(
 				arm9 = min(s32next, arm9 + kIrqWait);
 				nds.idleCycles[0] += arm9-temp;
 				if (gxFIFO.size < 255) nds.freezeBus &= ~1;
+			}
+			// for proper stepping...
+			if (NDS_ARM9.debugStep) {
+				NDS_ARM9.debugStep = false;
+				execute = false;
+				//PostMessageA(DisViewWnd[0], WM_COMMAND, IDC_DISASMSEEK, NDS_ARM9.instruct_adr);
+				//InvalidateRect(DisViewWnd[0], NULL, FALSE);
+			}
+			if (NDS_ARM9.stepOverBreak == NDS_ARM9.instruct_adr && NDS_ARM9.stepOverBreak != 0) {
+				NDS_ARM9.stepOverBreak = 0;
+				execute = false;
+				//PostMessageA(DisViewWnd[0], WM_COMMAND, IDC_DISASMSEEK, NDS_ARM9.instruct_adr);
+				//InvalidateRect(DisViewWnd[0], NULL, FALSE);
+			}
+			// aaand handle step to return
+			if (NDS_ARM9.runToRetTmp != 0 && NDS_ARM9.runToRetTmp == NDS_ARM9.instruct_adr) {
+				NDS_ARM9.runToRetTmp = 0;
+				NDS_ARM9.runToRet = true;
 			}
 		}
 		if(doarm7 && (!doarm9 || arm7 <= timer))
@@ -1964,6 +2016,23 @@ static /*donotinline*/ std::pair<s32,s32> armInnerLoop(
 #endif
 				}
 			}
+			if (NDS_ARM7.debugStep) {
+				NDS_ARM7.debugStep = false;
+				execute = false;
+				//PostMessageA(DisViewWnd[1], WM_COMMAND, IDC_DISASMSEEK, NDS_ARM7.instruct_adr);
+				//InvalidateRect(DisViewWnd[1], NULL, FALSE);
+			}
+			if (NDS_ARM7.stepOverBreak == NDS_ARM7.instruct_adr && NDS_ARM7.stepOverBreak != 0) {
+				NDS_ARM7.stepOverBreak = 0;
+				execute = false;
+				//PostMessageA(DisViewWnd[1], WM_COMMAND, IDC_DISASMSEEK, NDS_ARM7.instruct_adr);
+				//InvalidateRect(DisViewWnd[1], NULL, FALSE);
+			}
+			// aaand handle step to return
+			if (NDS_ARM7.runToRetTmp != 0 && NDS_ARM7.runToRetTmp == NDS_ARM7.instruct_adr) {
+				NDS_ARM7.runToRetTmp = 0;
+				NDS_ARM7.runToRet = true;
+			}
 		}
 
 		timer = minarmtime<doarm9,doarm7>(arm9,arm7);
@@ -1984,6 +2053,7 @@ void NDS_debug_break()
 void NDS_debug_continue()
 {
 	NDS_ARM9.stalled = NDS_ARM7.stalled = 0;
+	execute = true;
 }
 
 void NDS_debug_step()
@@ -1995,9 +2065,7 @@ void NDS_debug_step()
 template<bool FORCE>
 void NDS_exec(s32 nb)
 {
-	#ifdef GDB_STUB
-	gdbstub_mutex_lock();
-	#endif
+	GDBSTUB_MUTEX_LOCK();
 
 	LagFrameFlag=1;
 
@@ -2028,19 +2096,15 @@ void NDS_exec(s32 nb)
 				if ((NDS_ARM9.stalled || NDS_ARM7.stalled) && execute)
 				{
 					driver->EMU_DebugIdleEnter();
-					
+
 					while((NDS_ARM9.stalled || NDS_ARM7.stalled) && execute)
 					{
-					        #ifdef GDB_STUB
-					        gdbstub_mutex_unlock();
-					        #endif
+						GDBSTUB_MUTEX_UNLOCK();
 						driver->EMU_DebugIdleUpdate();
-					        #ifdef GDB_STUB
-					        gdbstub_mutex_lock();
-					        #endif
+						GDBSTUB_MUTEX_LOCK();
 						nds_debug_continuing[0] = nds_debug_continuing[1] = true;
 					}
-					
+
 					driver->EMU_DebugIdleWakeUp();
 				}
 			#endif
@@ -2136,11 +2200,13 @@ void NDS_exec(s32 nb)
 	}
 	currFrameCounter++;
 	DEBUG_Notify.NextFrame();
-	if(cheats) cheats->process(CHEAT_TYPE_INTERNAL);
+	if (cheats != NULL)
+	{
+		cheats->process(CHEAT_TYPE_INTERNAL);
+		CHEATS::ResetJitIfNeeded();
+	}
 
-        #ifdef GDB_STUB
-        gdbstub_mutex_unlock();
-        #endif
+	GDBSTUB_MUTEX_UNLOCK();
 }
 
 template<int PROCNUM> static void execHardware_interrupts_core()
@@ -2420,19 +2486,24 @@ bool NDS_FakeBoot()
 
 	//since we're bypassing the code to decrypt the secure area, we need to make sure its decrypted first
 	//this has not been validated on big endian systems. it almost positively doesn't work.
+	bool hasSecureArea = false;
 	if (gameInfo.header.CRC16 != 0)
 	{
-		bool okRom = DecryptSecureArea((u8*)&gameInfo.header, (u8*)gameInfo.secureArea);
+		int okRom = DecryptSecureArea((u8*)&gameInfo.header, (u8*)gameInfo.secureArea);
 
-		if(!okRom) {
+		if(okRom == -1)
+		{
 			printf("Specified file is not a valid rom\n");
 			return false;
+		}
+		else if (okRom == 1)
+		{
+			hasSecureArea = true;
 		}
 	}
 	
 	//firmware loads the game card arm9 and arm7 programs as specified in rom header
 	{
-		bool hasSecureArea = ((gameInfo.romType == ROM_NDS) && (gameInfo.header.CRC16 != 0));
 		//copy the arm9 program to the address specified by rom header
 		u32 src = header->ARM9src;
 		u32 dst = header->ARM9cpy;
@@ -2560,6 +2631,16 @@ bool NDS_FakeBoot()
 	return true;
 }
 
+static void NDS_CurrentCPUInfoToNDSError(NDSError &ndsError)
+{
+	ndsError.programCounterARM9		= NDS_ARM9.R[15];
+	ndsError.instructionARM9		= NDS_ARM9.instruction;
+	ndsError.instructionAddrARM9	= NDS_ARM9.instruct_adr;
+	ndsError.programCounterARM7		= NDS_ARM7.R[15];
+	ndsError.instructionARM7		= NDS_ARM7.instruction;
+	ndsError.instructionAddrARM7	= NDS_ARM7.instruct_adr;
+}
+
 bool _HACK_DONT_STOPMOVIE = false;
 void NDS_Reset()
 {
@@ -2637,7 +2718,7 @@ void NDS_Reset()
 	//initialize CP15 specially for this platform
 	//TODO - how much of this is necessary for firmware boot?
 	//(only ARM9 has CP15)
-	reconstruct(&cp15);
+	armcp15_init(&cp15);
 	MMU.ARM9_RW_MODE = BIT7(cp15.ctrl);
 	NDS_ARM9.intVector = 0xFFFF0000 * (BIT13(cp15.ctrl));
 	NDS_ARM9.LDTBit = !BIT15(cp15.ctrl); //TBit
@@ -3089,16 +3170,6 @@ void NDS_swapScreen()
 NDSError NDS_GetLastError()
 {
 	return _lastNDSError;
-}
-
-static void NDS_CurrentCPUInfoToNDSError(NDSError &ndsError)
-{
-	ndsError.programCounterARM9		= NDS_ARM9.R[15];
-	ndsError.instructionARM9		= NDS_ARM9.instruction;
-	ndsError.instructionAddrARM9	= NDS_ARM9.instruct_adr;
-	ndsError.programCounterARM7		= NDS_ARM7.R[15];
-	ndsError.instructionARM7		= NDS_ARM7.instruction;
-	ndsError.instructionAddrARM7	= NDS_ARM7.instruct_adr;
 }
 
 void emu_halt(EmuHaltReasonCode reasonCode, NDSErrorTag errorTag)

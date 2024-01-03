@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011-2012 Roger Manuel
-	Copyright (C) 2013-2019 DeSmuME team
+	Copyright (C) 2013-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -188,7 +188,9 @@ void VideoFilter::__InstanceInit(size_t srcWidth, size_t srcHeight, VideoFilterT
 		__vfThread[i].param.filterFunction = NULL;
 		
 		__vfThread[i].task = new Task;
-		__vfThread[i].task->start(false);
+		char name[16];
+		snprintf(name, 16, "video filter %d", (int)i);
+		__vfThread[i].task->start(false, 0, name);
 	}
 	
 	__vfFunc = _vfAttributes.filterFunction;
@@ -621,18 +623,18 @@ void VideoFilter::RunFilterCustomByAttributes(const uint32_t *__restrict srcBuff
 	
 	// Assign the surfaces and run the filter
 	SSurface srcSurface;
+	memset(&srcSurface, 0, sizeof(srcSurface));
 	srcSurface.Surface = (unsigned char *)srcBuffer;
 	srcSurface.Pitch = srcWidth*2;
 	srcSurface.Width = srcWidth;
 	srcSurface.Height = srcHeight;
-	srcSurface.userData = NULL;
 	
 	SSurface dstSurface;
+	memset(&dstSurface, 0, sizeof(dstSurface));
 	dstSurface.Surface = (unsigned char *)dstBuffer;
 	dstSurface.Pitch = dstWidth*2;
 	dstSurface.Width = dstWidth;
 	dstSurface.Height = dstHeight;
-	srcSurface.userData = NULL;
 	
 	if (filterFunction == NULL)
 	{

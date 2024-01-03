@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2012-2017 DeSmuME team
+	Copyright (C) 2012-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -27,8 +27,7 @@
 
 CoreAudioInput::CoreAudioInput()
 {
-	_spinlockAUHAL = (OSSpinLock *)malloc(sizeof(OSSpinLock));
-	*_spinlockAUHAL = OS_SPINLOCK_INIT;
+	_unfairlockAUHAL = apple_unfairlock_create();
 	
 	_hwStateChangedCallbackFunc = &CoreAudioInputDefaultHardwareStateChangedCallback;
 	_hwStateChangedCallbackParam1 = NULL;
@@ -50,6 +49,7 @@ CoreAudioInput::CoreAudioInput()
 	_isPaused = true;
 	_isHardwareEnabled = false;
 	_isHardwareLocked = true;
+	_isHardwareAuthorized = true;
 	_captureFrames = 0;
 	
 	_auHALInputDevice = NULL;
@@ -60,7 +60,7 @@ CoreAudioInput::CoreAudioInput()
 	_auOutputNode = 0;
 	memset(&_timeStamp, 0, sizeof(AudioTimeStamp));
 	
-#if !defined(FORCE_AUDIOCOMPONENT_10_5) && defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 	AudioComponentDescription halInputDeviceDesc;
 	AudioComponentDescription formatConverterDesc;
 	AudioComponentDescription outputDesc;
@@ -91,7 +91,7 @@ CoreAudioInput::CoreAudioInput()
 	
 	NewAUGraph(&_auGraph);
 	AUGraphOpen(_auGraph);
-#if defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 	AUGraphAddNode(_auGraph, (AudioComponentDescription *)&formatConverterDesc, &_auFormatConverterNode);
 	AUGraphAddNode(_auGraph, (AudioComponentDescription *)&outputDesc, &_auOutputNode);
 #else
@@ -255,9 +255,9 @@ CoreAudioInput::CoreAudioInput()
 
 CoreAudioInput::~CoreAudioInput()
 {
-	OSSpinLockLock(_spinlockAUHAL);
+	apple_unfairlock_lock(this->_unfairlockAUHAL);
 	DestroyAudioUnitInstance(&_auHALInputDevice);
-	OSSpinLockUnlock(_spinlockAUHAL);
+	apple_unfairlock_unlock(this->_unfairlockAUHAL);
 	
 	AUGraphClose(_auGraph);
 	AUGraphUninitialize(_auGraph);
@@ -281,8 +281,7 @@ CoreAudioInput::~CoreAudioInput()
 	delete _samplesConverted;
 	_samplesConverted = NULL;
 	
-	free(_spinlockAUHAL);
-	_spinlockAUHAL = NULL;
+	apple_unfairlock_destroy(this->_unfairlockAUHAL);
 	
 	CFRelease(this->_hwDeviceInfo.name);
 	CFRelease(this->_hwDeviceInfo.manufacturer);
@@ -480,7 +479,7 @@ void CoreAudioInput::Start()
 							   &defaultInputDeviceID);
 	
 	// Set the default input device to the audio unit.
-	OSSpinLockLock(this->_spinlockAUHAL);
+	apple_unfairlock_lock(this->_unfairlockAUHAL);
 	
 	error = this->InitInputAUHAL(defaultInputDeviceID);
 	if (error == noErr)
@@ -516,12 +515,12 @@ void CoreAudioInput::Start()
 		this->_isHardwareEnabled = false;
 	}
 	
-	if (this->IsHardwareEnabled() && !this->IsHardwareLocked() && !this->GetPauseState())
+	if (this->IsHardwareEnabled() && this->IsHardwareAuthorized() && !this->IsHardwareLocked() && !this->GetPauseState())
 	{
 		AudioOutputUnitStart(this->_auHALInputDevice);
 	}
 	
-	OSSpinLockUnlock(this->_spinlockAUHAL);
+	apple_unfairlock_unlock(this->_unfairlockAUHAL);
 	
 	AUGraphInitialize(_auGraph);
 	if (!this->GetPauseState())
@@ -534,16 +533,17 @@ void CoreAudioInput::Start()
 	this->_hwStateChangedCallbackFunc(&this->_hwDeviceInfo,
 									  this->IsHardwareEnabled(),
 									  this->IsHardwareLocked(),
+									  this->IsHardwareAuthorized(),
 									  this->_hwStateChangedCallbackParam1,
 									  this->_hwStateChangedCallbackParam2);
 }
 
 void CoreAudioInput::Stop()
 {
-	OSSpinLockLock(this->_spinlockAUHAL);
+	apple_unfairlock_lock(this->_unfairlockAUHAL);
 	AudioOutputUnitStop(this->_auHALInputDevice);
 	AudioUnitUninitialize(this->_auHALInputDevice);
-	OSSpinLockUnlock(this->_spinlockAUHAL);
+	apple_unfairlock_unlock(this->_unfairlockAUHAL);
 	
 	AUGraphStop(this->_auGraph);
 	AUGraphUninitialize(this->_auGraph);
@@ -577,6 +577,22 @@ bool CoreAudioInput::IsHardwareLocked() const
 	return this->_isHardwareLocked;
 }
 
+bool CoreAudioInput::IsHardwareAuthorized() const
+{
+	return this->_isHardwareAuthorized;
+}
+
+void CoreAudioInput::SetHardwareAuthorized(bool isAuthorized)
+{
+	const bool didStateChange = (this->_isHardwareAuthorized != isAuthorized);
+	
+	this->_isHardwareAuthorized = isAuthorized;
+	if (didStateChange)
+	{
+		this->SetPauseState( this->GetPauseState() );
+	}
+}
+
 bool CoreAudioInput::GetPauseState() const
 {
 	return this->_isPaused;
@@ -584,22 +600,24 @@ bool CoreAudioInput::GetPauseState() const
 
 void CoreAudioInput::SetPauseState(bool pauseState)
 {
-	if (pauseState && !this->GetPauseState())
+	if (!this->_isPaused && pauseState)
 	{
-		OSSpinLockLock(this->_spinlockAUHAL);
+		this->_isPaused = true;
+		
+		apple_unfairlock_lock(this->_unfairlockAUHAL);
 		AudioOutputUnitStop(this->_auHALInputDevice);
-		OSSpinLockUnlock(this->_spinlockAUHAL);
+		apple_unfairlock_unlock(this->_unfairlockAUHAL);
 		AUGraphStop(this->_auGraph);
 	}
-	else if (!pauseState && this->GetPauseState() && !this->IsHardwareLocked())
+	else if (this->_isPaused && !pauseState)
 	{
-		OSSpinLockLock(this->_spinlockAUHAL);
+		this->_isPaused = false;
+		
+		apple_unfairlock_lock(this->_unfairlockAUHAL);
 		AudioOutputUnitStart(this->_auHALInputDevice);
-		OSSpinLockUnlock(this->_spinlockAUHAL);
+		apple_unfairlock_unlock(this->_unfairlockAUHAL);
 		AUGraphStart(this->_auGraph);
 	}
-	
-	this->_isPaused = (this->IsHardwareLocked()) ? true : pauseState;
 }
 
 float CoreAudioInput::GetNormalizedGain() const
@@ -612,14 +630,14 @@ void CoreAudioInput::SetGainAsNormalized(float normalizedGain)
 	Float32 gainValue = normalizedGain;
 	UInt32 gainPropSize = sizeof(gainValue);
 	
-	OSSpinLockLock(this->_spinlockAUHAL);
+	apple_unfairlock_lock(this->_unfairlockAUHAL);
 	AudioUnitSetProperty(this->_auHALInputDevice,
 						 kAudioDevicePropertyVolumeScalar,
 						 kAudioUnitScope_Input,
 						 this->_inputElement,
 						 &gainValue,
 						 gainPropSize);
-	OSSpinLockUnlock(this->_spinlockAUHAL);
+	apple_unfairlock_unlock(this->_unfairlockAUHAL);
 }
 
 void CoreAudioInput::UpdateHardwareGain(float normalizedGain)
@@ -685,15 +703,18 @@ void CoreAudioInput::UpdateHardwareLock()
 		hardwareLocked = true;
 	}
 	
+	const bool didStateChange = (this->_isHardwareLocked != hardwareLocked);
 	this->_isHardwareLocked = hardwareLocked;
-	if (this->_isHardwareLocked && !this->GetPauseState())
+	
+	if (didStateChange)
 	{
-		this->SetPauseState(true);
+		this->SetPauseState( this->GetPauseState() );
 	}
 	
 	this->_hwStateChangedCallbackFunc(&this->_hwDeviceInfo,
 									  this->IsHardwareEnabled(),
 									  this->IsHardwareLocked(),
+									  this->IsHardwareAuthorized(),
 									  this->_hwStateChangedCallbackParam1,
 									  this->_hwStateChangedCallbackParam2);
 }
@@ -710,7 +731,7 @@ uint8_t CoreAudioInput::generateSample()
 {
 	uint8_t theSample = MIC_NULL_SAMPLE_VALUE;
 	
-	if (this->_isPaused)
+	if ( this->GetPauseState() || !this->IsHardwareEnabled() || this->IsHardwareLocked() || !this->IsHardwareAuthorized() )
 	{
 		return theSample;
 	}
@@ -868,6 +889,7 @@ void CoreAudioInputAUHALChanged(void *inRefCon,
 void CoreAudioInputDefaultHardwareStateChangedCallback(CoreAudioInputDeviceInfo *deviceInfo,
 													   const bool isHardwareEnabled,
 													   const bool isHardwareLocked,
+													   const bool isHardwareAuthorized,
 													   void *inParam1,
 													   void *inParam2)
 {
@@ -885,14 +907,13 @@ CoreAudioOutput::CoreAudioOutput(size_t bufferSamples, size_t sampleSize)
 {
 	OSStatus error = noErr;
 	
-	_spinlockAU = (OSSpinLock *)malloc(sizeof(OSSpinLock));
-	*_spinlockAU = OS_SPINLOCK_INIT;
+	_unfairlockAU = apple_unfairlock_create();
 	
 	_buffer = new RingBuffer(bufferSamples, sampleSize);
 	_volume = 1.0f;
 	
 	// Create a new audio unit
-#if !defined(FORCE_AUDIOCOMPONENT_10_5) && defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+#if !defined(FORCE_AUDIOCOMPONENT_10_5) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 	if (IsOSXVersionSupported(10, 6, 0))
 	{
 		AudioComponentDescription audioDesc;
@@ -967,46 +988,45 @@ CoreAudioOutput::CoreAudioOutput(size_t bufferSamples, size_t sampleSize)
 
 CoreAudioOutput::~CoreAudioOutput()
 {
-	OSSpinLockLock(_spinlockAU);
-	DestroyAudioUnitInstance(&_au);
-	OSSpinLockUnlock(_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
+	DestroyAudioUnitInstance(&this->_au);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 	
-	delete _buffer;
-	_buffer = NULL;
+	delete this->_buffer;
+	this->_buffer = NULL;
 	
-	free(_spinlockAU);
-	_spinlockAU = NULL;
+	apple_unfairlock_destroy(this->_unfairlockAU);
 }
 
 void CoreAudioOutput::start()
 {
 	this->clearBuffer();
 	
-	OSSpinLockLock(this->_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
 	AudioUnitReset(this->_au, kAudioUnitScope_Global, 0);
 	AudioOutputUnitStart(this->_au);
-	OSSpinLockUnlock(this->_spinlockAU);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 }
 
 void CoreAudioOutput::pause()
 {
-	OSSpinLockLock(this->_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
 	AudioOutputUnitStop(this->_au);
-	OSSpinLockUnlock(this->_spinlockAU);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 }
 
 void CoreAudioOutput::unpause()
 {
-	OSSpinLockLock(this->_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
 	AudioOutputUnitStart(this->_au);
-	OSSpinLockUnlock(this->_spinlockAU);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 }
 
 void CoreAudioOutput::stop()
 {
-	OSSpinLockLock(this->_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
 	AudioOutputUnitStop(this->_au);
-	OSSpinLockUnlock(this->_spinlockAU);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 	
 	this->clearBuffer();
 }
@@ -1029,16 +1049,16 @@ void CoreAudioOutput::clearBuffer()
 
 void CoreAudioOutput::mute()
 {
-	OSSpinLockLock(this->_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
 	AudioUnitSetParameter(this->_au, kHALOutputParam_Volume, kAudioUnitScope_Global, 0, 0.0f, 0);
-	OSSpinLockUnlock(this->_spinlockAU);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 }
 
 void CoreAudioOutput::unmute()
 {
-	OSSpinLockLock(this->_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
 	AudioUnitSetParameter(this->_au, kHALOutputParam_Volume, kAudioUnitScope_Global, 0, this->_volume, 0);
-	OSSpinLockUnlock(this->_spinlockAU);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 }
 
 size_t CoreAudioOutput::getAvailableSamples() const
@@ -1055,9 +1075,9 @@ void CoreAudioOutput::setVolume(float vol)
 {
 	this->_volume = vol;
 	
-	OSSpinLockLock(this->_spinlockAU);
+	apple_unfairlock_lock(this->_unfairlockAU);
 	AudioUnitSetParameter(this->_au, kHALOutputParam_Volume, kAudioUnitScope_Global, 0, vol, 0);
-	OSSpinLockUnlock(this->_spinlockAU);
+	apple_unfairlock_unlock(this->_unfairlockAU);
 }
 
 OSStatus CoreAudioOutputRenderCallback(void *inRefCon,
@@ -1091,13 +1111,13 @@ bool CreateAudioUnitInstance(AudioUnit *au, ComponentDescription *auDescription)
 		return result;
 	}
 	
-	Component theComponent = FindNextComponent(NULL, auDescription);
+	SILENCE_DEPRECATION_MACOS_10_8( Component theComponent = FindNextComponent(NULL, auDescription) );
 	if (theComponent == NULL)
 	{
 		return result;
 	}
 	
-	OSErr error = OpenAComponent(theComponent, au);
+	SILENCE_DEPRECATION_MACOS_10_8( OSErr error = OpenAComponent(theComponent, au) );
 	if (error != noErr)
 	{
 		return result;
@@ -1107,7 +1127,7 @@ bool CreateAudioUnitInstance(AudioUnit *au, ComponentDescription *auDescription)
 	return result;
 }
 
-#if !defined(FORCE_AUDIOCOMPONENT_10_5) && defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 bool CreateAudioUnitInstance(AudioUnit *au, AudioComponentDescription *auDescription)
 {
 	bool result = false;
@@ -1142,7 +1162,7 @@ void DestroyAudioUnitInstance(AudioUnit *au)
 	
 	AudioOutputUnitStop(*au);
 	AudioUnitUninitialize(*au);
-#if !defined(FORCE_AUDIOCOMPONENT_10_5) && defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+#if !defined(FORCE_AUDIOCOMPONENT_10_5) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 	if (IsOSXVersionSupported(10, 6, 0))
 	{
 		AudioComponentInstanceDispose(*au);
@@ -1150,6 +1170,6 @@ void DestroyAudioUnitInstance(AudioUnit *au)
 	else
 #endif
 	{
-		CloseComponent(*au);
+		SILENCE_DEPRECATION_MACOS_10_8( CloseComponent(*au) );
 	}
 }

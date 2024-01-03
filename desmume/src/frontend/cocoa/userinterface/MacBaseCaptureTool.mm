@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2018 DeSmuME team
+	Copyright (C) 2018-2023 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
 @synthesize dummyObject;
 @synthesize window;
 @synthesize saveDirectoryPathTextField;
-@synthesize sharedData;
+@synthesize fetchObject;
 @synthesize saveDirectoryPath;
 @synthesize romName;
 @synthesize formatID;
@@ -46,7 +46,7 @@
 		return nil;
 	}
 	
-	sharedData			= nil;
+	fetchObject			= nil;
 	saveDirectoryPath	= nil;
 	romName				= @"No_ROM_loaded";
 	
@@ -66,7 +66,6 @@
 
 - (void)dealloc
 {
-	[self setSharedData:nil];
 	[self setSaveDirectoryPath:nil];
 	[self setRomName:nil];
 	
@@ -84,26 +83,31 @@
 	[panel setTitle:NSSTRING_TITLE_SAVE_SCREENSHOT_PANEL];
 	
 #if MAC_OS_X_VERSION_MIN_REQUIRED > MAC_OS_X_VERSION_10_5
-	[panel beginSheetModalForWindow:[self window]
-				  completionHandler:^(NSInteger result) {
-					  [self chooseDirectoryPathDidEnd:panel returnCode:result contextInfo:nil];
-				  } ];
-#else
-	[panel beginSheetForDirectory:nil
-							 file:nil
-							types:nil
-				   modalForWindow:[self window]
-					modalDelegate:self
-				   didEndSelector:@selector(chooseDirectoryPathDidEnd:returnCode:contextInfo:)
-					  contextInfo:nil];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		[panel beginSheetModalForWindow:[self window]
+					  completionHandler:^(NSInteger result) {
+						  [self chooseDirectoryPathDidEnd:panel returnCode:(int)result contextInfo:nil];
+					  } ];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( [panel beginSheetForDirectory:nil
+																 file:nil
+																types:nil
+													   modalForWindow:[self window]
+														modalDelegate:self
+													   didEndSelector:@selector(chooseDirectoryPathDidEnd:returnCode:contextInfo:)
+														  contextInfo:nil] );
+	}
 }
 
 - (void) chooseDirectoryPathDidEnd:(NSOpenPanel *)sheet returnCode:(int)returnCode contextInfo:(void *)contextInfo
 {
 	[sheet orderOut:self];
 	
-	if (returnCode == NSCancelButton)
+	if (returnCode == GUI_RESPONSE_CANCEL)
 	{
 		return;
 	}

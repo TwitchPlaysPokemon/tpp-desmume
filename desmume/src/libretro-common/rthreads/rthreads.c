@@ -22,6 +22,7 @@
 
 #ifdef __unix__
 #define _POSIX_C_SOURCE 199309
+#define _GNU_SOURCE
 #endif
 
 #include <stdlib.h>
@@ -270,8 +271,6 @@ int sthread_detach(sthread_t *thread)
  * @thread to terminate. If that thread has already terminated, then
  * it will return immediately. The thread specified by @thread must
  * be joinable.
- *
- * Returns: 0 on success, otherwise it returns a non-zero error number.
  */
 void sthread_join(sthread_t *thread)
 {
@@ -301,6 +300,30 @@ bool sthread_isself(sthread_t *thread)
    return GetCurrentThreadId() == thread->thread_id;
 #else
    return pthread_equal(pthread_self(),thread->id);
+#endif
+}
+
+/**
+ * sthread_set_name:
+ * @thread                  : pointer to thread object
+ * @name                    : name to define for the thread (at most
+ *                            15 bytes)
+ *
+ * Set the thread name, useful for debugging.
+ */
+void sthread_setname(sthread_t *thread, const char *name)
+{
+   if (!thread)
+      return;
+   // TODO: implement that for Windows too.
+   // This can't be implemented on Apple OSes because pthread_setname_np() works
+   // substantially different. Not only does pthread_setname_np() take only the
+   // 'name' parameter, but it can only change the thread name on the current
+   // thread, when standard pthread_setname_np() can set the thread name from
+   // any thread. At the time of this writing (2021/08/30), there is no way to
+   // set the thread name from a different thread when running an Apple OS.
+#if !defined(USE_WIN32_THREADS) && !defined(__APPLE__)
+   pthread_setname_np(thread->id, name);
 #endif
 }
 

@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2011-2018 DeSmuME team
+	Copyright (C) 2011-2023 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #import "cocoa_input.h"
 #import "cocoa_firmware.h"
 #import "cocoa_GPU.h"
+#import "cocoa_cheat.h"
 #import "cocoa_globals.h"
 #import "cocoa_output.h"
 #import "cocoa_rom.h"
@@ -35,6 +36,7 @@
 #include "../../slot1.h"
 #include "../../slot2.h"
 #include "../../SPU.h"
+#include "../../wifi.h"
 #undef BOOL
 
 //accessed from other files
@@ -44,14 +46,17 @@ volatile bool execute = true;
 
 @synthesize execControl;
 
-@dynamic cdsController;
 @synthesize cdsFirmware;
+@synthesize cdsController;
 @synthesize cdsGPU;
+@synthesize cdsCheatManager;
 @synthesize cdsOutputList;
 
 @dynamic masterExecute;
 @dynamic isFrameSkipEnabled;
+@dynamic framesToSkipSetting;
 @dynamic coreState;
+@dynamic emulationPaused;
 @dynamic isSpeedLimitEnabled;
 @dynamic isCheatingEnabled;
 @dynamic speedScalar;
@@ -117,17 +122,17 @@ volatile bool execute = true;
 	_isTimerAtSecond = NO;
 	
 	cdsFirmware = nil;
-	cdsGPU = [[[[CocoaDSGPU alloc] init] autorelease] retain];
-	cdsController = [[[[CocoaDSController alloc] init] autorelease] retain];
-	cdsOutputList = [[[[NSMutableArray alloc] initWithCapacity:32] autorelease] retain];
+	cdsController = [[CocoaDSController alloc] init];
+	cdsGPU = [[CocoaDSGPU alloc] init];
+	cdsCheatManager = [[CocoaDSCheatManager alloc] init];
+	cdsOutputList = [[NSMutableArray alloc] initWithCapacity:32];
 	
 	ClientInputHandler *inputHandler = [cdsController inputHandler];
 	inputHandler->SetClientExecutionController(execControl);
 	execControl->SetClientInputHandler(inputHandler);
 	execControl->SetWifiEmulationMode(WifiEmulationLevel_Off);
 	
-	spinlockMasterExecute = OS_SPINLOCK_INIT;
-	spinlockCdsController = OS_SPINLOCK_INIT;
+	_unfairlockMasterExecute = apple_unfairlock_create();
 	
 	threadParam.cdsCore = self;
 	
@@ -162,10 +167,11 @@ volatile bool execute = true;
 	pthread_attr_destroy(&threadAttr);
 	
 	[cdsGPU setOutputList:cdsOutputList rwlock:&threadParam.rwlockOutputList];
+	[cdsCheatManager setRwlockCoreExecute:&threadParam.rwlockCoreExecute];
 	
 	macOS_driver *newDriver = new macOS_driver;
 	newDriver->SetCoreThreadMutexLock(&threadParam.mutexThreadExecute);
-	newDriver->SetCoreExecuteRWLock(self.rwlockCoreExecute);
+	newDriver->SetCoreExecuteRWLock(&threadParam.rwlockCoreExecute);
 	newDriver->SetExecutionControl(execControl);
 	driver = newDriver;
 	
@@ -186,16 +192,25 @@ volatile bool execute = true;
 	
 	[self removeAllOutputs];
 	
-	[[cdsGPU sharedData] semaphoreFramebufferDestroy];
+	((MacGPUFetchObjectAsync *)[cdsGPU fetchObject])->SemaphoreFramebufferDestroy();
 	
-	[self setCdsController:nil];
 	[self setCdsFirmware:nil];
-	[self setCdsGPU:nil];
-	[self setCdsOutputList:nil];
+	
+	[cdsController release];
+	cdsController = nil;
+	
+	[cdsGPU release];
+	cdsGPU = nil;
+	
+	[cdsOutputList release];
+	cdsOutputList = nil;
+	
 	[self setErrorStatus:nil];
 	[self setExtFirmwareMACAddressString:nil];
 	[self setFirmwareMACAddressSelectionString:nil];
 	[self setCurrentSessionMACAddressString:nil];
+	
+	apple_unfairlock_destroy(_unfairlockMasterExecute);
 	
 	pthread_cancel(coreThread);
 	pthread_join(coreThread, NULL);
@@ -216,7 +231,7 @@ volatile bool execute = true;
 
 - (void) setMasterExecute:(BOOL)theState
 {
-	OSSpinLockLock(&spinlockMasterExecute);
+	apple_unfairlock_lock(_unfairlockMasterExecute);
 	
 	if (theState)
 	{
@@ -227,48 +242,16 @@ volatile bool execute = true;
 		emu_halt(EMUHALT_REASON_UNKNOWN, NDSErrorTag_BothCPUs);
 	}
 	
-	OSSpinLockUnlock(&spinlockMasterExecute);
+	apple_unfairlock_unlock(_unfairlockMasterExecute);
 }
 
 - (BOOL) masterExecute
 {
-	OSSpinLockLock(&spinlockMasterExecute);
+	apple_unfairlock_lock(_unfairlockMasterExecute);
 	const BOOL theState = (execute) ? YES : NO;
-	OSSpinLockUnlock(&spinlockMasterExecute);
+	apple_unfairlock_unlock(_unfairlockMasterExecute);
 	
 	return theState;
-}
-
-- (void) setCdsController:(CocoaDSController *)theController
-{
-	OSSpinLockLock(&spinlockCdsController);
-	
-	if (theController == cdsController)
-	{
-		OSSpinLockUnlock(&spinlockCdsController);
-		return;
-	}
-	
-	if (theController != nil)
-	{
-		[theController retain];
-	}
-	
-	pthread_mutex_lock(&threadParam.mutexThreadExecute);
-	[cdsController release];
-	cdsController = theController;
-	pthread_mutex_unlock(&threadParam.mutexThreadExecute);
-	
-	OSSpinLockUnlock(&spinlockCdsController);
-}
-
-- (CocoaDSController *) cdsController
-{
-	OSSpinLockLock(&spinlockCdsController);
-	CocoaDSController *theController = cdsController;
-	OSSpinLockUnlock(&spinlockCdsController);
-	
-	return theController;
 }
 
 - (void) setIsFrameSkipEnabled:(BOOL)enable
@@ -280,6 +263,25 @@ volatile bool execute = true;
 {
 	const bool enable = execControl->GetEnableFrameSkip();
 	return (enable) ? YES : NO;
+}
+
+- (void) setFramesToSkipSetting:(NSInteger)framesToSkip
+{
+	if (framesToSkip < 0)
+	{
+		framesToSkip = 0; // Actual frame skip values can't be negative.
+	}
+	else if (framesToSkip > MAX_FIXED_FRAMESKIP_VALUE)
+	{
+		framesToSkip = MAX_FIXED_FRAMESKIP_VALUE;
+	}
+	
+	execControl->SetFramesToSkipSetting((uint8_t)framesToSkip);
+}
+
+- (NSInteger) framesToSkipSetting
+{
+	return (NSInteger)execControl->GetFramesToSkipSetting();
 }
 
 - (void) setSpeedScalar:(CGFloat)scalar
@@ -602,10 +604,10 @@ volatile bool execute = true;
 	}
 	
 	pthread_mutex_lock(&threadParam.mutexThreadExecute);
-	
 	execControl->SetExecutionBehavior((ExecutionBehavior)coreState);
-	
 	pthread_rwlock_rdlock(&threadParam.rwlockOutputList);
+	
+	char frameStatusCStr[64] = {0};
 	
 	switch ((ExecutionBehavior)coreState)
 	{
@@ -616,7 +618,8 @@ volatile bool execute = true;
 				[cdsOutput setIdle:YES];
 			}
 			
-			[self setFrameStatus:[NSString stringWithFormat:@"%llu", (unsigned long long)[self frameNumber]]];
+			snprintf(frameStatusCStr, sizeof(frameStatusCStr), "%llu", (unsigned long long)[self frameNumber]);
+			
 			[_fpsTimer invalidate];
 			_fpsTimer = nil;
 			break;
@@ -629,7 +632,8 @@ volatile bool execute = true;
 				[cdsOutput setIdle:NO];
 			}
 			
-			[self setFrameStatus:[NSString stringWithFormat:@"%llu", (unsigned long long)[self frameNumber]]];
+			snprintf(frameStatusCStr, sizeof(frameStatusCStr), "%llu", (unsigned long long)[self frameNumber]);
+			
 			[_fpsTimer invalidate];
 			_fpsTimer = nil;
 			break;
@@ -642,17 +646,16 @@ volatile bool execute = true;
 				[cdsOutput setIdle:NO];
 			}
 			
-			[self setFrameStatus:@"Executing..."];
-			
+			snprintf(frameStatusCStr, sizeof(frameStatusCStr), "%s", "Executing...");
+
 			if (_fpsTimer == nil)
 			{
 				_isTimerAtSecond = NO;
-				_fpsTimer = [[NSTimer alloc] initWithFireDate:[NSDate date]
-													 interval:0.5
-													   target:self
-													 selector:@selector(getTimedEmulatorStatistics:)
-													 userInfo:nil
-													  repeats:YES];
+				_fpsTimer = [NSTimer timerWithTimeInterval:0.5
+													target:self
+												  selector:@selector(getTimedEmulatorStatistics:)
+												  userInfo:nil
+												   repeats:YES];
 				
 				[[NSRunLoop currentRunLoop] addTimer:_fpsTimer forMode:NSRunLoopCommonModes];
 			}
@@ -669,7 +672,8 @@ volatile bool execute = true;
 				}
 			}
 			
-			[self setFrameStatus:[NSString stringWithFormat:@"Jumping to frame %llu.", (unsigned long long)execControl->GetFrameJumpTarget()]];
+			snprintf(frameStatusCStr, sizeof(frameStatusCStr), "Jumping to frame %llu.", (unsigned long long)execControl->GetFrameJumpTarget());
+			
 			[_fpsTimer invalidate];
 			_fpsTimer = nil;
 			break;
@@ -684,8 +688,23 @@ volatile bool execute = true;
 	pthread_cond_signal(&threadParam.condThreadExecute);
 	pthread_mutex_unlock(&threadParam.mutexThreadExecute);
 	
-	[[self cdsGPU] respondToPauseState:(coreState == ExecutionBehavior_Pause)];
 	[[self cdsController] setHardwareMicPause:(coreState != ExecutionBehavior_Run)];
+	
+	// This method affects UI updates, but can also be called from a thread that is different from
+	// the main thread. When compiling against the macOS v10.13 SDK and earlier, UI updates were allowed
+	// when doing KVO changes on other threads. However, the macOS v10.14 SDK and later now require that
+	// any KVO changes that affect UI updates MUST be performed on the main thread. Therefore, we need
+	// to push the UI-related stuff to the main thread here.
+	NSAutoreleasePool *tempPool = [[NSAutoreleasePool alloc] init];
+	
+	NSDictionary *userInfo = [[NSDictionary alloc] initWithObjectsAndKeys:
+							  [NSNumber numberWithInteger:coreState], @"ExecutionState",
+							  [NSString stringWithCString:frameStatusCStr encoding:NSUTF8StringEncoding], @"FrameStatusString",
+							  nil];
+	[[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:@"org.desmume.DeSmuME.handleEmulatorExecutionState" object:self userInfo:userInfo];
+	[userInfo release];
+	
+	[tempPool release];
 }
 
 - (NSInteger) coreState
@@ -694,52 +713,57 @@ volatile bool execute = true;
 	return behavior;
 }
 
+- (void) setEmulationPaused:(BOOL)theState
+{
+	// Do nothing. This is for KVO-compliance only.
+	// This method (actually its corresponding getter method) is really intended for
+	// UI updates only. If you want to pause the emulator, call setCoreState: and pass
+	// to it a value of ExecutionBehavior_Pause.
+}
+
+- (BOOL) emulationPaused
+{
+	return (execControl->GetExecutionBehavior() == ExecutionBehavior_Pause) ? YES : NO;
+}
+
 - (void) setArm9ImageURL:(NSURL *)fileURL
 {
-	const char *filePath = (fileURL != NULL) ? [[fileURL path] cStringUsingEncoding:NSUTF8StringEncoding] : NULL;
-	execControl->SetARM9ImagePath(filePath);
+	execControl->SetARM9ImagePath([CocoaDSUtil cPathFromFileURL:fileURL]);
 }
 
 - (NSURL *) arm9ImageURL
 {
-	const char *filePath = execControl->GetARM9ImagePath();
-	return [NSURL fileURLWithPath:[NSString stringWithCString:filePath encoding:NSUTF8StringEncoding]];
+	return [CocoaDSUtil fileURLFromCPath:execControl->GetARM9ImagePath()];
 }
 
 - (void) setArm7ImageURL:(NSURL *)fileURL
 {
-	const char *filePath = (fileURL != NULL) ? [[fileURL path] cStringUsingEncoding:NSUTF8StringEncoding] : NULL;
-	execControl->SetARM7ImagePath(filePath);
+	execControl->SetARM7ImagePath([CocoaDSUtil cPathFromFileURL:fileURL]);
 }
 
 - (NSURL *) arm7ImageURL
 {
-	const char *filePath = execControl->GetARM7ImagePath();
-	return [NSURL fileURLWithPath:[NSString stringWithCString:filePath encoding:NSUTF8StringEncoding]];
+	return [CocoaDSUtil fileURLFromCPath:execControl->GetARM7ImagePath()];
 }
 
 - (void) setFirmwareImageURL:(NSURL *)fileURL
 {
-	const char *filePath = (fileURL != NULL) ? [[fileURL path] cStringUsingEncoding:NSUTF8StringEncoding] : NULL;
-	execControl->SetFirmwareImagePath(filePath);
+	execControl->SetFirmwareImagePath([CocoaDSUtil cPathFromFileURL:fileURL]);
 }
 
 - (NSURL *) firmwareImageURL
 {
-	const char *filePath = execControl->GetFirmwareImagePath();
-	return [NSURL fileURLWithPath:[NSString stringWithCString:filePath encoding:NSUTF8StringEncoding]];
+	return [CocoaDSUtil fileURLFromCPath:execControl->GetFirmwareImagePath()];
 }
 
 - (void) setSlot1R4URL:(NSURL *)fileURL
 {
-	const char *filePath = (fileURL != NULL) ? [[fileURL path] cStringUsingEncoding:NSUTF8StringEncoding] : NULL;
-	execControl->SetSlot1R4Path(filePath);
+	execControl->SetSlot1R4Path([CocoaDSUtil cPathFromFileURL:fileURL]);
 }
 
 - (NSURL *) slot1R4URL
 {
-	const char *filePath = execControl->GetSlot1R4Path();
-	return [NSURL fileURLWithPath:[NSString stringWithCString:filePath encoding:NSUTF8StringEncoding]];
+	return [CocoaDSUtil fileURLFromCPath:execControl->GetSlot1R4Path()];
 }
 
 - (void) updateFirmwareMACAddressString
@@ -968,13 +992,18 @@ volatile bool execute = true;
 		return NO;
 	}
 	
-	std::string sramPath = (sramURL != nil) ? [[sramURL path] cStringUsingEncoding:NSUTF8StringEncoding] : "";
-	const char *fileName = [[fileURL path] cStringUsingEncoding:NSUTF8StringEncoding];
+	const char *cSramPath = [CocoaDSUtil cPathFromFileURL:sramURL];
+	std::string sramPath = (cSramPath != NULL) ? std::string(cSramPath) : "";
+	const char *fileName = [CocoaDSUtil cPathFromFileURL:fileURL];
 	
-	NSDate *currentDate = [NSDate date];
-	NSString *currentDateStr = [currentDate descriptionWithCalendarFormat:@"%Y %m %d %H %M %S %F"
-																 timeZone:nil
-																   locale:[[NSUserDefaults standardUserDefaults] dictionaryRepresentation]];
+	NSDateFormatter *df = [[NSDateFormatter alloc] init];
+	[df setDateFormat:@"Y M d H m s SSS"];
+	
+	 // Copy the current date into a formatted string.
+	NSString *dateString = [df stringFromDate:[NSDate date]];
+	
+	[df release];
+	df = nil;
 	
 	int dateYear = 2009;
 	int dateMonth = 1;
@@ -983,8 +1012,8 @@ volatile bool execute = true;
 	int dateMinute = 0;
 	int dateSecond = 0;
 	int dateMillisecond = 0;
-	const char *dateCStr = [currentDateStr cStringUsingEncoding:NSUTF8StringEncoding];
-	sscanf(dateCStr, "%i %i %i %i %i %i %i", &dateYear, &dateMonth, &dateDay, &dateHour, &dateMinute, &dateSecond, &dateMillisecond);
+	sscanf([dateString cStringUsingEncoding:NSUTF8StringEncoding], "%i %i %i %i %i %i %i",
+		   &dateYear, &dateMonth, &dateDay, &dateHour, &dateMinute, &dateSecond, &dateMillisecond);
 	
 	DateTime rtcDate = DateTime(dateYear,
 								dateMonth,
@@ -1113,8 +1142,17 @@ volatile bool execute = true;
 
 static void* RunCoreThread(void *arg)
 {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber10_6)
+	{
+		pthread_setname_np("Emulation Core");
+	}
+#endif
+	
 	CoreThreadParam *param = (CoreThreadParam *)arg;
 	CocoaDSCore *cdsCore = (CocoaDSCore *)param->cdsCore;
+	CocoaDSGPU *cdsGPU = [cdsCore cdsGPU];
+	ClientCheatManager *cheatManager = [[cdsCore cdsCheatManager] internalManager];
 	ClientExecutionControl *execControl = [cdsCore execControl];
 	ClientInputHandler *inputHandler = execControl->GetClientInputHandler();
 	NSMutableArray *cdsOutputList = [cdsCore cdsOutputList];
@@ -1138,7 +1176,7 @@ static void* RunCoreThread(void *arg)
 	ExecutionBehavior lastBehavior = ExecutionBehavior_Pause;
 	uint64_t frameJumpTarget = 0;
 	
-	[[[cdsCore cdsGPU] sharedData] semaphoreFramebufferCreate];
+	((MacGPUFetchObjectAsync *)[cdsGPU fetchObject])->SemaphoreFramebufferCreate();
 	
 	do
 	{
@@ -1148,6 +1186,8 @@ static void* RunCoreThread(void *arg)
 		execControl->ApplySettingsOnExecutionLoopStart();
 		behavior = execControl->GetExecutionBehaviorApplied();
 		
+		[cdsGPU respondToPauseState:(behavior == ExecutionBehavior_Pause)];
+		
 		while (!(behavior != ExecutionBehavior_Pause && execute))
 		{
 			pthread_cond_wait(&param->condThreadExecute, &param->mutexThreadExecute);
@@ -1156,6 +1196,8 @@ static void* RunCoreThread(void *arg)
 			execControl->ApplySettingsOnExecutionLoopStart();
 			behavior = execControl->GetExecutionBehaviorApplied();
 		}
+		
+		[cdsGPU respondToPauseState:(behavior == ExecutionBehavior_Pause)];
 		
 		if ( (lastBehavior == ExecutionBehavior_Run) && (behavior != ExecutionBehavior_Run) )
 		{
@@ -1191,6 +1233,8 @@ static void* RunCoreThread(void *arg)
 		
 		// Execute the frame and increment the frame counter.
 		pthread_rwlock_wrlock(&param->rwlockCoreExecute);
+		cheatManager->ApplyToMaster();
+		cheatManager->ApplyPendingInternalCheatWrites();
 		NDS_exec<false>();
 		SPU_Emulate_user();
 		execControl->FetchOutputPostNDSExec();
@@ -1204,7 +1248,10 @@ static void* RunCoreThread(void *arg)
 			
 			inputHandler->SetHardwareMicPause(true);
 			inputHandler->ClearAverageMicLevel();
+			
+			NSAutoreleasePool *tempPool = [[NSAutoreleasePool alloc] init];
 			inputHandler->ReportAverageMicLevel();
+			[tempPool release];
 			
 			[cdsCore postNDSError:ndsError];
 			continue;
@@ -1215,11 +1262,14 @@ static void* RunCoreThread(void *arg)
 			avCaptureObject->StreamWriteStart();
 		}
 		
-		// Make sure that the mic level is updated at least once every 8 frames, regardless
+		// Make sure that the mic level is updated at least once every 4 frames, regardless
 		// of whether the NDS actually reads the mic or not.
-		if ((ndsFrameInfo.frameIndex & 0x07) == 0x07)
+		if ((ndsFrameInfo.frameIndex & 0x03) == 0x03)
 		{
+			NSAutoreleasePool *tempPool = [[NSAutoreleasePool alloc] init];
 			inputHandler->ReportAverageMicLevel();
+			[tempPool release];
+			
 			inputHandler->ClearAverageMicLevel();
 		}
 		
@@ -1227,7 +1277,7 @@ static void* RunCoreThread(void *arg)
 		
 		if ( (behavior == ExecutionBehavior_Run) || (behavior == ExecutionBehavior_FrameJump) )
 		{
-			if ((ndsFrameInfo.frameIndex & 0x1F) == 0x1F)
+			if ((ndsFrameInfo.frameIndex & 0x3F) == 0x3F)
 			{
 				if (executionSpeedAverageFramesCollected > 0.0001)
 				{
@@ -1319,8 +1369,16 @@ static void* RunCoreThread(void *arg)
 					}
 					else
 					{
-						const double frameTimeBias = (lastExecutionSpeedDifference > 0.0) ? 1.0 - lastExecutionSpeedDifference : 1.0;
-						execControl->SetFramesToSkip( execControl->CalculateFrameSkip(startTime, frameTime * frameTimeBias) );
+						const uint8_t framesToSkipSetting = execControl->GetFramesToSkipSettingApplied();
+						if (framesToSkipSetting == 0) // A value of 0 is interpreted as 'automatic'.
+						{
+							const double frameTimeBias = (lastExecutionSpeedDifference > 0.0) ? 1.0 - lastExecutionSpeedDifference : 1.0;
+							execControl->SetFramesToSkip( execControl->CalculateFrameSkip(startTime, frameTime * frameTimeBias) );
+						}
+						else
+						{
+							execControl->SetFramesToSkip(framesToSkipSetting);
+						}
 					}
 				}
 				break;

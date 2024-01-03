@@ -1,7 +1,7 @@
 /*
 	Copyright (C) 2006 yopyop
 	Copyright (C) 2007 shash
-	Copyright (C) 2007-2017 DeSmuME team
+	Copyright (C) 2007-2023 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,9 +24,14 @@
 #include "firmware.h"
 #include "mc.h"
 #include "mem.h"
+#include "NDSSystem.h"
 
 #ifdef HAVE_LUA
 #include "lua-engine.h"
+#endif
+
+#ifdef TARGET_INTERFACE
+#include "frontend/interface/interface.h"
 #endif
 
 #ifdef HAVE_JIT
@@ -621,6 +626,10 @@ FORCEINLINE void* MMU_gpu_map(const u32 vram_addr)
 	return MMU.ARM9_LCD + (vram_page << 14) + ofs;
 }
 
+// Call MMU_WriteFromExternal() when modifying memory outside of the normal execution process, such
+// as when using cheats or when the client wants to write to memory directly. This function returns
+// true if memory is modified in such a way that requires the JIT execution be reset.
+template<typename T, size_t LENGTH> bool MMU_WriteFromExternal(const int targetProc, const u32 targetAddress, T newValue);
 
 template<int PROCNUM, MMU_ACCESS_TYPE AT> u8 _MMU_read08(u32 addr);
 template<int PROCNUM, MMU_ACCESS_TYPE AT> u16 _MMU_read16(u32 addr);
@@ -698,6 +707,19 @@ FORCEINLINE u8 _MMU_read08(const int PROCNUM, const MMU_ACCESS_TYPE AT, const u3
 #ifdef HAVE_LUA
 	CallRegisteredLuaMemHook(addr, 1, /*FIXME*/ 0, LUAMEMHOOK_READ);
 #endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 1, HOOK_READ);
+#endif
+
+	// break points, wheee
+	for (size_t i = 0; i < memReadBreakPoints.size(); ++i)
+	{
+		if (addr == memReadBreakPoints[i])
+		{
+			execute = false;
+			i = memReadBreakPoints.size();
+		}
+	}
 
 	if(PROCNUM==ARMCPU_ARM9)
 		if((addr&(~0x3FFF)) == MMU.DTCMRegion)
@@ -733,6 +755,19 @@ FORCEINLINE u16 _MMU_read16(const int PROCNUM, const MMU_ACCESS_TYPE AT, const u
 #ifdef HAVE_LUA
 	CallRegisteredLuaMemHook(addr, 2, /*FIXME*/ 0, LUAMEMHOOK_READ);
 #endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 2, HOOK_READ);
+#endif
+
+	// break points, wheee
+	for (size_t i = 0; i < memReadBreakPoints.size(); ++i)
+	{
+		if (addr == memReadBreakPoints[i])
+		{
+			execute = false;
+			i = memReadBreakPoints.size();
+		}
+	}
 
 	//special handling for execution from arm9, since we spend so much time in there
 	if(PROCNUM==ARMCPU_ARM9 && AT == MMU_AT_CODE)
@@ -781,6 +816,18 @@ FORCEINLINE u32 _MMU_read32(const int PROCNUM, const MMU_ACCESS_TYPE AT, const u
 #ifdef HAVE_LUA
 	CallRegisteredLuaMemHook(addr, 4, /*FIXME*/ 0, LUAMEMHOOK_READ);
 #endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 4, HOOK_READ);
+#endif
+	// break points, wheee
+	for (size_t i = 0; i < memReadBreakPoints.size(); ++i)
+	{
+		if (addr == memReadBreakPoints[i])
+		{
+			execute = false;
+			i = memReadBreakPoints.size();
+		}
+	}
 
 	//special handling for execution from arm9, since we spend so much time in there
 	if(PROCNUM==ARMCPU_ARM9 && AT == MMU_AT_CODE)
@@ -837,12 +884,25 @@ FORCEINLINE void _MMU_write08(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 		if((addr&(~0x3FFF)) == MMU.DTCMRegion) return; //dtcm
 	}
 
+	// break points, wheee
+	for (size_t i = 0; i < memWriteBreakPoints.size(); ++i)
+	{
+		if (addr == memWriteBreakPoints[i])
+		{
+			execute = false;
+			i = memWriteBreakPoints.size();
+		}
+	}
+
 	if(PROCNUM==ARMCPU_ARM9)
 		if((addr&(~0x3FFF)) == MMU.DTCMRegion)
 		{
 			T1WriteByte(MMU.ARM9_DTCM, addr & 0x3FFF, val);
 #ifdef HAVE_LUA
 			CallRegisteredLuaMemHook(addr, 1, val, LUAMEMHOOK_WRITE);
+#endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 1, HOOK_READ);
 #endif
 			return;
 		}
@@ -855,6 +915,9 @@ FORCEINLINE void _MMU_write08(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 #ifdef HAVE_LUA
 		CallRegisteredLuaMemHook(addr, 1, val, LUAMEMHOOK_WRITE);
 #endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 1, HOOK_WRITE);
+#endif
 		return;
 	}
 
@@ -862,6 +925,9 @@ FORCEINLINE void _MMU_write08(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 	else _MMU_ARM7_write08(addr,val);
 #ifdef HAVE_LUA
 	CallRegisteredLuaMemHook(addr, 1, val, LUAMEMHOOK_WRITE);
+#endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 1, HOOK_WRITE);
 #endif
 }
 
@@ -876,12 +942,25 @@ FORCEINLINE void _MMU_write16(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 		if((addr&(~0x3FFF)) == MMU.DTCMRegion) return; //dtcm
 	}
 
+	// break points, wheee
+	for (size_t i = 0; i < memWriteBreakPoints.size(); ++i)
+	{
+		if (addr == memWriteBreakPoints[i])
+		{
+			execute = false;
+			i = memWriteBreakPoints.size();
+		}
+	}
+
 	if(PROCNUM==ARMCPU_ARM9)
 		if((addr&(~0x3FFF)) == MMU.DTCMRegion)
 		{
 			T1WriteWord(MMU.ARM9_DTCM, addr & 0x3FFE, val);
 #ifdef HAVE_LUA
 			CallRegisteredLuaMemHook(addr, 2, val, LUAMEMHOOK_WRITE);
+#endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 2, HOOK_WRITE);
 #endif
 			return;
 		}
@@ -902,6 +981,9 @@ FORCEINLINE void _MMU_write16(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 #ifdef HAVE_LUA
 	CallRegisteredLuaMemHook(addr, 2, val, LUAMEMHOOK_WRITE);
 #endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 2, HOOK_WRITE);
+#endif
 }
 
 FORCEINLINE void _MMU_write32(const int PROCNUM, const MMU_ACCESS_TYPE AT, const u32 addr, u32 val)
@@ -915,12 +997,25 @@ FORCEINLINE void _MMU_write32(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 		if((addr&(~0x3FFF)) == MMU.DTCMRegion) return; //dtcm
 	}
 
+	// break points, wheee
+	for (size_t i = 0; i < memWriteBreakPoints.size(); ++i)
+	{
+		if (addr == memWriteBreakPoints[i])
+		{
+			execute = false;
+			i = memWriteBreakPoints.size();
+		}
+	}
+
 	if(PROCNUM==ARMCPU_ARM9)
 		if((addr&(~0x3FFF)) == MMU.DTCMRegion)
 		{
 			T1WriteLong(MMU.ARM9_DTCM, addr & 0x3FFC, val);
 #ifdef HAVE_LUA
 			CallRegisteredLuaMemHook(addr, 4, val, LUAMEMHOOK_WRITE);
+#endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 4, HOOK_WRITE);
 #endif
 			return;
 		}
@@ -934,6 +1029,9 @@ FORCEINLINE void _MMU_write32(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 #ifdef HAVE_LUA
 		CallRegisteredLuaMemHook(addr, 4, val, LUAMEMHOOK_WRITE);
 #endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 4, HOOK_WRITE);
+#endif
 		return;
 	}
 
@@ -941,6 +1039,9 @@ FORCEINLINE void _MMU_write32(const int PROCNUM, const MMU_ACCESS_TYPE AT, const
 	else _MMU_ARM7_write32(addr,val);
 #ifdef HAVE_LUA
 	CallRegisteredLuaMemHook(addr, 4, val, LUAMEMHOOK_WRITE);
+#endif
+#ifdef TARGET_INTERFACE
+    call_registered_interface_mem_hook(addr, 4, HOOK_WRITE);
 #endif
 }
 

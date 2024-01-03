@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2012-2018 DeSmuME Team
+	Copyright (C) 2012-2023 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -16,11 +16,11 @@
 	along with the this software.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define STRING_DESMUME_WEBSITE						"http://desmume.org"
+#define STRING_DESMUME_WEBSITE						"https://desmume.org"
 #define STRING_DESMUME_SHORT_DESCRIPTION			"Nintendo DS Emulator"
-#define STRING_DESMUME_FORUM_SITE					"http://forums.desmume.org/index.php"
-#define STRING_DESMUME_TECH_SUPPORT_SITE			"http://forums.desmume.org/viewforum.php?id=4"
-#define STRING_DESMUME_BUG_REPORT_SITE				"https://github.com/TASVideos/desmume/issues"
+#define STRING_DESMUME_FORUM_SITE					"https://forums.desmume.org/index.php"
+#define STRING_DESMUME_TECH_SUPPORT_SITE			"https://forums.desmume.org/viewforum.php?id=4"
+#define STRING_DESMUME_BUG_REPORT_SITE				"https://github.com/TASEmulators/desmume/issues"
 
 // User Interface Localized Strings
 #define NSSTRING_TITLE_OPEN_ROM_PANEL				NSLocalizedString(@"Open ROM", nil)
@@ -30,7 +30,7 @@
 #define NSSTRING_TITLE_EXPORT_ROM_SAVE_PANEL		NSLocalizedString(@"Export ROM Save File", nil)
 #define NSSTRING_TITLE_SELECT_ROM_PANEL				NSLocalizedString(@"Select ROM", nil)
 #define NSSTRING_TITLE_SELECT_ADVANSCENE_DB_PANEL	NSLocalizedString(@"Select ADVANsCEne Database", nil)
-#define NSSTRING_TITLE_SELECT_R4_CHEAT_DB_PANEL		NSLocalizedString(@"Select R4 Cheat Database", nil)
+#define NSSTRING_TITLE_OPEN_CHEAT_DB_PANEL			NSLocalizedString(@"Open Cheat Database", nil)
 #define NSSTRING_TITLE_SELECT_ARM7_IMAGE_PANEL		NSLocalizedString(@"Select ARM7 BIOS Image", nil)
 #define NSSTRING_TITLE_SELECT_ARM9_IMAGE_PANEL		NSLocalizedString(@"Select ARM9 BIOS Image", nil)
 #define NSSTRING_TITLE_SELECT_FIRMWARE_IMAGE_PANEL	NSLocalizedString(@"Select Firmware Image", nil)
@@ -46,8 +46,8 @@
 #define NSSTRING_TITLE_ENABLE_SPEED_LIMIT			NSLocalizedString(@"Enable Speed Limit", nil)
 #define NSSTRING_TITLE_DISABLE_AUTO_FRAME_SKIP		NSLocalizedString(@"Disable Auto Frame Skip", nil)
 #define NSSTRING_TITLE_ENABLE_AUTO_FRAME_SKIP		NSLocalizedString(@"Enable Auto Frame Skip", nil)
-#define NSSTRING_TITLE_DISABLE_CHEATS				NSLocalizedString(@"Disable Cheats", nil)
-#define NSSTRING_TITLE_ENABLE_CHEATS				NSLocalizedString(@"Enable Cheats", nil)
+#define NSSTRING_TITLE_DISABLE_CHEATS				NSLocalizedString(@"Disable Cheat System", nil)
+#define NSSTRING_TITLE_ENABLE_CHEATS				NSLocalizedString(@"Enable Cheat System", nil)
 #define NSSTRING_TITLE_DISABLE_HUD					NSLocalizedString(@"Disable HUD", nil)
 #define NSSTRING_TITLE_ENABLE_HUD					NSLocalizedString(@"Enable HUD", nil)
 #define NSSTRING_TITLE_EXIT_FULL_SCREEN				NSLocalizedString(@"Exit Full Screen", nil)
@@ -106,7 +106,7 @@
 #define NSSTRING_STATUS_HUD_ENABLED					NSLocalizedString(@"HUD enabled.", nil)
 #define NSSTRING_STATUS_VOLUME						NSLocalizedString(@"Volume: %1.1f%%", nil)
 #define NSSTRING_STATUS_NO_ROM_LOADED				NSLocalizedString(@"No ROM loaded.", nil)
-#define NSSTRING_STATUS_SIZE_BYTES					NSLocalizedString(@"%i bytes", nil)
+#define NSSTRING_STATUS_SIZE_BYTES					NSLocalizedString(@"%llu bytes", nil)
 
 #define NSSTRING_STATUS_EMULATION_NOT_RUNNING		NSLocalizedString(@"Emulation is not running.", nil)
 #define NSSTRING_STATUS_SLOT1_UNKNOWN_STATE			NSLocalizedString(@"Unknown state.", nil)
@@ -183,6 +183,8 @@
 #define MAX_VOLUME									100.0f
 #define MAX_BRIGHTNESS								100.0f
 
+#define MAX_FIXED_FRAMESKIP_VALUE					255
+
 #define CHEAT_DESCRIPTION_LENGTH					1024
 
 #define WINDOW_STATUS_BAR_HEIGHT					24		// Height of an emulation window status bar in pixels.
@@ -212,6 +214,13 @@
 #define RUMBLE_ITERATIONS_RUMBLE_PAK				2
 #define RUMBLE_ITERATIONS_ENABLE					1
 #define RUMBLE_ITERATIONS_TEST						3
+
+enum
+{
+	APP_APPEARANCEMODE_AUTOMATIC                    = 0,
+	APP_APPEARANCEMODE_LIGHT                        = 1,
+	APP_APPEARANCEMODE_DARK                         = 2
+};
 
 enum
 {
@@ -296,37 +305,8 @@ enum
 
 enum
 {
-	CHEAT_TYPE_INTERNAL								= 0,
-	CHEAT_TYPE_ACTION_REPLAY						= 1,
-	CHEAT_TYPE_CODE_BREAKER							= 2
-};
-
-enum
-{
-	CHEATSEARCH_SEARCHSTYLE_EXACT_VALUE				= 0,
-	CHEATSEARCH_SEARCHSTYLE_COMPARATIVE				= 1
-};
-
-enum
-{
-	CHEATSEARCH_COMPARETYPE_GREATER_THAN			= 0,
-	CHEATSEARCH_COMPARETYPE_LESSER_THAN				= 1,
-	CHEATSEARCH_COMPARETYPE_EQUALS_TO				= 2,
-	CHEATSEARCH_COMPARETYPE_NOT_EQUALS_TO			= 3
-};
-
-enum
-{
 	CHEATSEARCH_UNSIGNED							= 0,
 	CHEATSEARCH_SIGNED								= 1
-};
-
-enum
-{
-	CHEATEXPORT_ERROR_FILE_NOT_FOUND				= 1,
-	CHEATEXPORT_ERROR_WRONG_FILE_FORMAT				= 2,
-	CHEATEXPORT_ERROR_SERIAL_NOT_FOUND				= 3,
-	CHEATEXPORT_ERROR_EXPORT_FAILED					= 4
 };
 
 /*
@@ -345,7 +325,8 @@ enum
 	MESSAGE_SET_EMULATION_FLAGS,
 	
 	// Video Messages
-	MESSAGE_FETCH_AND_PUSH_VIDEO,
+	MESSAGE_FETCH_ONLY,
+	MESSAGE_FETCH_AND_PERFORM_ACTIONS,
 	MESSAGE_RECEIVE_GPU_FRAME,
 	MESSAGE_CHANGE_VIEW_PROPERTIES,
 	MESSAGE_REDRAW_VIEW,
@@ -385,4 +366,25 @@ enum
 {
 	PADDLE_CONTROL_RELATIVE = 0,
 	PADDLE_CONTROL_DIRECT
+};
+
+enum
+{
+	GPUClientFetchObjectIDMask_Async       = (1 << 0),
+	GPUClientFetchObjectIDMask_DisplayLink = (1 << 1),
+	GPUClientFetchObjectIDMask_OpenGL      = (1 << 2),
+	GPUClientFetchObjectIDMask_Metal       = (1 << 3),
+	GPUClientFetchObjectIDMask_macOS       = (1 << 4),
+	GPUClientFetchObjectIDMask_OpenEmu     = (1 << 5)
+};
+
+enum
+{
+	GPUClientFetchObjectID_Default            = 0,
+	GPUClientFetchObjectID_GenericAsync       = GPUClientFetchObjectIDMask_Async,
+	GPUClientFetchObjectID_GenericDisplayLink = GPUClientFetchObjectIDMask_Async | GPUClientFetchObjectIDMask_DisplayLink,
+	GPUClientFetchObjectID_GenericOpenGL      = GPUClientFetchObjectIDMask_Async | GPUClientFetchObjectIDMask_DisplayLink | GPUClientFetchObjectIDMask_OpenGL,
+	GPUClientFetchObjectID_MacOpenGL          = GPUClientFetchObjectIDMask_Async | GPUClientFetchObjectIDMask_DisplayLink | GPUClientFetchObjectIDMask_OpenGL | GPUClientFetchObjectIDMask_macOS,
+	GPUClientFetchObjectID_MacMetal           = GPUClientFetchObjectIDMask_Async | GPUClientFetchObjectIDMask_DisplayLink | GPUClientFetchObjectIDMask_Metal  | GPUClientFetchObjectIDMask_macOS,
+	GPUClientFetchObjectID_OpenEmu            = GPUClientFetchObjectIDMask_Async | GPUClientFetchObjectIDMask_DisplayLink | GPUClientFetchObjectIDMask_OpenGL | GPUClientFetchObjectIDMask_OpenEmu
 };

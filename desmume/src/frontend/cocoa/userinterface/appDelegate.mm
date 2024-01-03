@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2011-2018 DeSmuME Team
+	Copyright (C) 2011-2023 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@
 #import "inputPrefsView.h"
 
 #import "cocoa_core.h"
+#import "cocoa_cheat.h"
 #import "cocoa_GPU.h"
 #import "cocoa_file.h"
 #import "cocoa_firmware.h"
@@ -50,11 +51,15 @@
 @synthesize emuControlController;
 @synthesize prefWindowController;
 @synthesize cdsCoreController;
+@synthesize databaseFileController;
+@synthesize gameListController;
 @synthesize avCaptureToolDelegate;
 @synthesize wifiSettingsPanelDelegate;
 @synthesize migrationDelegate;
 
+@synthesize isAppRunningOnPowerPC;
 @synthesize isAppRunningOnIntel;
+@synthesize isAppRunningOnARM64;
 @synthesize isDeveloperPlusBuild;
 @synthesize didApplicationFinishLaunching;
 @synthesize delayedROMFileName;
@@ -67,11 +72,23 @@
 		return nil;
 	}
 	
-	// Determine if we're running on Intel or PPC.
+#if defined(__ppc__) || defined(__ppc64__)
+	isAppRunningOnPowerPC = YES;
+#else
+	isAppRunningOnPowerPC = NO;
+#endif
+	
+	// Determine if we're running on Intel or non-Intel (PowerPC or ARM64).
 #if defined(__i386__) || defined(__x86_64__)
 	isAppRunningOnIntel = YES;
 #else
 	isAppRunningOnIntel = NO;
+#endif
+	
+#if defined(__aarch64__)
+	isAppRunningOnARM64 = YES;
+#else
+	isAppRunningOnARM64 = NO;
 #endif
     
 #if defined(GDB_STUB)
@@ -85,6 +102,8 @@
 	
 	RGBA8888ToNSColorValueTransformer *nsColorTransformer = [[[RGBA8888ToNSColorValueTransformer alloc] init] autorelease];
 	[NSValueTransformer setValueTransformer:nsColorTransformer forName:@"RGBA8888ToNSColorValueTransformer"];
+	
+	[[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(handleSystemAppearanceThemeChange:) name:@"AppleInterfaceThemeChangedNotification" object:nil];
 	
 	return self;
 }
@@ -151,7 +170,12 @@
 	NSDictionary *prefsDict = [NSDictionary dictionaryWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"DefaultUserPrefs" ofType:@"plist"]];
 	if (prefsDict == nil)
 	{
-		[[NSAlert alertWithMessageText:NSSTRING_ALERT_CRITICAL_FILE_MISSING_PRI defaultButton:nil alternateButton:nil otherButton:nil informativeTextWithFormat:NSSTRING_ALERT_CRITICAL_FILE_MISSING_SEC] runModal];
+		NSAlert *criticalErrorAlert = [[[NSAlert alloc] init] autorelease];
+		[criticalErrorAlert setAlertStyle:ALERTSTYLE_CRITICAL];
+		[criticalErrorAlert setMessageText:NSSTRING_ALERT_CRITICAL_FILE_MISSING_PRI];
+		[criticalErrorAlert setInformativeText:NSSTRING_ALERT_CRITICAL_FILE_MISSING_SEC];
+		[criticalErrorAlert runModal];
+		
 		[NSApp terminate:nil];
 		return;
 	}
@@ -171,10 +195,10 @@
 	
 	[CocoaDSFile setupAllFilePaths];
 	
-	// On macOS v10.13 and later, some unwanted menu items will show up in the View menu.
+	// On macOS v10.12 and later, some unwanted menu items will show up in the View menu.
 	// Disable automatic window tabbing for all NSWindows in order to rid ourselves of
 	// these unwanted menu items.
-#if defined(MAC_OS_X_VERSION_10_13) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_13)
+#if defined(MAC_OS_X_VERSION_10_12) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_12)
 	if ([[NSWindow class] respondsToSelector:@selector(setAllowsAutomaticWindowTabbing:)])
 	{
 		[NSWindow setAllowsAutomaticWindowTabbing:NO];
@@ -192,15 +216,23 @@
 	buildInfoStr = [[buildInfoStr stringByAppendingString:@"\nOperating System: "] stringByAppendingString:[CocoaDSUtil operatingSystemString]];
 	buildInfoStr = [[buildInfoStr stringByAppendingString:@"\nModel Identifier: "] stringByAppendingString:[CocoaDSUtil modelIdentifierString]];
 	
-	NSFont *aboutTextFilesFont = [NSFont fontWithName:@"Monaco" size:10];
+	NSString *readMeTextData = [NSString stringWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@FILENAME_README ofType:@""] encoding:NSUTF8StringEncoding error:NULL];
+	NSString *licenseTextData = [NSString stringWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@FILENAME_COPYING ofType:@""] encoding:NSUTF8StringEncoding error:NULL];
+	NSString *authorsTextData = [NSString stringWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@FILENAME_AUTHORS ofType:@""] encoding:NSMacOSRomanStringEncoding error:NULL];
+	NSString *changeLogTextData = [NSString stringWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@FILENAME_CHANGELOG ofType:@""] encoding:NSMacOSRomanStringEncoding error:NULL];
+	
+	NSDictionary *aboutTextAttr = [NSDictionary dictionaryWithObjectsAndKeys:
+								   [NSColor controlTextColor], NSForegroundColorAttributeName,
+								   [NSFont fontWithName:@"Monaco" size:10], NSFontAttributeName,
+								   nil];
+	
 	NSMutableDictionary *aboutWindowProperties = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-												  [[NSBundle mainBundle] pathForResource:@FILENAME_README ofType:@""], @"readMePath",
-												  [[NSBundle mainBundle] pathForResource:@FILENAME_COPYING ofType:@""], @"licensePath",
-												  [[NSBundle mainBundle] pathForResource:@FILENAME_AUTHORS ofType:@""], @"authorsPath",
-												  [[NSBundle mainBundle] pathForResource:@FILENAME_CHANGELOG ofType:@""], @"changeLogPath",
+												  [[[NSAttributedString alloc] initWithString:readMeTextData attributes:aboutTextAttr] autorelease], @"readMeTextData",
+												  [[[NSAttributedString alloc] initWithString:licenseTextData attributes:aboutTextAttr] autorelease], @"licenseTextData",
+												  [[[NSAttributedString alloc] initWithString:authorsTextData attributes:aboutTextAttr] autorelease], @"authorsTextData",
+												  [[[NSAttributedString alloc] initWithString:changeLogTextData attributes:aboutTextAttr] autorelease], @"changeLogTextData",
 												  descriptionStr, @"descriptionString",
 												  buildInfoStr, @"buildInfoString",
-												  aboutTextFilesFont, @"aboutTextFilesFont",
 												  nil];
 	
 	[aboutWindowController setContent:aboutWindowProperties];
@@ -215,6 +247,7 @@
 	
 	// Init the DS emulation core.
 	CocoaDSCore *newCore = [[[CocoaDSCore alloc] init] autorelease];
+	[cdsCoreController setContent:newCore];
 	
 	// Init the DS controller.
 	[[newCore cdsController] setDelegate:emuControl];
@@ -232,7 +265,6 @@
 	[emuControl setCdsSpeaker:newSpeaker];
 	
 	// Set up all the object controllers.
-	[cdsCoreController setContent:newCore];
 	[prefWindowController setContent:[prefWindowDelegate bindings]];
 	
 	[emuControl appInit];
@@ -241,6 +273,13 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber10_6)
+	{
+		pthread_setname_np("App Main Thread");
+	}
+#endif
+	
 	EmuControllerDelegate *emuControl = (EmuControllerDelegate *)[emuControlController content];
 	
 	// Determine if the app was run for the first time.
@@ -276,6 +315,7 @@
 	// Bring the application to the front
 	[NSApp activateIgnoringOtherApps:YES];
 	[emuControl restoreDisplayWindowStates];
+	[emuControl updateCheatDatabaseRecentsMenu:nil];
 	
 	// Load a new ROM on launch per user preferences.
 	if ([[NSUserDefaults standardUserDefaults] objectForKey:@"General_AutoloadROMOnLaunch"] != nil)
@@ -352,6 +392,14 @@
 		[self application:NSApp openFile:[self delayedROMFileName]];
 		[self setDelayedROMFileName:nil];
 	}
+	
+	// Request hardware microphone permissions now. Hopefully, the user will address the
+	// permissions dialog before the ROM program actually needs the microphone input.
+	const NSInteger micPermStatus = [emuControl updateHostMicrophonePermissionStatus];
+	if (micPermStatus == 0) // (micPermStatus == AVAuthorizationStatusNotDetermined)
+	{
+		[emuControl changeHostMicrophonePermission:self];
+	}
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
@@ -388,6 +436,7 @@
 	[[NSUserDefaults standardUserDefaults] setDouble:[emuControl lastSetSpeedScalar] forKey:@"CoreControl_SpeedScalar"];
 	[[NSUserDefaults standardUserDefaults] setBool:[cdsCore isSpeedLimitEnabled] forKey:@"CoreControl_EnableSpeedLimit"];
 	[[NSUserDefaults standardUserDefaults] setBool:[cdsCore isFrameSkipEnabled] forKey:@"CoreControl_EnableAutoFrameSkip"];
+	[[NSUserDefaults standardUserDefaults] setInteger:[cdsCore framesToSkipSetting] forKey:@"CoreControl_FramesToSkipSetting"];
 	[[NSUserDefaults standardUserDefaults] setBool:[cdsCore isCheatingEnabled] forKey:@"CoreControl_EnableCheats"];
 	
 #ifdef GDB_STUB
@@ -430,6 +479,15 @@
 	[troubleshootingWindow makeKeyAndOrderFront:sender];
 }
 
+- (IBAction) changeAppAppearance:(id)sender
+{
+	const NSInteger appAppearanceMode = [CocoaDSUtil getIBActionSenderTag:sender];
+	[[NSUserDefaults standardUserDefaults] setInteger:appAppearanceMode forKey:@"Debug_AppAppearanceMode"];
+	[[NSUserDefaults standardUserDefaults] synchronize];
+	
+	[self handleSystemAppearanceThemeChange:nil];
+}
+
 #pragma mark Class Methods
 - (void) setupSlotMenuItems
 {
@@ -444,7 +502,7 @@
 		[loadItem setAction:@selector(loadEmuSaveStateSlot:)];
 		
 		saveItem = [self addSlotMenuItem:mSaveStateSlot slotNumber:(NSUInteger)(i + 1)];
-		[saveItem setKeyEquivalentModifierMask:NSShiftKeyMask];
+		[saveItem setKeyEquivalentModifierMask:EVENT_MODIFIERFLAG_SHIFT];
 		[saveItem setTag:i];
 		[saveItem setAction:@selector(saveEmuSaveStateSlot:)];
 	}
@@ -517,12 +575,6 @@
 	[cdsCore setEmuFlagEmulateEnsata:[[NSUserDefaults standardUserDefaults] boolForKey:@"Emulation_EmulateEnsata"]];
 	[cdsCore setEmuFlagDebugConsole:[[NSUserDefaults standardUserDefaults] boolForKey:@"Emulation_UseDebugConsole"]];
 	
-	// If we're not running on Intel, force the CPU emulation engine to use the interpreter engine.
-	if (!isAppRunningOnIntel)
-	{
-		[[NSUserDefaults standardUserDefaults] setInteger:CPUEmulationEngineID_Interpreter forKey:@"Emulation_CPUEmulationEngine"];
-	}
-	
 	// Set the CPU emulation engine per user preferences.
 	[cdsCore setCpuEmulationEngine:[[NSUserDefaults standardUserDefaults] integerForKey:@"Emulation_CPUEmulationEngine"]];
 	[cdsCore setMaxJITBlockSize:[[NSUserDefaults standardUserDefaults] integerForKey:@"Emulation_MaxJITBlockSize"]];
@@ -536,6 +588,7 @@
 	[emuControl changeCoreSpeedWithDouble:[[NSUserDefaults standardUserDefaults] doubleForKey:@"CoreControl_SpeedScalar"]];
 	[cdsCore setIsSpeedLimitEnabled:[[NSUserDefaults standardUserDefaults] boolForKey:@"CoreControl_EnableSpeedLimit"]];
 	[cdsCore setIsFrameSkipEnabled:[[NSUserDefaults standardUserDefaults] boolForKey:@"CoreControl_EnableAutoFrameSkip"]];
+	[cdsCore setFramesToSkipSetting:[[NSUserDefaults standardUserDefaults] integerForKey:@"CoreControl_FramesToSkipSetting"]];
 	[cdsCore setIsCheatingEnabled:[[NSUserDefaults standardUserDefaults] boolForKey:@"CoreControl_EnableCheats"]];
 	
 	// Set up the firmware per user preferences.
@@ -675,6 +728,35 @@
 	
 	// Set up the preferences window.
 	[prefWindowDelegate setupUserDefaults];
+}
+
+- (void) handleSystemAppearanceThemeChange:(NSNotification *) notification
+{
+	EmuControllerDelegate *emuControl = (EmuControllerDelegate *)[emuControlController content];
+	PreferencesWindowDelegate *prefWindowDelegate = (PreferencesWindowDelegate *)[prefWindow delegate];
+	
+	[emuControl handleAppearanceChange];
+	[prefWindowDelegate handleAppearanceChange];
+}
+
+#pragma mark NSUserInterfaceValidations Protocol
+
+- (BOOL)validateUserInterfaceItem:(id <NSValidatedUserInterfaceItem>)theItem
+{
+	BOOL enable = YES;
+	const SEL theAction = [theItem action];
+	
+	if (theAction == @selector(changeAppAppearance:))
+	{
+		const NSInteger appAppearanceMode = [[NSUserDefaults standardUserDefaults] integerForKey:@"Debug_AppAppearanceMode"];
+		
+		if ([(id)theItem isMemberOfClass:[NSMenuItem class]])
+		{
+			[(NSMenuItem*)theItem setState:([theItem tag] == appAppearanceMode) ? GUI_STATE_ON : GUI_STATE_OFF];
+		}
+	}
+	
+	return enable;
 }
 
 @end

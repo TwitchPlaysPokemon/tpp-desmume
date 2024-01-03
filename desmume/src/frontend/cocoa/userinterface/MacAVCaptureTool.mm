@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2018 DeSmuME team
+	Copyright (C) 2018-2022 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -90,9 +90,10 @@ static AVFrame *get_video_frame(OutputStream *ost)
 	
 	return ost->frame;
 }
-
+*/
 FFmpegFileStream::FFmpegFileStream()
 {
+	/*
 	memset(&_videoStream, 0, sizeof(OutputStream));
 	memset(&_audioStream, 0, sizeof(OutputStream));
 	
@@ -100,13 +101,14 @@ FFmpegFileStream::FFmpegFileStream()
 	_outputCtx = NULL;
 	_audioCodec = NULL;
 	_videoCodec = NULL;
+	*/
 }
 
 FFmpegFileStream::~FFmpegFileStream()
 {
 	this->Close(FSCA_WriteRemainingInQueue);
 }
-
+/*
 AVFrame* FFmpegFileStream::_InitVideoFrame(const int pixFormat, const int videoWidth, const int videoHeight)
 {
 	AVFrame *theFrame = av_frame_alloc();
@@ -176,9 +178,10 @@ void FFmpegFileStream::_CloseStream(OutputStream *outStream)
 	swr_free(&outStream->swr_ctx);
 	outStream->swr_ctx = NULL;
 }
-
+*/
 void FFmpegFileStream::_CloseStreams()
 {
+	/*
 	// Write the trailer, if any. The trailer must be written before you
 	// close the CodecContexts open when you wrote the header; otherwise
 	// av_write_trailer() may try to use memory that was freed on
@@ -195,11 +198,13 @@ void FFmpegFileStream::_CloseStreams()
 	{
 		this->_CloseStream(&this->_audioStream);
 	}
+	*/
 }
 
 ClientAVCaptureError FFmpegFileStream::_SendStreamFrame(OutputStream *outStream)
 {
 	ClientAVCaptureError error = ClientAVCaptureError_None;
+	/*
 	bool gotValidPacket = false;
 	
 	int result = 0;
@@ -245,12 +250,13 @@ ClientAVCaptureError FFmpegFileStream::_SendStreamFrame(OutputStream *outStream)
 		av_free(thePacket.data);
 		av_packet_unref(&thePacket);
 	}
-	
+	*/
 	return error;
 }
 
 void FFmpegFileStream::_LogPacket(const AVPacket *thePacket)
 {
+	/*
 	AVRational *time_base = &this->_outputCtx->streams[thePacket->stream_index]->time_base;
 	
 	printf("pts:%s pts_time:%s dts:%s dts_time:%s duration:%s duration_time:%s stream_index:%d\n",
@@ -258,11 +264,13 @@ void FFmpegFileStream::_LogPacket(const AVPacket *thePacket)
 		   av_ts2str(thePacket->dts), av_ts2timestr(thePacket->dts, time_base),
 		   av_ts2str(thePacket->duration), av_ts2timestr(thePacket->duration, time_base),
 		   thePacket->stream_index);
+	*/
 }
 
 ClientAVCaptureError FFmpegFileStream::Open()
 {
 	ClientAVCaptureError error = ClientAVCaptureError_None;
+	/*
 	int result = 0;
 	AVDictionary *containerOptions = NULL;
 	AVDictionary *videoOptions = NULL;
@@ -758,7 +766,7 @@ ClientAVCaptureError FFmpegFileStream::Open()
 		error = ClientAVCaptureError_FileOpenError;
 		return error;
 	}
-	
+	*/
 	return error;
 }
 
@@ -814,8 +822,8 @@ void FFmpegFileStream::Close(FileStreamCloseAction theAction)
 					ssem_signal(this->_semQueue);
 					
 				} while (true);
-				*
-				
+				*/
+				/*
 				AVPacket thePacket = { 0 };
 				int result = 0;
 				
@@ -878,6 +886,7 @@ void FFmpegFileStream::Close(FileStreamCloseAction theAction)
 						}
 					}
 				}
+				*/
 			}
 			break;
 		}
@@ -888,7 +897,7 @@ void FFmpegFileStream::Close(FileStreamCloseAction theAction)
 	}
 	
 	this->_CloseStreams();
-	
+	/*
 	// Close the output file.
 	if (!(this->_outputFormat->flags & AVFMT_NOFILE))
 	{
@@ -898,19 +907,20 @@ void FFmpegFileStream::Close(FileStreamCloseAction theAction)
 	// free the stream
 	avformat_free_context(this->_outputCtx);
 	this->_outputCtx = NULL;
-	
+	*/
 	printf("AV recording complete.\n");
 }
 
 bool FFmpegFileStream::IsValid()
 {
-	return (this->_outputCtx != NULL);
+	//return (this->_outputCtx != NULL);
+	return false;
 }
 
 ClientAVCaptureError FFmpegFileStream::FlushVideo(uint8_t *srcBuffer, const size_t bufferSize)
 {
 	ClientAVCaptureError error = ClientAVCaptureError_None;
-	
+	/*
 	int result = 0;
 	AVCodecContext *codecCtx = this->_videoStream.enc;
 	
@@ -942,14 +952,14 @@ ClientAVCaptureError FFmpegFileStream::FlushVideo(uint8_t *srcBuffer, const size
 	{
 		return error;
 	}
-	
+	*/
 	return error;
 }
 
 ClientAVCaptureError FFmpegFileStream::FlushAudio(uint8_t *srcBuffer, const size_t bufferSize)
 {
 	ClientAVCaptureError error = ClientAVCaptureError_None;
-	
+	/*
 	int result = 0;
 	AVCodecContext *codecCtx = this->_audioStream.enc;
 	const size_t sampleSize = sizeof(int16_t) * 2;
@@ -1035,7 +1045,7 @@ ClientAVCaptureError FFmpegFileStream::FlushAudio(uint8_t *srcBuffer, const size
 			this->_audioStream.inBufferOffset = 0;
 		}
 	}
-	
+	*/
 	return error;
 }
 
@@ -1061,13 +1071,13 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 	const size_t futureFrameSize = this->_writtenBytes + this->_expectedMaxFrameSize;
 	if (futureFrameSize >= this->_maxSegmentSize)
 	{
-		AVFormatContext *oldContext = this->_outputCtx;
+		//AVFormatContext *oldContext = this->_outputCtx;
 		
 		this->_CloseStreams();
 		this->_segmentNumber++;
 		
 		error = this->Open();
-		
+		/*
 		// Close the output file.
 		if (!(oldContext->flags & AVFMT_NOFILE))
 		{
@@ -1075,7 +1085,7 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 		}
 		
 		avformat_free_context(oldContext);
-		
+		*/
 		if (error)
 		{
 			puts("Error creating new AVI segment.");
@@ -1086,7 +1096,7 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 	
 	return error;
 }
-*/
+
 @implementation MacAVCaptureToolDelegate
 
 @synthesize recordButton;
@@ -1232,20 +1242,16 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 
 - (void) setVideoSizeUsingEmulatorSettings
 {
+	GPUClientFetchObject *currentFetchObj = [self fetchObject];
+	
 	// Do a few sanity checks before proceeding.
-	if ([self sharedData] == nil)
+	if (currentFetchObj == NULL)
 	{
 		return;
 	}
 	
-	GPUClientFetchObject *fetchObject = [[self sharedData] GPUFetchObject];
-	if (fetchObject == NULL)
-	{
-		return;
-	}
-	
-	const u8 lastBufferIndex = fetchObject->GetLastFetchIndex();
-	const NDSDisplayInfo &displayInfo = fetchObject->GetFetchDisplayInfoForBufferIndex(lastBufferIndex);
+	const u8 lastBufferIndex = currentFetchObj->GetLastFetchIndex();
+	const NDSDisplayInfo &displayInfo = currentFetchObj->GetFetchDisplayInfoForBufferIndex(lastBufferIndex);
 	
 	double normalWidth = 0.0;
 	double normalHeight = 0.0;
@@ -1298,6 +1304,8 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 
 - (void) openFileStream
 {
+	GPUClientFetchObject *currentFetchObj = [self fetchObject];
+	
 	// One final check for the video size if we're using the emulator settings.
 	if (videoSizeOption == VideoSizeOption_UseEmulatorSettings)
 	{
@@ -1305,13 +1313,7 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 	}
 	
 	// Do a few sanity checks before proceeding.
-	if ([self sharedData] == nil)
-	{
-		return;
-	}
-	
-	GPUClientFetchObject *fetchObject = [[self sharedData] GPUFetchObject];
-	if (fetchObject == NULL)
+	if (currentFetchObj == NULL)
 	{
 		return;
 	}
@@ -1346,10 +1348,10 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 	// Set up the rendering properties.
 	MacCaptureToolParams param;
 	param.refObject					= newCaptureObject;
-	param.sharedData				= [self sharedData];
+	param.fetchObject				= currentFetchObj;
 	param.formatID					= [self formatID];
-	param.savePath					= std::string([savePath cStringUsingEncoding:NSUTF8StringEncoding]);
-	param.romName					= std::string([romName cStringUsingEncoding:NSUTF8StringEncoding]);
+	param.savePath					= std::string([CocoaDSUtil cPathFromFilePath:savePath]);
+	param.romName					= std::string([CocoaDSUtil cPathFromFilePath:romName]);
 	param.useDeposterize			= [self useDeposterize] ? true : false;
 	param.outputFilterID			= (OutputFilterTypeID)[self outputFilterID];
 	param.pixelScalerID				= (VideoFilterTypeID)[self pixelScalerID];
@@ -1362,8 +1364,8 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 	param.cdpProperty.clientWidth	= [self videoWidth];
 	param.cdpProperty.clientHeight	= [self videoHeight];
 	
-	const u8 lastBufferIndex = fetchObject->GetLastFetchIndex();
-	const NDSDisplayInfo &displayInfo = fetchObject->GetFetchDisplayInfoForBufferIndex(lastBufferIndex);
+	const u8 lastBufferIndex = currentFetchObj->GetLastFetchIndex();
+	const NDSDisplayInfo &displayInfo = currentFetchObj->GetFetchDisplayInfoForBufferIndex(lastBufferIndex);
 	
 	if ( (displayInfo.renderedWidth[NDSDisplayID_Main]  == 0) || (displayInfo.renderedHeight[NDSDisplayID_Main]  == 0) ||
 	     (displayInfo.renderedWidth[NDSDisplayID_Touch] == 0) || (displayInfo.renderedHeight[NDSDisplayID_Touch] == 0) )
@@ -1381,10 +1383,10 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 	NSString *fileNameNSString = [[dateFormatter stringFromDate:[NSDate date]] stringByAppendingString:[NSString stringWithCString:param.romName.c_str() encoding:NSUTF8StringEncoding]];
 	[dateFormatter release];
 	
-	std::string fileName = param.savePath + "/" + std::string([fileNameNSString cStringUsingEncoding:NSUTF8StringEncoding]);
+	NSString *savePathNSString = [CocoaDSUtil filePathFromCPath:param.savePath.c_str()];
+	std::string fileName = std::string([CocoaDSUtil cPathFromFilePath:[savePathNSString stringByAppendingPathComponent:fileNameNSString]]);
 	
 	// Create the output file stream.
-	/*
 	ClientAVCaptureError error = ClientAVCaptureError_None;
 	FFmpegFileStream *ffmpegFS = new FFmpegFileStream;
 	
@@ -1410,7 +1412,6 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 		
 		_videoCaptureOutput = newVideoCaptureObject;
 	}
-	*/
 }
 
 - (void) closeFileStream
@@ -1463,7 +1464,13 @@ ClientAVCaptureError FFmpegFileStream::WriteOneFrame(const AVStreamWriteParam &p
 
 static void* RunAVCaptureCloseThread(void *arg)
 {
-	/*
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
+	if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber10_6)
+	{
+		pthread_setname_np("AVCapture Close");
+	}
+#endif
+	
 	ClientAVCaptureObject *captureObject = (ClientAVCaptureObject *)arg;
 	FFmpegFileStream *ffmpegFS = (FFmpegFileStream *)captureObject->GetOutputFileStream();
 	
@@ -1473,6 +1480,6 @@ static void* RunAVCaptureCloseThread(void *arg)
 	delete captureObject;
 	
 	[[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:@"org.desmume.DeSmuME.avFileStreamCloseFinish" object:nil userInfo:nil];
-	*/
+	
 	return NULL;
 }

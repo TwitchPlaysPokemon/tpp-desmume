@@ -195,7 +195,7 @@ void SoundView_Refresh(bool forceRedraw)
 			sprintf(buf, "$%04X (%.1f Hz)", thischan.timer, (ARM7_CLOCK/2) / (double)(0x10000 - thischan.timer));
 			SetDlgItemText(hDlg, IDC_SOUND0TMR+chanId, buf);
 
-			sprintf(buf, "samp #%d / #%d", sputrunc(thischan.sampcnt), thischan.totlength << format_shift[thischan.format]);
+			sprintf(buf, "samp #%d / #%d", thischan.sampcntInt, thischan.totlength_shifted);
 			SetDlgItemText(hDlg, IDC_SOUND0POSLEN+chanId, buf);
 		}
 		else {
@@ -371,7 +371,7 @@ INT_PTR CALLBACK LevelBarProc(HWND hBar, UINT msg, WPARAM wParam, LPARAM lParam)
 		u8 chan = (u8)GetProp(hBar, "chan");
 		PAINTSTRUCT ps;
 		HDC hdc = BeginPaint(hBar, &ps);
-		u32 vol =  volBar[chan + chanOfs()];
+		int vol =  volBar[chan + chanOfs()];
 		if (vol > 0)
 		{
 			RECT rc = {0, 0, vol, ps.rcPaint.bottom};

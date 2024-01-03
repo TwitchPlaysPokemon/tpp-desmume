@@ -23,6 +23,9 @@
 ClientDisplayPresenter::ClientDisplayPresenter()
 {
 	_fetchObject = NULL;
+	_lastFontFilePath = NULL;
+	_hudFontFileCache = NULL;
+	_hudFontFileCacheSize = 0;
 	
 	ClientDisplayPresenterProperties defaultProperty;
 	defaultProperty.normalWidth		= GPU_FRAMEBUFFER_NATIVE_WIDTH;
@@ -58,13 +61,20 @@ ClientDisplayPresenter::~ClientDisplayPresenter()
 		this->_ftLibrary = NULL;
 	}
 	
+	if (this->_hudFontFileCache != NULL)
+	{
+		free(this->_hudFontFileCache);
+		this->_hudFontFileCache = NULL;
+		this->_hudFontFileCacheSize = 0;
+	}
+	
 	pthread_mutex_destroy(&this->_mutexHUDString);
 }
 
 void ClientDisplayPresenter::__InstanceInit(const ClientDisplayPresenterProperties &props)
 {
-	_stagedProperty = props;
-	_renderProperty = _stagedProperty;
+	_propsPending = props;
+	_propsApplied = _propsPending;
 	
 	_useDeposterize = false;
 	_pixelScaler = VideoFilterTypeID_None;
@@ -80,6 +90,7 @@ void ClientDisplayPresenter::__InstanceInit(const ClientDisplayPresenterProperti
 	_scaleFactor = 1.0;
 	
 	_hudObjectScale = 1.0;
+	_isHUDRenderMipmapped = false;
 	_isHUDVisible = false;
 	_showExecutionSpeed = false;
 	_showVideoFPS = true;
@@ -265,14 +276,14 @@ void ClientDisplayPresenter::_UpdateClientSize()
 
 void ClientDisplayPresenter::_UpdateViewScale()
 {
-	double checkWidth = this->_renderProperty.normalWidth;
-	double checkHeight = this->_renderProperty.normalHeight;
-	ClientDisplayPresenter::ConvertNormalToTransformedBounds(1.0, this->_renderProperty.rotation, checkWidth, checkHeight);
-	this->_renderProperty.viewScale = ClientDisplayPresenter::GetMaxScalarWithinBounds(checkWidth, checkHeight, this->_renderProperty.clientWidth, this->_renderProperty.clientHeight);
+	double checkWidth = this->_propsApplied.normalWidth;
+	double checkHeight = this->_propsApplied.normalHeight;
+	ClientDisplayPresenter::ConvertNormalToTransformedBounds(1.0, this->_propsApplied.rotation, checkWidth, checkHeight);
+	this->_propsApplied.viewScale = ClientDisplayPresenter::GetMaxScalarWithinBounds(checkWidth, checkHeight, this->_propsApplied.clientWidth, this->_propsApplied.clientHeight);
 	
-	const double logicalClientWidth = this->_renderProperty.clientWidth / this->_scaleFactor;
+	const double logicalClientWidth = this->_propsApplied.clientWidth / this->_scaleFactor;
 	
-	this->_hudObjectScale = logicalClientWidth / this->_renderProperty.normalWidth;
+	this->_hudObjectScale = logicalClientWidth / this->_propsApplied.normalWidth;
 	if (this->_hudObjectScale > 1.74939175)
 	{
 		// If the view scale is <= 1.74939175, we scale the HUD objects linearly. Otherwise, we scale
@@ -286,30 +297,30 @@ void ClientDisplayPresenter::_UpdateViewScale()
 // NDS screen layout
 const ClientDisplayPresenterProperties& ClientDisplayPresenter::GetPresenterProperties() const
 {
-	return this->_renderProperty;
+	return this->_propsApplied;
 }
 
 void ClientDisplayPresenter::CommitPresenterProperties(const ClientDisplayPresenterProperties &props)
 {
-	this->_stagedProperty = props;
+	this->_propsPending = props;
 }
 
 void ClientDisplayPresenter::SetupPresenterProperties()
 {
 	// Validate the staged properties.
-	this->_stagedProperty.gapDistance = (double)DS_DISPLAY_UNSCALED_GAP * this->_stagedProperty.gapScale;
-	ClientDisplayPresenter::CalculateNormalSize(this->_stagedProperty.mode, this->_stagedProperty.layout, this->_stagedProperty.gapScale, this->_stagedProperty.normalWidth, this->_stagedProperty.normalHeight);
+	this->_propsPending.gapDistance = (double)DS_DISPLAY_UNSCALED_GAP * this->_propsPending.gapScale;
+	ClientDisplayPresenter::CalculateNormalSize(this->_propsPending.mode, this->_propsPending.layout, this->_propsPending.gapScale, this->_propsPending.normalWidth, this->_propsPending.normalHeight);
 	
-	const bool didNormalSizeChange = (this->_renderProperty.mode != this->_stagedProperty.mode) ||
-	                                 (this->_renderProperty.layout != this->_stagedProperty.layout) ||
-	                                 (this->_renderProperty.gapScale != this->_stagedProperty.gapScale);
+	const bool didNormalSizeChange = (this->_propsApplied.mode != this->_propsPending.mode) ||
+	                                 (this->_propsApplied.layout != this->_propsPending.layout) ||
+	                                 (this->_propsApplied.gapScale != this->_propsPending.gapScale);
 	
-	const bool didOrderChange = (this->_renderProperty.order != this->_stagedProperty.order);
-	const bool didRotationChange = (this->_renderProperty.rotation != this->_stagedProperty.rotation);
-	const bool didClientSizeChange = (this->_renderProperty.clientWidth != this->_stagedProperty.clientWidth) || (this->_renderProperty.clientHeight != this->_stagedProperty.clientHeight);
+	const bool didOrderChange = (this->_propsApplied.order != this->_propsPending.order);
+	const bool didRotationChange = (this->_propsApplied.rotation != this->_propsPending.rotation);
+	const bool didClientSizeChange = (this->_propsApplied.clientWidth != this->_propsPending.clientWidth) || (this->_propsApplied.clientHeight != this->_propsPending.clientHeight);
 	
 	// Copy the staged properties to the current rendering properties.
-	this->_renderProperty = this->_stagedProperty;
+	this->_propsApplied = this->_propsPending;
 	
 	// Update internal states based on the new render properties
 	this->_UpdateViewScale();
@@ -346,37 +357,37 @@ void ClientDisplayPresenter::SetupPresenterProperties()
 
 double ClientDisplayPresenter::GetRotation() const
 {
-	return this->_renderProperty.rotation;
+	return this->_propsApplied.rotation;
 }
 
 double ClientDisplayPresenter::GetViewScale() const
 {
-	return this->_renderProperty.viewScale;
+	return this->_propsApplied.viewScale;
 }
 
 ClientDisplayMode ClientDisplayPresenter::GetMode() const
 {
-	return this->_renderProperty.mode;
+	return this->_propsApplied.mode;
 }
 
 ClientDisplayLayout ClientDisplayPresenter::GetLayout() const
 {
-	return this->_renderProperty.layout;
+	return this->_propsApplied.layout;
 }
 
 ClientDisplayOrder ClientDisplayPresenter::GetOrder() const
 {
-	return this->_renderProperty.order;
+	return this->_propsApplied.order;
 }
 
 double ClientDisplayPresenter::GetGapScale() const
 {
-	return this->_renderProperty.gapScale;
+	return this->_propsApplied.gapScale;
 }
 
 double ClientDisplayPresenter::GetGapDistance() const
 {
-	return this->_renderProperty.gapDistance;
+	return this->_propsApplied.gapDistance;
 }
 
 ClientDisplaySource ClientDisplayPresenter::GetDisplayVideoSource(const NDSDisplayID displayID) const
@@ -478,7 +489,36 @@ void ClientDisplayPresenter::LoadHUDFont()
 	FT_Face fontFace;
 	FT_Error error = FT_Err_Ok;
 	
-	error = FT_New_Face(this->_ftLibrary, this->_lastFontFilePath, 0, &fontFace);
+	// Cache the entire font file in memory just in case the client needs to repeatedly
+	// reload the font. Font files are small (usually less than 1MB), so we shouldn't be
+	// wasting too much memory by doing this.
+	if (this->_hudFontFileCache == NULL)
+	{
+		FILE *fp = fopen(this->_lastFontFilePath, "rb");
+		if (fp == NULL)
+		{
+			return;
+		}
+		
+		// Do some basic validation of the font file.
+		fseek(fp, 0, SEEK_END);
+		const size_t fileSize = ftell(fp);
+		
+		this->_hudFontFileCache = (uint8_t *)malloc(fileSize);
+		fseek(fp, 0, SEEK_SET);
+		this->_hudFontFileCacheSize = fread(this->_hudFontFileCache, 1, fileSize, fp);
+		fclose(fp);
+		
+		if (this->_hudFontFileCacheSize != fileSize)
+		{
+			free(this->_hudFontFileCache);
+			this->_hudFontFileCache = NULL;
+			this->_hudFontFileCacheSize = 0;
+			return;
+		}
+	}
+	
+	error = FT_New_Memory_Face(this->_ftLibrary, this->_hudFontFileCache, this->_hudFontFileCacheSize, 0, &fontFace);
 	if (error == FT_Err_Unknown_File_Format)
 	{
 		printf("ClientDisplayPresenter: FreeType failed to load font face because it is in an unknown format from:\n%s\n", this->_lastFontFilePath);
@@ -525,6 +565,17 @@ float ClientDisplayPresenter::GetHUDObjectScale() const
 void ClientDisplayPresenter::SetHUDObjectScale(float objectScale)
 {
 	this->_hudObjectScale = objectScale;
+}
+
+
+bool ClientDisplayPresenter::WillHUDRenderMipmapped() const
+{
+	return this->_isHUDRenderMipmapped;
+}
+
+void ClientDisplayPresenter::SetHUDRenderMipmapped(const bool mipmapState)
+{
+	this->_isHUDRenderMipmapped = mipmapState;
 }
 
 bool ClientDisplayPresenter::GetHUDVisibility() const
@@ -942,8 +993,8 @@ void ClientDisplayPresenter::LoadDisplays()
 			break;
 	}
 	
-	const bool loadMainScreen  = this->_isSelectedDisplayEnabled[NDSDisplayID_Main]  && ((this->_renderProperty.mode == ClientDisplayMode_Main)  || (this->_renderProperty.mode == ClientDisplayMode_Dual));
-	const bool loadTouchScreen = this->_isSelectedDisplayEnabled[NDSDisplayID_Touch] && ((this->_renderProperty.mode == ClientDisplayMode_Touch) || (this->_renderProperty.mode == ClientDisplayMode_Dual)) && (this->_selectedSourceForDisplay[NDSDisplayID_Main] != this->_selectedSourceForDisplay[NDSDisplayID_Touch]);
+	const bool loadMainScreen  = this->_isSelectedDisplayEnabled[NDSDisplayID_Main]  && ((this->_propsApplied.mode == ClientDisplayMode_Main)  || (this->_propsApplied.mode == ClientDisplayMode_Dual));
+	const bool loadTouchScreen = this->_isSelectedDisplayEnabled[NDSDisplayID_Touch] && ((this->_propsApplied.mode == ClientDisplayMode_Touch) || (this->_propsApplied.mode == ClientDisplayMode_Dual)) && (this->_selectedSourceForDisplay[NDSDisplayID_Main] != this->_selectedSourceForDisplay[NDSDisplayID_Touch]);
 	
 	if (loadMainScreen)
 	{
@@ -1310,9 +1361,9 @@ void ClientDisplayViewInterface::FlushAndFinalizeImmediate()
 // Touch screen input handling
 void ClientDisplayViewInterface::GetNDSPoint(const ClientDisplayPresenterProperties &props,
 											 const double logicalClientWidth, const double logicalClientHeight,
-											 const int inputID, const bool isInitialTouchPress,
 											 const double clientX, const double clientY,
-											 uint8_t &outX, uint8_t &outY) const
+											 const bool isInitialTouchPress,
+											 uint8_t &outX, uint8_t &outY, bool &outTouchPressInMajorDisplay)
 {
 	double x = clientX;
 	double y = clientY;
@@ -1349,10 +1400,10 @@ void ClientDisplayViewInterface::GetNDSPoint(const ClientDisplayPresenterPropert
 				if (isInitialTouchPress)
 				{
 					const bool isClickWithinMajorDisplay = (props.order == ClientDisplayOrder_TouchFirst) && (x >= 0.0) && (x < 256.0);
-					(*_initialTouchInMajorDisplay)[inputID] = isClickWithinMajorDisplay;
+					outTouchPressInMajorDisplay = isClickWithinMajorDisplay;
 				}
 				
-				const bool handleClickInMajorDisplay = (*_initialTouchInMajorDisplay)[inputID];
+				const bool handleClickInMajorDisplay = outTouchPressInMajorDisplay;
 				if (!handleClickInMajorDisplay)
 				{
 					const double minorDisplayScale = (props.normalWidth - (double)GPU_FRAMEBUFFER_NATIVE_WIDTH) / (double)GPU_FRAMEBUFFER_NATIVE_WIDTH;
@@ -1396,6 +1447,23 @@ void ClientDisplayViewInterface::GetNDSPoint(const ClientDisplayPresenterPropert
 	
 	outX = (u8)(x + 0.001);
 	outY = (u8)(y + 0.001);
+}
+
+void ClientDisplayViewInterface::GetNDSPoint(const ClientDisplayPresenterProperties &props,
+											 const double logicalClientWidth, const double logicalClientHeight,
+											 const double clientX, const double clientY,
+											 const int inputID, const bool isInitialTouchPress,
+											 uint8_t &outX, uint8_t &outY) const
+{
+	bool isClickInMajorDisplay = (*this->_initialTouchInMajorDisplay)[inputID];
+	
+	ClientDisplayViewInterface::GetNDSPoint(props,
+											logicalClientWidth, logicalClientHeight,
+											clientX, clientY,
+											isInitialTouchPress,
+											outX, outY, isClickInMajorDisplay);
+	
+	(*this->_initialTouchInMajorDisplay)[inputID] = isClickInMajorDisplay;
 }
 
 /********************************************************************************************
@@ -1647,16 +1715,16 @@ void ClientDisplay3DPresenter::SetHUDTouchLinePositionVertices(float *vtxBufferP
 {
 	const float x = (this->_ndsFrameInfo.inputStatesApplied.Touch == 0) ? this->_ndsFrameInfo.touchLocXApplied : this->_ndsFrameInfo.touchLocXPending;
 	const float y = 191.0f - ((this->_ndsFrameInfo.inputStatesApplied.Touch == 0) ? this->_ndsFrameInfo.touchLocYApplied : this->_ndsFrameInfo.touchLocYPending);
-	const float w = this->_renderProperty.normalWidth / 2.0f;
-	const float h = this->_renderProperty.normalHeight / 2.0f;
+	const float w = this->_propsApplied.normalWidth / 2.0f;
+	const float h = this->_propsApplied.normalHeight / 2.0f;
 	
-	if (this->_renderProperty.mode == ClientDisplayMode_Dual)
+	if (this->_propsApplied.mode == ClientDisplayMode_Dual)
 	{
-		switch (this->_renderProperty.layout)
+		switch (this->_propsApplied.layout)
 		{
 			case ClientDisplayLayout_Horizontal:
 			{
-				if (this->_renderProperty.order == ClientDisplayOrder_MainFirst)
+				if (this->_propsApplied.order == ClientDisplayOrder_MainFirst)
 				{
 					vtxBufferPtr[0]		=  x;															vtxBufferPtr[1]		=  h;						// Vertical line, top left
 					vtxBufferPtr[2]		=  x + 1.0f;													vtxBufferPtr[3]		=  h;						// Vertical line, top right
@@ -1697,7 +1765,7 @@ void ClientDisplay3DPresenter::SetHUDTouchLinePositionVertices(float *vtxBufferP
 				vtxBufferPtr[12]	=  w;																vtxBufferPtr[13]	= -h + (y/2.0f);			// Minor bottom display, horizontal line, bottom right
 				vtxBufferPtr[14]	= -w + (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;							vtxBufferPtr[15]	= -h + (y/2.0f);			// Minor bottom display, horizontal line, bottom left
 				
-				if (this->_renderProperty.order == ClientDisplayOrder_MainFirst)
+				if (this->_propsApplied.order == ClientDisplayOrder_MainFirst)
 				{
 					memcpy(vtxBufferPtr + (2 * 8), vtxBufferPtr + (0 * 8), sizeof(float) * (2 * 8));													// Unused lines
 				}
@@ -1728,7 +1796,7 @@ void ClientDisplay3DPresenter::SetHUDTouchLinePositionVertices(float *vtxBufferP
 				vtxBufferPtr[12]	=  w;																vtxBufferPtr[13]	= -h + (y/3.0f);			// Minor bottom display, horizontal line, bottom right
 				vtxBufferPtr[14]	= -w + (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;							vtxBufferPtr[15]	= -h + (y/3.0f);			// Minor bottom display, horizontal line, bottom left
 				
-				if (this->_renderProperty.order == ClientDisplayOrder_MainFirst)
+				if (this->_propsApplied.order == ClientDisplayOrder_MainFirst)
 				{
 					memcpy(vtxBufferPtr + (2 * 8), vtxBufferPtr + (0 * 8), sizeof(float) * (2 * 8));													// Unused lines
 				}
@@ -1759,7 +1827,7 @@ void ClientDisplay3DPresenter::SetHUDTouchLinePositionVertices(float *vtxBufferP
 				vtxBufferPtr[12]	=  w;																vtxBufferPtr[13]	= -h + (y/5.0f);			// Minor bottom display, horizontal line, bottom right
 				vtxBufferPtr[14]	= -w + (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;							vtxBufferPtr[15]	= -h + (y/5.0f);			// Minor bottom display, horizontal line, bottom left
 				
-				if (this->_renderProperty.order == ClientDisplayOrder_MainFirst)
+				if (this->_propsApplied.order == ClientDisplayOrder_MainFirst)
 				{
 					memcpy(vtxBufferPtr + (2 * 8), vtxBufferPtr + (0 * 8), sizeof(float) * (2 * 8));													// Unused lines
 				}
@@ -1780,9 +1848,9 @@ void ClientDisplay3DPresenter::SetHUDTouchLinePositionVertices(float *vtxBufferP
 				
 			default: // Default to vertical orientation.
 			{
-				const float g = (float)this->_renderProperty.gapDistance;
+				const float g = (float)this->_propsApplied.gapDistance;
 				
-				if (this->_renderProperty.order == ClientDisplayOrder_MainFirst)
+				if (this->_propsApplied.order == ClientDisplayOrder_MainFirst)
 				{
 					vtxBufferPtr[0]		= -w + x;														vtxBufferPtr[1]		= -g/2.0f;					// Vertical line, top left
 					vtxBufferPtr[2]		= -w + x + 1.0f;												vtxBufferPtr[3]		= -g/2.0f;					// Vertical line, top right
@@ -2053,13 +2121,13 @@ void ClientDisplay3DPresenter::SetHUDTextureCoordinates(float *texCoordBufferPtr
 
 void ClientDisplay3DPresenter::SetScreenVertices(float *vtxBufferPtr)
 {
-	const float w = this->_renderProperty.normalWidth / 2.0f;
-	const float h = this->_renderProperty.normalHeight / 2.0f;
-	const size_t f = (this->_renderProperty.order == ClientDisplayOrder_MainFirst) ? 0 : 8;
+	const float w = this->_propsApplied.normalWidth / 2.0f;
+	const float h = this->_propsApplied.normalHeight / 2.0f;
+	const size_t f = (this->_propsApplied.order == ClientDisplayOrder_MainFirst) ? 0 : 8;
 	
-	if (this->_renderProperty.mode == ClientDisplayMode_Dual)
+	if (this->_propsApplied.mode == ClientDisplayMode_Dual)
 	{
-		switch (this->_renderProperty.layout)
+		switch (this->_propsApplied.layout)
 		{
 			case ClientDisplayLayout_Horizontal:
 			{
@@ -2100,7 +2168,7 @@ void ClientDisplay3DPresenter::SetScreenVertices(float *vtxBufferPtr)
 				
 			case ClientDisplayLayout_Hybrid_16_9:
 			{
-				const float g = (float)this->_renderProperty.gapDistance * (this->_renderProperty.normalWidth - (float)GPU_FRAMEBUFFER_NATIVE_WIDTH) / (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;
+				const float g = (float)this->_propsApplied.gapDistance * (this->_propsApplied.normalWidth - (float)GPU_FRAMEBUFFER_NATIVE_WIDTH) / (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;
 				
 				vtxBufferPtr[0]		= -w + (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;		vtxBufferPtr[1]		= -h + g + (64.0f * 2.0f);	// Minor top display, top left
 				vtxBufferPtr[2]		=  w;											vtxBufferPtr[3]		= -h + g + (64.0f * 2.0f);	// Minor top display, top right
@@ -2123,7 +2191,7 @@ void ClientDisplay3DPresenter::SetScreenVertices(float *vtxBufferPtr)
 				
 			case ClientDisplayLayout_Hybrid_16_10:
 			{
-				const float g = (float)this->_renderProperty.gapDistance * (this->_renderProperty.normalWidth - (float)GPU_FRAMEBUFFER_NATIVE_WIDTH) / (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;
+				const float g = (float)this->_propsApplied.gapDistance * (this->_propsApplied.normalWidth - (float)GPU_FRAMEBUFFER_NATIVE_WIDTH) / (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;
 				
 				vtxBufferPtr[0]		= -w + (float)GPU_FRAMEBUFFER_NATIVE_WIDTH;		vtxBufferPtr[1]		= -h + g + (38.4f * 2.0f);	// Minor top display, top left
 				vtxBufferPtr[2]		=  w;											vtxBufferPtr[3]		= -h + g + (38.4f * 2.0f);	// Minor top display, top right
@@ -2146,7 +2214,7 @@ void ClientDisplay3DPresenter::SetScreenVertices(float *vtxBufferPtr)
 				
 			default: // Default to vertical orientation.
 			{
-				const float g = (float)this->_renderProperty.gapDistance;
+				const float g = (float)this->_propsApplied.gapDistance;
 				
 				vtxBufferPtr[0+f]	= -w;									vtxBufferPtr[1+f]	=  h;						// Top display, top left
 				vtxBufferPtr[2+f]	=  w;									vtxBufferPtr[3+f]	=  h;						// Top display, top right

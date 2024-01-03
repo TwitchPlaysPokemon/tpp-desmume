@@ -266,6 +266,11 @@
 		AB142028186E2CD80015D52F /* Image_MemoryExpansionPak.png in Resources */ = {isa = PBXBuildFile; fileRef = AB142025186E2CD80015D52F /* Image_MemoryExpansionPak.png */; };
 		AB142029186E2CD80015D52F /* Image_MemoryExpansionPak.png in Resources */ = {isa = PBXBuildFile; fileRef = AB142025186E2CD80015D52F /* Image_MemoryExpansionPak.png */; };
 		AB14202A186E2CD80015D52F /* Image_MemoryExpansionPak.png in Resources */ = {isa = PBXBuildFile; fileRef = AB142025186E2CD80015D52F /* Image_MemoryExpansionPak.png */; };
+		AB1B20AC2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB1B20AB2AD5ED59007CA7EB /* slot2_hcv1000.cpp */; };
+		AB1B20AD2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB1B20AB2AD5ED59007CA7EB /* slot2_hcv1000.cpp */; };
+		AB1B20AE2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB1B20AB2AD5ED59007CA7EB /* slot2_hcv1000.cpp */; };
+		AB1B20AF2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB1B20AB2AD5ED59007CA7EB /* slot2_hcv1000.cpp */; };
+		AB1B20B02AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AB1B20AB2AD5ED59007CA7EB /* slot2_hcv1000.cpp */; };
 		AB1CC8001AA509C2008B0A16 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB1CC7FF1AA509C2008B0A16 /* CoreAudio.framework */; };
 		AB1CC80A1AA509DF008B0A16 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB1CC7FF1AA509C2008B0A16 /* CoreAudio.framework */; };
 		AB1CC80B1AA509E0008B0A16 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB1CC7FF1AA509C2008B0A16 /* CoreAudio.framework */; };
@@ -319,9 +324,6 @@
 		AB2A99AF1725F00F0062C1A1 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87914205EAE00DE561F /* InfoPlist.strings */; };
 		AB2A99B01725F00F0062C1A1 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87C14205EBC00DE561F /* MainMenu.xib */; };
 		AB2A99B11725F00F0062C1A1 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB901BDD1420706100348EEC /* Localizable.strings */; };
-		AB2A99B21725F00F0062C1A1 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97873144E89CC00793FA3 /* Icon_ActionReplay_32x32.png */; };
-		AB2A99B31725F00F0062C1A1 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97874144E89CC00793FA3 /* Icon_CodeBreaker_32x32.png */; };
-		AB2A99B41725F00F0062C1A1 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97875144E89CC00793FA3 /* Icon_DeSmuME_32x32.png */; };
 		AB2A99B51725F00F0062C1A1 /* HID_usage_strings.plist in Resources */ = {isa = PBXBuildFile; fileRef = AB350D3A147A1D93007165AC /* HID_usage_strings.plist */; };
 		AB2A99B61725F00F0062C1A1 /* AppIcon_ROMCheats.icns in Resources */ = {isa = PBXBuildFile; fileRef = ABBF04A414B515F300E505A0 /* AppIcon_ROMCheats.icns */; };
 		AB2A99B71725F00F0062C1A1 /* Icon_VolumeFull_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABC3AF2B14B7F06900D5B13D /* Icon_VolumeFull_16x16.png */; };
@@ -521,9 +523,6 @@
 		AB2F3B8515CF9C6000858373 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87914205EAE00DE561F /* InfoPlist.strings */; };
 		AB2F3B8615CF9C6000858373 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87C14205EBC00DE561F /* MainMenu.xib */; };
 		AB2F3B8715CF9C6000858373 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB901BDD1420706100348EEC /* Localizable.strings */; };
-		AB2F3B8815CF9C6000858373 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97873144E89CC00793FA3 /* Icon_ActionReplay_32x32.png */; };
-		AB2F3B8915CF9C6000858373 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97874144E89CC00793FA3 /* Icon_CodeBreaker_32x32.png */; };
-		AB2F3B8A15CF9C6000858373 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97875144E89CC00793FA3 /* Icon_DeSmuME_32x32.png */; };
 		AB2F3B8B15CF9C6000858373 /* HID_usage_strings.plist in Resources */ = {isa = PBXBuildFile; fileRef = AB350D3A147A1D93007165AC /* HID_usage_strings.plist */; };
 		AB2F3B8C15CF9C6000858373 /* AppIcon_ROMCheats.icns in Resources */ = {isa = PBXBuildFile; fileRef = ABBF04A414B515F300E505A0 /* AppIcon_ROMCheats.icns */; };
 		AB2F3B8D15CF9C6000858373 /* Icon_VolumeFull_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABC3AF2B14B7F06900D5B13D /* Icon_VolumeFull_16x16.png */; };
@@ -844,6 +843,11 @@
 		AB6A198416CAD66900384EED /* cocoa_GPU.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB6A198216CAD66900384EED /* cocoa_GPU.mm */; };
 		AB6A198516CAD66900384EED /* cocoa_GPU.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB6A198216CAD66900384EED /* cocoa_GPU.mm */; };
 		AB6A198616CAD66900384EED /* cocoa_GPU.mm in Sources */ = {isa = PBXBuildFile; fileRef = AB6A198216CAD66900384EED /* cocoa_GPU.mm */; };
+		AB6D78942809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = AB6D78932809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png */; };
+		AB6D78952809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = AB6D78932809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png */; };
+		AB6D78962809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = AB6D78932809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png */; };
+		AB6D78972809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = AB6D78932809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png */; };
+		AB6D78982809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = AB6D78932809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png */; };
 		AB700DBA16CDDBC400FBD336 /* DisplayWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB700DB816CDDBC400FBD336 /* DisplayWindow.xib */; };
 		AB700DBB16CDDBC400FBD336 /* DisplayWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB700DB816CDDBC400FBD336 /* DisplayWindow.xib */; };
 		AB700DBC16CDDBC400FBD336 /* DisplayWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB700DB816CDDBC400FBD336 /* DisplayWindow.xib */; };
@@ -863,9 +867,6 @@
 		AB711EF31481C35F009011C8 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87914205EAE00DE561F /* InfoPlist.strings */; };
 		AB711EF41481C35F009011C8 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87C14205EBC00DE561F /* MainMenu.xib */; };
 		AB711EF51481C35F009011C8 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB901BDD1420706100348EEC /* Localizable.strings */; };
-		AB711EFB1481C35F009011C8 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97873144E89CC00793FA3 /* Icon_ActionReplay_32x32.png */; };
-		AB711EFC1481C35F009011C8 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97874144E89CC00793FA3 /* Icon_CodeBreaker_32x32.png */; };
-		AB711EFD1481C35F009011C8 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97875144E89CC00793FA3 /* Icon_DeSmuME_32x32.png */; };
 		AB711EFE1481C35F009011C8 /* HID_usage_strings.plist in Resources */ = {isa = PBXBuildFile; fileRef = AB350D3A147A1D93007165AC /* HID_usage_strings.plist */; };
 		AB711F011481C35F009011C8 /* arm_instructions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABD1FEA31345AC8400AF11D1 /* arm_instructions.cpp */; };
 		AB711F021481C35F009011C8 /* armcpu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABD1FEA41345AC8400AF11D1 /* armcpu.cpp */; };
@@ -968,9 +969,6 @@
 		AB73A9721507C9F500A310C8 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87914205EAE00DE561F /* InfoPlist.strings */; };
 		AB73A9731507C9F500A310C8 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87C14205EBC00DE561F /* MainMenu.xib */; };
 		AB73A9741507C9F500A310C8 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB901BDD1420706100348EEC /* Localizable.strings */; };
-		AB73A9751507C9F500A310C8 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97873144E89CC00793FA3 /* Icon_ActionReplay_32x32.png */; };
-		AB73A9761507C9F500A310C8 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97874144E89CC00793FA3 /* Icon_CodeBreaker_32x32.png */; };
-		AB73A9771507C9F500A310C8 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97875144E89CC00793FA3 /* Icon_DeSmuME_32x32.png */; };
 		AB73A9781507C9F500A310C8 /* HID_usage_strings.plist in Resources */ = {isa = PBXBuildFile; fileRef = AB350D3A147A1D93007165AC /* HID_usage_strings.plist */; };
 		AB73A9791507C9F500A310C8 /* AppIcon_ROMCheats.icns in Resources */ = {isa = PBXBuildFile; fileRef = ABBF04A414B515F300E505A0 /* AppIcon_ROMCheats.icns */; };
 		AB73A97A1507C9F500A310C8 /* Icon_VolumeFull_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABC3AF2B14B7F06900D5B13D /* Icon_VolumeFull_16x16.png */; };
@@ -1168,6 +1166,66 @@
 		ABA03571169127C000817C69 /* troubleshootingWindowDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABA0356F169127C000817C69 /* troubleshootingWindowDelegate.mm */; };
 		ABA03572169127C000817C69 /* troubleshootingWindowDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABA0356F169127C000817C69 /* troubleshootingWindowDelegate.mm */; };
 		ABA03573169127C000817C69 /* troubleshootingWindowDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABA0356F169127C000817C69 /* troubleshootingWindowDelegate.mm */; };
+		ABA1658F2808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165812808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png */; };
+		ABA165902808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165822808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png */; };
+		ABA165912808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165832808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png */; };
+		ABA165942808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165862808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png */; };
+		ABA165952808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165872808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png */; };
+		ABA165962808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165882808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png */; };
+		ABA165972808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165892808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png */; };
+		ABA165982808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658A2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png */; };
+		ABA165992808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658B2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png */; };
+		ABA1659A2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658C2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png */; };
+		ABA1659B2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658D2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png */; };
+		ABA1659C2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658E2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png */; };
+		ABA1659D2808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165812808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png */; };
+		ABA1659E2808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165822808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png */; };
+		ABA1659F2808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165832808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png */; };
+		ABA165A22808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165862808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png */; };
+		ABA165A32808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165872808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png */; };
+		ABA165A42808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165882808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png */; };
+		ABA165A52808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165892808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png */; };
+		ABA165A62808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658A2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png */; };
+		ABA165A72808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658B2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png */; };
+		ABA165A82808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658C2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png */; };
+		ABA165A92808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658D2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png */; };
+		ABA165AA2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658E2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png */; };
+		ABA165AB2808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165812808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png */; };
+		ABA165AC2808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165822808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png */; };
+		ABA165AD2808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165832808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png */; };
+		ABA165B02808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165862808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png */; };
+		ABA165B12808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165872808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png */; };
+		ABA165B22808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165882808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png */; };
+		ABA165B32808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165892808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png */; };
+		ABA165B42808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658A2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png */; };
+		ABA165B52808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658B2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png */; };
+		ABA165B62808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658C2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png */; };
+		ABA165B72808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658D2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png */; };
+		ABA165B82808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658E2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png */; };
+		ABA165B92808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165812808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png */; };
+		ABA165BA2808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165822808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png */; };
+		ABA165BB2808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165832808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png */; };
+		ABA165BE2808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165862808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png */; };
+		ABA165BF2808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165872808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png */; };
+		ABA165C02808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165882808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png */; };
+		ABA165C12808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165892808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png */; };
+		ABA165C22808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658A2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png */; };
+		ABA165C32808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658B2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png */; };
+		ABA165C42808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658C2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png */; };
+		ABA165C52808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658D2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png */; };
+		ABA165C62808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658E2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png */; };
+		ABA165C72808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165812808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png */; };
+		ABA165C82808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165822808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png */; };
+		ABA165C92808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165832808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png */; };
+		ABA165CC2808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165862808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png */; };
+		ABA165CD2808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165872808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png */; };
+		ABA165CE2808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165882808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png */; };
+		ABA165CF2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA165892808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png */; };
+		ABA165D02808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658A2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png */; };
+		ABA165D12808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658B2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png */; };
+		ABA165D22808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658C2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png */; };
+		ABA165D32808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658D2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png */; };
+		ABA165D42808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = ABA1658E2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png */; };
 		ABA93EB0178C7D4200CBF50B /* encrypt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABA93EAF178C7D4200CBF50B /* encrypt.cpp */; };
 		ABA93EB1178C7D4200CBF50B /* encrypt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABA93EAF178C7D4200CBF50B /* encrypt.cpp */; };
 		ABA93EB2178C7D4200CBF50B /* encrypt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABA93EAF178C7D4200CBF50B /* encrypt.cpp */; };
@@ -1203,9 +1261,6 @@
 		ABAD0F7B15ACE7A00000EC47 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87914205EAE00DE561F /* InfoPlist.strings */; };
 		ABAD0F7C15ACE7A00000EC47 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = AB00E87C14205EBC00DE561F /* MainMenu.xib */; };
 		ABAD0F7D15ACE7A00000EC47 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = AB901BDD1420706100348EEC /* Localizable.strings */; };
-		ABAD0F7E15ACE7A00000EC47 /* Icon_ActionReplay_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97873144E89CC00793FA3 /* Icon_ActionReplay_32x32.png */; };
-		ABAD0F7F15ACE7A00000EC47 /* Icon_CodeBreaker_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97874144E89CC00793FA3 /* Icon_CodeBreaker_32x32.png */; };
-		ABAD0F8015ACE7A00000EC47 /* Icon_DeSmuME_32x32.png in Resources */ = {isa = PBXBuildFile; fileRef = ABB97875144E89CC00793FA3 /* Icon_DeSmuME_32x32.png */; };
 		ABAD0F8115ACE7A00000EC47 /* HID_usage_strings.plist in Resources */ = {isa = PBXBuildFile; fileRef = AB350D3A147A1D93007165AC /* HID_usage_strings.plist */; };
 		ABAD0F8215ACE7A00000EC47 /* AppIcon_ROMCheats.icns in Resources */ = {isa = PBXBuildFile; fileRef = ABBF04A414B515F300E505A0 /* AppIcon_ROMCheats.icns */; };
 		ABAD0F8315ACE7A00000EC47 /* Icon_VolumeFull_16x16.png in Resources */ = {isa = PBXBuildFile; fileRef = ABC3AF2B14B7F06900D5B13D /* Icon_VolumeFull_16x16.png */; };
@@ -1508,6 +1563,11 @@
 		ABD59849187D4A6C00069403 /* Icon_PaddleKnob_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABD59846187D4A6C00069403 /* Icon_PaddleKnob_256x256.png */; };
 		ABD5984A187D4A6C00069403 /* Icon_PaddleKnob_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABD59846187D4A6C00069403 /* Icon_PaddleKnob_256x256.png */; };
 		ABD5984B187D4A6C00069403 /* Icon_PaddleKnob_256x256.png in Resources */ = {isa = PBXBuildFile; fileRef = ABD59846187D4A6C00069403 /* Icon_PaddleKnob_256x256.png */; };
+		ABEBCE372A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABEBCE362A703E260028CE8A /* CheatDatabaseWindowController.mm */; };
+		ABEBCE382A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABEBCE362A703E260028CE8A /* CheatDatabaseWindowController.mm */; };
+		ABEBCE392A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABEBCE362A703E260028CE8A /* CheatDatabaseWindowController.mm */; };
+		ABEBCE3A2A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABEBCE362A703E260028CE8A /* CheatDatabaseWindowController.mm */; };
+		ABEBCE3B2A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = ABEBCE362A703E260028CE8A /* CheatDatabaseWindowController.mm */; };
 		ABECB50918A460710052D52A /* xbrz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABECB50818A460710052D52A /* xbrz.cpp */; };
 		ABECB50A18A460710052D52A /* xbrz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABECB50818A460710052D52A /* xbrz.cpp */; };
 		ABECB50B18A460710052D52A /* xbrz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABECB50818A460710052D52A /* xbrz.cpp */; };
@@ -1522,6 +1582,11 @@
 		ABEF84831873578F00E99ADC /* ForceFeedback.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB8C6E56186CD07E00E3EC64 /* ForceFeedback.framework */; };
 		ABEF84841873579400E99ADC /* ForceFeedback.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB8C6E56186CD07E00E3EC64 /* ForceFeedback.framework */; };
 		ABEF84851873579700E99ADC /* ForceFeedback.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB8C6E56186CD07E00E3EC64 /* ForceFeedback.framework */; };
+		ABEFFDDE2A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */ = {isa = PBXBuildFile; fileRef = ABEFFDDC2A78CB67009C3A2D /* CheatDatabaseViewer.xib */; };
+		ABEFFDDF2A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */ = {isa = PBXBuildFile; fileRef = ABEFFDDC2A78CB67009C3A2D /* CheatDatabaseViewer.xib */; };
+		ABEFFDE02A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */ = {isa = PBXBuildFile; fileRef = ABEFFDDC2A78CB67009C3A2D /* CheatDatabaseViewer.xib */; };
+		ABEFFDE12A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */ = {isa = PBXBuildFile; fileRef = ABEFFDDC2A78CB67009C3A2D /* CheatDatabaseViewer.xib */; };
+		ABEFFDE22A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */ = {isa = PBXBuildFile; fileRef = ABEFFDDC2A78CB67009C3A2D /* CheatDatabaseViewer.xib */; };
 		ABF50ABA169F5FDA0018C08D /* assembler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABF50A7B169F5FDA0018C08D /* assembler.cpp */; };
 		ABF50ABB169F5FDA0018C08D /* assert.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABF50A7D169F5FDA0018C08D /* assert.cpp */; };
 		ABF50ABC169F5FDA0018C08D /* buffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ABF50A7F169F5FDA0018C08D /* buffer.cpp */; };
@@ -1855,6 +1920,7 @@
 		AB0F29A514BE7213009ABC6F /* Icon_Speaker_420x420.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_Speaker_420x420.png; path = images/Icon_Speaker_420x420.png; sourceTree = "<group>"; };
 		AB126D06182ECB9500EBCF22 /* slot2_passme.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = slot2_passme.cpp; sourceTree = "<group>"; };
 		AB142025186E2CD80015D52F /* Image_MemoryExpansionPak.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Image_MemoryExpansionPak.png; path = images/Image_MemoryExpansionPak.png; sourceTree = "<group>"; };
+		AB1B20AB2AD5ED59007CA7EB /* slot2_hcv1000.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = slot2_hcv1000.cpp; sourceTree = "<group>"; };
 		AB1CC7FF1AA509C2008B0A16 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		AB1CC8161AA50C8D008B0A16 /* Icon_MicrophoneBlack_256x256.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_MicrophoneBlack_256x256.png; path = images/Icon_MicrophoneBlack_256x256.png; sourceTree = "<group>"; };
 		AB1CC8171AA50C8D008B0A16 /* Icon_MicrophoneBlueGlow_256x256.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_MicrophoneBlueGlow_256x256.png; path = images/Icon_MicrophoneBlueGlow_256x256.png; sourceTree = "<group>"; };
@@ -1918,7 +1984,7 @@
 		AB27CD3C1F99169300396812 /* lvm.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lvm.h; sourceTree = "<group>"; };
 		AB27CD3D1F99169300396812 /* lzio.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = lzio.c; sourceTree = "<group>"; };
 		AB27CD3E1F99169300396812 /* lzio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lzio.h; sourceTree = "<group>"; };
-		AB2A9A791725F00F0062C1A1 /* DeSmuME (PPC).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DeSmuME (PPC).app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB2A9A791725F00F0062C1A1 /* DeSmuME (ppc32).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DeSmuME (ppc32).app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB2C25061DEBFBD400706BFC /* encoding_utf.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = encoding_utf.c; sourceTree = "<group>"; };
 		AB2F3C4515CF9C6000858373 /* DeSmuME (PPC).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DeSmuME (PPC).app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB2F56EE1704C86900E28885 /* utilities.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utilities.h; sourceTree = "<group>"; };
@@ -2002,7 +2068,20 @@
 		AB6A187B16C9951C00384EED /* EmuControllerDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = EmuControllerDelegate.mm; sourceTree = "<group>"; };
 		AB6A198116CAD66900384EED /* cocoa_GPU.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cocoa_GPU.h; sourceTree = "<group>"; };
 		AB6A198216CAD66900384EED /* cocoa_GPU.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = cocoa_GPU.mm; sourceTree = "<group>"; };
+		AB6D78932809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_MicrophoneIdleNoHardware_256x256.png; path = images/Icon_MicrophoneIdleNoHardware_256x256.png; sourceTree = "<group>"; };
 		AB6FBEF5139B6258007BB045 /* slot1_retail_nand.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = slot1_retail_nand.cpp; sourceTree = "<group>"; };
+		AB6FE66A26E6F7C2002B2106 /* GPU_Operations_AVX2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GPU_Operations_AVX2.cpp; sourceTree = "<group>"; };
+		AB6FE66B26E6F7C2002B2106 /* GPU_Operations_AVX2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GPU_Operations_AVX2.h; sourceTree = "<group>"; };
+		AB6FE66C26E6F7C2002B2106 /* GPU_Operations_SSE2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GPU_Operations_SSE2.cpp; sourceTree = "<group>"; };
+		AB6FE66D26E6F7C2002B2106 /* GPU_Operations_SSE2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GPU_Operations_SSE2.h; sourceTree = "<group>"; };
+		AB6FE66E26E6F7C2002B2106 /* GPU_Operations.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GPU_Operations.cpp; sourceTree = "<group>"; };
+		AB6FE66F26E6F7C2002B2106 /* GPU_Operations.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GPU_Operations.h; sourceTree = "<group>"; };
+		AB6FE67026E6F7C2002B2106 /* OGLRender_3_2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OGLRender_3_2.cpp; sourceTree = "<group>"; };
+		AB6FE67126E6F7C2002B2106 /* OGLRender_3_2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OGLRender_3_2.h; sourceTree = "<group>"; };
+		AB6FE67226E6F815002B2106 /* colorspacehandler_AVX2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = colorspacehandler_AVX2.cpp; sourceTree = "<group>"; };
+		AB6FE67326E6F815002B2106 /* colorspacehandler_AVX2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = colorspacehandler_AVX2.h; sourceTree = "<group>"; };
+		AB6FE67426E6F815002B2106 /* colorspacehandler_AVX512.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = colorspacehandler_AVX512.cpp; sourceTree = "<group>"; };
+		AB6FE67526E6F815002B2106 /* colorspacehandler_AVX512.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = colorspacehandler_AVX512.h; sourceTree = "<group>"; };
 		AB700DB916CDDBC400FBD336 /* English */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = English; path = translations/English.lproj/DisplayWindow.xib; sourceTree = "<group>"; };
 		AB700DDC16CDE4C300FBD336 /* DisplayWindowController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DisplayWindowController.h; sourceTree = "<group>"; };
 		AB700DDD16CDE4C300FBD336 /* DisplayWindowController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = DisplayWindowController.mm; sourceTree = "<group>"; };
@@ -2022,6 +2101,18 @@
 		AB9971CE134EDA0800531BA7 /* cocoa_globals.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cocoa_globals.h; sourceTree = "<group>"; };
 		ABA0356E169127BB00817C69 /* troubleshootingWindowDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = troubleshootingWindowDelegate.h; sourceTree = "<group>"; };
 		ABA0356F169127C000817C69 /* troubleshootingWindowDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = troubleshootingWindowDelegate.mm; sourceTree = "<group>"; };
+		ABA165812808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_ActionReplay_32x32.png; path = images/Icon_ActionReplay_32x32.png; sourceTree = "<group>"; };
+		ABA165822808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_CodeBreaker_32x32.png; path = images/Icon_CodeBreaker_32x32.png; sourceTree = "<group>"; };
+		ABA165832808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_DeSmuME_32x32.png; path = images/Icon_DeSmuME_32x32.png; sourceTree = "<group>"; };
+		ABA165862808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_MicrophoneOff_DarkMode_256x256.png; path = images/Icon_MicrophoneOff_DarkMode_256x256.png; sourceTree = "<group>"; };
+		ABA165872808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_VolumeFull_DarkMode_16x16.png; path = images/Icon_VolumeFull_DarkMode_16x16.png; sourceTree = "<group>"; };
+		ABA165882808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon_VolumeFull_DarkMode_16x16@2x.png"; path = "images/Icon_VolumeFull_DarkMode_16x16@2x.png"; sourceTree = "<group>"; };
+		ABA165892808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_VolumeMute_DarkMode_16x16.png; path = images/Icon_VolumeMute_DarkMode_16x16.png; sourceTree = "<group>"; };
+		ABA1658A2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon_VolumeMute_DarkMode_16x16@2x.png"; path = "images/Icon_VolumeMute_DarkMode_16x16@2x.png"; sourceTree = "<group>"; };
+		ABA1658B2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_VolumeOneThird_DarkMode_16x16.png; path = images/Icon_VolumeOneThird_DarkMode_16x16.png; sourceTree = "<group>"; };
+		ABA1658C2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon_VolumeOneThird_DarkMode_16x16@2x.png"; path = "images/Icon_VolumeOneThird_DarkMode_16x16@2x.png"; sourceTree = "<group>"; };
+		ABA1658D2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_VolumeTwoThird_DarkMode_16x16.png; path = images/Icon_VolumeTwoThird_DarkMode_16x16.png; sourceTree = "<group>"; };
+		ABA1658E2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Icon_VolumeTwoThird_DarkMode_16x16@2x.png"; path = "images/Icon_VolumeTwoThird_DarkMode_16x16@2x.png"; sourceTree = "<group>"; };
 		ABA6574914511EC90077E5E9 /* cocoa_cheat.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cocoa_cheat.h; sourceTree = "<group>"; };
 		ABA6574A14511EC90077E5E9 /* cocoa_cheat.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = cocoa_cheat.mm; sourceTree = "<group>"; };
 		ABA93EAE178C7D4200CBF50B /* encrypt.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = encrypt.h; sourceTree = "<group>"; };
@@ -2041,9 +2132,6 @@
 		ABB6AD5C173A3F2B00EC2E8D /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		ABB9211F17CEB4110049D4C5 /* slot1comp_protocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = slot1comp_protocol.h; sourceTree = "<group>"; };
 		ABB9212017CEB4110049D4C5 /* slot1comp_protocol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = slot1comp_protocol.cpp; sourceTree = "<group>"; };
-		ABB97873144E89CC00793FA3 /* Icon_ActionReplay_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_ActionReplay_32x32.png; path = Images/Icon_ActionReplay_32x32.png; sourceTree = "<group>"; };
-		ABB97874144E89CC00793FA3 /* Icon_CodeBreaker_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_CodeBreaker_32x32.png; path = Images/Icon_CodeBreaker_32x32.png; sourceTree = "<group>"; };
-		ABB97875144E89CC00793FA3 /* Icon_DeSmuME_32x32.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Icon_DeSmuME_32x32.png; path = Images/Icon_DeSmuME_32x32.png; sourceTree = "<group>"; };
 		ABBB4ACC1D9C927C00794E08 /* deposterize.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = deposterize.cpp; sourceTree = "<group>"; };
 		ABBC0F8C1394B1AA0028B6BD /* DefaultUserPrefs.plist */ = {isa = PBXFileReference; lastKnownFileType = file.bplist; path = DefaultUserPrefs.plist; sourceTree = "<group>"; };
 		ABBCE29415ACB1E600A2C965 /* arm_jit.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = arm_jit.h; sourceTree = "<group>"; };
@@ -2254,6 +2342,8 @@
 		ABE6702A1415DE6C00E8E4C9 /* tinyxmlparser.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tinyxmlparser.cpp; sourceTree = "<group>"; };
 		ABE7F53C13EE1C7900FD3A71 /* cocoa_firmware.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cocoa_firmware.h; sourceTree = "<group>"; };
 		ABE7F53D13EE1C7900FD3A71 /* cocoa_firmware.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = cocoa_firmware.mm; sourceTree = "<group>"; };
+		ABEBCE352A703E260028CE8A /* CheatDatabaseWindowController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CheatDatabaseWindowController.h; sourceTree = "<group>"; };
+		ABEBCE362A703E260028CE8A /* CheatDatabaseWindowController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CheatDatabaseWindowController.mm; sourceTree = "<group>"; };
 		ABECB50718A460710052D52A /* xbrz.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = xbrz.h; sourceTree = "<group>"; };
 		ABECB50818A460710052D52A /* xbrz.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = xbrz.cpp; sourceTree = "<group>"; };
 		ABECB51218A460910052D52A /* OGLDisplayOutput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OGLDisplayOutput.h; sourceTree = "<group>"; };
@@ -2262,6 +2352,7 @@
 		ABEFCF5E141AB82A000CC0CD /* AppIcon_DeSmuME.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon_DeSmuME.icns; sourceTree = "<group>"; };
 		ABEFCF5F141AB82A000CC0CD /* AppIcon_NintendoDS_ROM.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon_NintendoDS_ROM.icns; sourceTree = "<group>"; };
 		ABEFCF60141AB82A000CC0CD /* AppIcon_SaveState.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon_SaveState.icns; sourceTree = "<group>"; };
+		ABEFFDDD2A78CB67009C3A2D /* English */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = English; path = translations/English.lproj/CheatDatabaseViewer.xib; sourceTree = "<group>"; };
 		ABF50A74169F5FDA0018C08D /* AsmJit.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AsmJit.h; sourceTree = "<group>"; };
 		ABF50A75169F5FDA0018C08D /* Config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Config.h; sourceTree = "<group>"; };
 		ABF50A76169F5FDA0018C08D /* core.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = core.h; sourceTree = "<group>"; };
@@ -2549,7 +2640,7 @@
 				AB73AA331507C9F500A310C8 /* DeSmuME.app */,
 				ABAD104915ACE7A00000EC47 /* DeSmuME (PPC).app */,
 				AB2F3C4515CF9C6000858373 /* DeSmuME (PPC).app */,
-				AB2A9A791725F00F0062C1A1 /* DeSmuME (PPC).app */,
+				AB2A9A791725F00F0062C1A1 /* DeSmuME (ppc32).app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -2585,6 +2676,7 @@
 				AB05E8201BBFD41200065D18 /* source-sans-pro */,
 				ABC2ECD613B1C87000FAAA2A /* Images */,
 				AB00E87C14205EBC00DE561F /* MainMenu.xib */,
+				ABEFFDDC2A78CB67009C3A2D /* CheatDatabaseViewer.xib */,
 				AB700DB816CDDBC400FBD336 /* DisplayWindow.xib */,
 				AB350D3A147A1D93007165AC /* HID_usage_strings.plist */,
 				8D1107310486CEB800E47090 /* Info.plist */,
@@ -3110,11 +3202,15 @@
 			isa = PBXGroup;
 			children = (
 				AB37E36C1D6188BC004A2C0D /* colorspacehandler.cpp */,
-				AB37E36D1D6188BC004A2C0D /* colorspacehandler.h */,
-				AB37E36E1D6188BC004A2C0D /* colorspacehandler_AltiVec.cpp */,
-				AB37E36F1D6188BC004A2C0D /* colorspacehandler_AltiVec.h */,
 				AB37E3721D6188BC004A2C0D /* colorspacehandler_SSE2.cpp */,
+				AB6FE67226E6F815002B2106 /* colorspacehandler_AVX2.cpp */,
+				AB6FE67426E6F815002B2106 /* colorspacehandler_AVX512.cpp */,
+				AB37E36E1D6188BC004A2C0D /* colorspacehandler_AltiVec.cpp */,
+				AB37E36D1D6188BC004A2C0D /* colorspacehandler.h */,
 				AB37E3731D6188BC004A2C0D /* colorspacehandler_SSE2.h */,
+				AB6FE67326E6F815002B2106 /* colorspacehandler_AVX2.h */,
+				AB6FE67526E6F815002B2106 /* colorspacehandler_AVX512.h */,
+				AB37E36F1D6188BC004A2C0D /* colorspacehandler_AltiVec.h */,
 			);
 			path = colorspacehandler;
 			sourceTree = "<group>";
@@ -3123,6 +3219,7 @@
 			isa = PBXGroup;
 			children = (
 				AB3ACB6614C2361100D7D192 /* appDelegate.h */,
+				ABEBCE352A703E260028CE8A /* CheatDatabaseWindowController.h */,
 				AB3ACB6814C2361100D7D192 /* cheatWindowDelegate.h */,
 				AB3E69811E25FBBF00D4CC75 /* DisplayViewCALayer.h */,
 				AB700DDC16CDE4C300FBD336 /* DisplayWindowController.h */,
@@ -3141,6 +3238,7 @@
 				ABA0356E169127BB00817C69 /* troubleshootingWindowDelegate.h */,
 				AB4B5A1F217E47E400381363 /* WifiSettingsPanel.h */,
 				AB3ACB6714C2361100D7D192 /* appDelegate.mm */,
+				ABEBCE362A703E260028CE8A /* CheatDatabaseWindowController.mm */,
 				AB3ACB6914C2361100D7D192 /* cheatWindowDelegate.mm */,
 				AB3E69821E25FBBF00D4CC75 /* DisplayViewCALayer.mm */,
 				AB700DDD16CDE4C300FBD336 /* DisplayWindowController.mm */,
@@ -3219,7 +3317,7 @@
 				AB0F293614BE6FA7009ABC6F /* ColorSwatch_Violet_16x16.png */,
 				AB0F293714BE6FA7009ABC6F /* ColorSwatch_Yellow_16x16.png */,
 				AB0F296B14BE705D009ABC6F /* Icon_ActionReplay_128x128.png */,
-				ABB97873144E89CC00793FA3 /* Icon_ActionReplay_32x32.png */,
+				ABA165812808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png */,
 				AB0819E21B4E64AE008CE1EC /* Icon_ActionReplay_32x32@2x.png */,
 				AB0F298814BE71E0009ABC6F /* Icon_ArrowDown_420x420.png */,
 				AB0F298914BE71E0009ABC6F /* Icon_ArrowLeft_420x420.png */,
@@ -3228,9 +3326,9 @@
 				AB851D28189B2C9A007363CC /* Icon_AutoholdClear_420x420.png */,
 				AB851D29189B2C9A007363CC /* Icon_AutoholdSet_420x420.png */,
 				AB0F296C14BE705D009ABC6F /* Icon_CodeBreaker_128x128.png */,
-				ABB97874144E89CC00793FA3 /* Icon_CodeBreaker_32x32.png */,
+				ABA165822808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png */,
 				AB0819E31B4E64AE008CE1EC /* Icon_CodeBreaker_32x32@2x.png */,
-				ABB97875144E89CC00793FA3 /* Icon_DeSmuME_32x32.png */,
+				ABA165832808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png */,
 				AB0819E41B4E64AE008CE1EC /* Icon_DeSmuME_32x32@2x.png */,
 				ABBFDFA61898EE3200A3FFA5 /* Icon_DisplayToggle_420x420.png */,
 				AB0F299414BE7213009ABC6F /* Icon_DoubleSpeed_420x420.png */,
@@ -3256,6 +3354,8 @@
 				ABACB7391AAC46B20066F429 /* Icon_MicrophoneDarkGreen_256x256.png */,
 				AB1CC8181AA50C8D008B0A16 /* Icon_MicrophoneGray_256x256.png */,
 				AB1CC8191AA50C8D008B0A16 /* Icon_MicrophoneGreen_256x256.png */,
+				AB6D78932809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png */,
+				ABA165862808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png */,
 				AB1CC81A1AA50C8D008B0A16 /* Icon_MicrophoneRed_256x256.png */,
 				AB0F29A014BE7213009ABC6F /* Icon_OpenROM_420x420.png */,
 				ABD59846187D4A6C00069403 /* Icon_PaddleKnob_256x256.png */,
@@ -3270,12 +3370,20 @@
 				AB0F290114BE6E68009ABC6F /* Icon_Speed2x_420x420.png */,
 				ABC3AF2B14B7F06900D5B13D /* Icon_VolumeFull_16x16.png */,
 				AB0819E51B4E64AE008CE1EC /* Icon_VolumeFull_16x16@2x.png */,
+				ABA165872808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png */,
+				ABA165882808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png */,
 				ABC3AF2C14B7F06900D5B13D /* Icon_VolumeMute_16x16.png */,
 				AB0819E61B4E64AE008CE1EC /* Icon_VolumeMute_16x16@2x.png */,
+				ABA165892808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png */,
+				ABA1658A2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png */,
 				ABC3AF2D14B7F06900D5B13D /* Icon_VolumeOneThird_16x16.png */,
 				AB0819E71B4E64AE008CE1EC /* Icon_VolumeOneThird_16x16@2x.png */,
+				ABA1658B2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png */,
+				ABA1658C2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png */,
 				ABC3AF2E14B7F06900D5B13D /* Icon_VolumeTwoThird_16x16.png */,
 				AB0819E81B4E64AE008CE1EC /* Icon_VolumeTwoThird_16x16@2x.png */,
+				ABA1658D2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png */,
+				ABA1658E2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png */,
 				ABD597BB187CD95A00069403 /* Image_GuitarGrip.png */,
 				AB142025186E2CD80015D52F /* Image_MemoryExpansionPak.png */,
 				AB8FFE491872032B00C10085 /* Image_PaddleController.png */,
@@ -3312,6 +3420,9 @@
 				ABD1FEB11345AC8400AF11D1 /* firmware.cpp */,
 				ABD1FEB41345AC8400AF11D1 /* gfx3d.cpp */,
 				ABD1FEB71345AC8400AF11D1 /* GPU.cpp */,
+				AB6FE66E26E6F7C2002B2106 /* GPU_Operations.cpp */,
+				AB6FE66C26E6F7C2002B2106 /* GPU_Operations_SSE2.cpp */,
+				AB6FE66A26E6F7C2002B2106 /* GPU_Operations_AVX2.cpp */,
 				ABD1FEB81345AC8400AF11D1 /* lua-engine.cpp */,
 				ABD1FEB91345AC8400AF11D1 /* matrix.cpp */,
 				ABD1FEBA1345AC8400AF11D1 /* mc.cpp */,
@@ -3320,6 +3431,7 @@
 				ABD1FEBF1345AC8400AF11D1 /* movie.cpp */,
 				ABD1FEC01345AC8400AF11D1 /* NDSSystem.cpp */,
 				ABD1FEC11345AC8400AF11D1 /* OGLRender.cpp */,
+				AB6FE67026E6F7C2002B2106 /* OGLRender_3_2.cpp */,
 				ABD1FEC21345AC8400AF11D1 /* path.cpp */,
 				ABD1FEC31345AC8400AF11D1 /* rasterize.cpp */,
 				ABD1FEC41345AC8400AF11D1 /* readwrite.cpp */,
@@ -3351,6 +3463,9 @@
 				ABD1FE801345AC8400AF11D1 /* gdbstub.h */,
 				ABD1FE811345AC8400AF11D1 /* gfx3d.h */,
 				ABD1FE831345AC8400AF11D1 /* GPU.h */,
+				AB6FE66F26E6F7C2002B2106 /* GPU_Operations.h */,
+				AB6FE66D26E6F7C2002B2106 /* GPU_Operations_SSE2.h */,
+				AB6FE66B26E6F7C2002B2106 /* GPU_Operations_AVX2.h */,
 				ABBCE29D15ACB26100A2C965 /* instruction_attributes.h */,
 				ABBCE29E15ACB26100A2C965 /* instructions.h */,
 				ABD1FE841345AC8400AF11D1 /* lua-engine.h */,
@@ -3363,6 +3478,7 @@
 				ABD1FE8B1345AC8400AF11D1 /* movie.h */,
 				ABD1FE8C1345AC8400AF11D1 /* NDSSystem.h */,
 				ABD1FE8D1345AC8400AF11D1 /* OGLRender.h */,
+				AB6FE67126E6F7C2002B2106 /* OGLRender_3_2.h */,
 				ABD1FE8F1345AC8400AF11D1 /* PACKED.h */,
 				ABD1FE8E1345AC8400AF11D1 /* PACKED_END.h */,
 				ABD1FE901345AC8400AF11D1 /* path.h */,
@@ -3401,6 +3517,7 @@
 				ABD1FF031345AC9B00AF11D1 /* slot2_expMemory.cpp */,
 				ABD1FF041345AC9B00AF11D1 /* slot2_gbagame.cpp */,
 				ABD1FF051345AC9B00AF11D1 /* slot2_guitarGrip.cpp */,
+				AB1B20AB2AD5ED59007CA7EB /* slot2_hcv1000.cpp */,
 				ABD1FF061345AC9B00AF11D1 /* slot2_mpcf.cpp */,
 				ABD1FF071345AC9C00AF11D1 /* slot2_none.cpp */,
 				ABD1FF081345AC9C00AF11D1 /* slot2_paddle.cpp */,
@@ -3668,9 +3785,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AB2A99A41725F00F0062C1A1 /* DeSmuME (OS X App; PowerPC Release Build) */ = {
+		AB2A99A41725F00F0062C1A1 /* DeSmuME (macOS App; Release Stage 1 PowerPC32 -- Xcode 3) */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AB2A9A761725F00F0062C1A1 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; PowerPC Release Build)" */;
+			buildConfigurationList = AB2A9A761725F00F0062C1A1 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; Release Stage 1 PowerPC32 -- Xcode 3)" */;
 			buildPhases = (
 				AB2A99A51725F00F0062C1A1 /* ShellScript */,
 				AB2A99A61725F00F0062C1A1 /* Resources */,
@@ -3682,15 +3799,15 @@
 			);
 			dependencies = (
 			);
-			name = "DeSmuME (OS X App; PowerPC Release Build)";
+			name = "DeSmuME (macOS App; Release Stage 1 PowerPC32 -- Xcode 3)";
 			productInstallPath = "$(HOME)/Applications";
 			productName = DeSmuME;
-			productReference = AB2A9A791725F00F0062C1A1 /* DeSmuME (PPC).app */;
+			productReference = AB2A9A791725F00F0062C1A1 /* DeSmuME (ppc32).app */;
 			productType = "com.apple.product-type.application";
 		};
-		AB2F3B7A15CF9C6000858373 /* DeSmuME (OS X App; PowerPC; LLVM-GCC) */ = {
+		AB2F3B7A15CF9C6000858373 /* DeSmuME (macOS App; PowerPC; LLVM-GCC) */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AB2F3C4215CF9C6000858373 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; PowerPC; LLVM-GCC)" */;
+			buildConfigurationList = AB2F3C4215CF9C6000858373 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; PowerPC; LLVM-GCC)" */;
 			buildPhases = (
 				AB2F3B7B15CF9C6000858373 /* ShellScript */,
 				AB2F3B7C15CF9C6000858373 /* Resources */,
@@ -3702,15 +3819,15 @@
 			);
 			dependencies = (
 			);
-			name = "DeSmuME (OS X App; PowerPC; LLVM-GCC)";
+			name = "DeSmuME (macOS App; PowerPC; LLVM-GCC)";
 			productInstallPath = "$(HOME)/Applications";
 			productName = DeSmuME;
 			productReference = AB2F3C4515CF9C6000858373 /* DeSmuME (PPC).app */;
 			productType = "com.apple.product-type.application";
 		};
-		AB711EBD1481C35F009011C8 /* DeSmuME (OS X App; Intel; LLVM-Clang) */ = {
+		AB711EBD1481C35F009011C8 /* DeSmuME (macOS App; Intel; LLVM-Clang) */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AB711F7C1481C35F009011C8 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; Intel; LLVM-Clang)" */;
+			buildConfigurationList = AB711F7C1481C35F009011C8 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; Intel; LLVM-Clang)" */;
 			buildPhases = (
 				AB75222C14C799C1009B97B3 /* ShellScript */,
 				AB711EBE1481C35F009011C8 /* Resources */,
@@ -3722,15 +3839,15 @@
 			);
 			dependencies = (
 			);
-			name = "DeSmuME (OS X App; Intel; LLVM-Clang)";
+			name = "DeSmuME (macOS App; Intel; LLVM-Clang)";
 			productInstallPath = "$(HOME)/Applications";
 			productName = DeSmuME;
 			productReference = AB711F7F1481C35F009011C8 /* DeSmuME.app */;
 			productType = "com.apple.product-type.application";
 		};
-		AB73A9671507C9F500A310C8 /* DeSmuME (OS X App; Intel; LLVM-GCC) */ = {
+		AB73A9671507C9F500A310C8 /* DeSmuME (macOS App; Intel; LLVM-GCC) */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AB73AA301507C9F500A310C8 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; Intel; LLVM-GCC)" */;
+			buildConfigurationList = AB73AA301507C9F500A310C8 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; Intel; LLVM-GCC)" */;
 			buildPhases = (
 				AB73A9681507C9F500A310C8 /* ShellScript */,
 				AB73A9691507C9F500A310C8 /* Resources */,
@@ -3742,15 +3859,15 @@
 			);
 			dependencies = (
 			);
-			name = "DeSmuME (OS X App; Intel; LLVM-GCC)";
+			name = "DeSmuME (macOS App; Intel; LLVM-GCC)";
 			productInstallPath = "$(HOME)/Applications";
 			productName = DeSmuME;
 			productReference = AB73AA331507C9F500A310C8 /* DeSmuME.app */;
 			productType = "com.apple.product-type.application";
 		};
-		ABAD0F7015ACE7A00000EC47 /* DeSmuME (OS X App; PowerPC; LLVM-Clang) */ = {
+		ABAD0F7015ACE7A00000EC47 /* DeSmuME (macOS App; PowerPC; LLVM-Clang) */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = ABAD104615ACE7A00000EC47 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; PowerPC; LLVM-Clang)" */;
+			buildConfigurationList = ABAD104615ACE7A00000EC47 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; PowerPC; LLVM-Clang)" */;
 			buildPhases = (
 				ABAD0F7115ACE7A00000EC47 /* ShellScript */,
 				ABAD0F7215ACE7A00000EC47 /* Resources */,
@@ -3762,7 +3879,7 @@
 			);
 			dependencies = (
 			);
-			name = "DeSmuME (OS X App; PowerPC; LLVM-Clang)";
+			name = "DeSmuME (macOS App; PowerPC; LLVM-Clang)";
 			productInstallPath = "$(HOME)/Applications";
 			productName = DeSmuME;
 			productReference = ABAD104915ACE7A00000EC47 /* DeSmuME (PPC).app */;
@@ -3776,7 +3893,7 @@
 			attributes = {
 				ORGANIZATIONNAME = "DeSmuME Team";
 			};
-			buildConfigurationList = C01FCF4E08A954540054247B /* Build configuration list for PBXProject "DeSmuME (XCode 3)" */;
+			buildConfigurationList = C01FCF4E08A954540054247B /* Build configuration list for PBXProject "DeSmuME (Xcode 3)" */;
 			compatibilityVersion = "Xcode 3.1";
 			developmentRegion = English;
 			hasScannedForEncodings = 1;
@@ -3794,11 +3911,11 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AB711EBD1481C35F009011C8 /* DeSmuME (OS X App; Intel; LLVM-Clang) */,
-				AB73A9671507C9F500A310C8 /* DeSmuME (OS X App; Intel; LLVM-GCC) */,
-				ABAD0F7015ACE7A00000EC47 /* DeSmuME (OS X App; PowerPC; LLVM-Clang) */,
-				AB2F3B7A15CF9C6000858373 /* DeSmuME (OS X App; PowerPC; LLVM-GCC) */,
-				AB2A99A41725F00F0062C1A1 /* DeSmuME (OS X App; PowerPC Release Build) */,
+				AB711EBD1481C35F009011C8 /* DeSmuME (macOS App; Intel; LLVM-Clang) */,
+				AB73A9671507C9F500A310C8 /* DeSmuME (macOS App; Intel; LLVM-GCC) */,
+				ABAD0F7015ACE7A00000EC47 /* DeSmuME (macOS App; PowerPC; LLVM-Clang) */,
+				AB2F3B7A15CF9C6000858373 /* DeSmuME (macOS App; PowerPC; LLVM-GCC) */,
+				AB2A99A41725F00F0062C1A1 /* DeSmuME (macOS App; Release Stage 1 PowerPC32 -- Xcode 3) */,
 			);
 		};
 /* End PBXProject section */
@@ -3819,9 +3936,6 @@
 				AB2A99AF1725F00F0062C1A1 /* InfoPlist.strings in Resources */,
 				AB2A99B01725F00F0062C1A1 /* MainMenu.xib in Resources */,
 				AB2A99B11725F00F0062C1A1 /* Localizable.strings in Resources */,
-				AB2A99B21725F00F0062C1A1 /* Icon_ActionReplay_32x32.png in Resources */,
-				AB2A99B31725F00F0062C1A1 /* Icon_CodeBreaker_32x32.png in Resources */,
-				AB2A99B41725F00F0062C1A1 /* Icon_DeSmuME_32x32.png in Resources */,
 				AB2A99B51725F00F0062C1A1 /* HID_usage_strings.plist in Resources */,
 				AB2A99B61725F00F0062C1A1 /* AppIcon_ROMCheats.icns in Resources */,
 				AB2A99B71725F00F0062C1A1 /* Icon_VolumeFull_16x16.png in Resources */,
@@ -3910,6 +4024,20 @@
 				AB081A0B1B4E64AE008CE1EC /* Icon_VolumeTwoThird_16x16@2x.png in Resources */,
 				AB05E82E1BBFD41300065D18 /* SIL Open Font License.txt in Resources */,
 				AB05E8311BBFD41300065D18 /* SourceSansPro-Bold.otf in Resources */,
+				ABA1658F2808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */,
+				ABA165902808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */,
+				ABA165912808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */,
+				ABA165942808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */,
+				ABA165952808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */,
+				ABA165962808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */,
+				ABA165972808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */,
+				ABA165982808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */,
+				ABA165992808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */,
+				ABA1659A2808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */,
+				ABA1659B2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */,
+				ABA1659C2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */,
+				AB6D78942809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */,
+				ABEFFDDF2A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3928,9 +4056,6 @@
 				AB2F3B8515CF9C6000858373 /* InfoPlist.strings in Resources */,
 				AB2F3B8615CF9C6000858373 /* MainMenu.xib in Resources */,
 				AB2F3B8715CF9C6000858373 /* Localizable.strings in Resources */,
-				AB2F3B8815CF9C6000858373 /* Icon_ActionReplay_32x32.png in Resources */,
-				AB2F3B8915CF9C6000858373 /* Icon_CodeBreaker_32x32.png in Resources */,
-				AB2F3B8A15CF9C6000858373 /* Icon_DeSmuME_32x32.png in Resources */,
 				AB2F3B8B15CF9C6000858373 /* HID_usage_strings.plist in Resources */,
 				AB2F3B8C15CF9C6000858373 /* AppIcon_ROMCheats.icns in Resources */,
 				AB2F3B8D15CF9C6000858373 /* Icon_VolumeFull_16x16.png in Resources */,
@@ -4019,6 +4144,20 @@
 				AB0819EF1B4E64AE008CE1EC /* Icon_VolumeTwoThird_16x16@2x.png in Resources */,
 				AB05E8621BBFD41300065D18 /* SIL Open Font License.txt in Resources */,
 				AB05E8651BBFD41300065D18 /* SourceSansPro-Bold.otf in Resources */,
+				ABA1659D2808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */,
+				ABA1659E2808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */,
+				ABA1659F2808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */,
+				ABA165A22808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */,
+				ABA165A32808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */,
+				ABA165A42808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */,
+				ABA165A52808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */,
+				ABA165A62808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */,
+				ABA165A72808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */,
+				ABA165A82808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */,
+				ABA165A92808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */,
+				ABA165AA2808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */,
+				AB6D78952809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */,
+				ABEFFDE02A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4037,9 +4176,6 @@
 				AB711EF31481C35F009011C8 /* InfoPlist.strings in Resources */,
 				AB711EF41481C35F009011C8 /* MainMenu.xib in Resources */,
 				AB711EF51481C35F009011C8 /* Localizable.strings in Resources */,
-				AB711EFB1481C35F009011C8 /* Icon_ActionReplay_32x32.png in Resources */,
-				AB711EFC1481C35F009011C8 /* Icon_CodeBreaker_32x32.png in Resources */,
-				AB711EFD1481C35F009011C8 /* Icon_DeSmuME_32x32.png in Resources */,
 				AB711EFE1481C35F009011C8 /* HID_usage_strings.plist in Resources */,
 				ABBF04A614B515F300E505A0 /* AppIcon_ROMCheats.icns in Resources */,
 				ABC3AF3314B7F06900D5B13D /* Icon_VolumeFull_16x16.png in Resources */,
@@ -4128,6 +4264,20 @@
 				AB0819F61B4E64AE008CE1EC /* Icon_VolumeTwoThird_16x16@2x.png in Resources */,
 				AB05E83B1BBFD41300065D18 /* SIL Open Font License.txt in Resources */,
 				AB05E83E1BBFD41300065D18 /* SourceSansPro-Bold.otf in Resources */,
+				ABA165C72808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */,
+				ABA165C82808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */,
+				ABA165C92808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */,
+				ABA165CC2808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */,
+				ABA165CD2808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */,
+				ABA165CE2808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */,
+				ABA165CF2808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */,
+				ABA165D02808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */,
+				ABA165D12808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */,
+				ABA165D22808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */,
+				ABA165D32808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */,
+				ABA165D42808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */,
+				AB6D78982809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */,
+				ABEFFDDE2A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4146,9 +4296,6 @@
 				AB73A9721507C9F500A310C8 /* InfoPlist.strings in Resources */,
 				AB73A9731507C9F500A310C8 /* MainMenu.xib in Resources */,
 				AB73A9741507C9F500A310C8 /* Localizable.strings in Resources */,
-				AB73A9751507C9F500A310C8 /* Icon_ActionReplay_32x32.png in Resources */,
-				AB73A9761507C9F500A310C8 /* Icon_CodeBreaker_32x32.png in Resources */,
-				AB73A9771507C9F500A310C8 /* Icon_DeSmuME_32x32.png in Resources */,
 				AB73A9781507C9F500A310C8 /* HID_usage_strings.plist in Resources */,
 				AB73A9791507C9F500A310C8 /* AppIcon_ROMCheats.icns in Resources */,
 				AB73A97A1507C9F500A310C8 /* Icon_VolumeFull_16x16.png in Resources */,
@@ -4237,6 +4384,20 @@
 				AB081A041B4E64AE008CE1EC /* Icon_VolumeTwoThird_16x16@2x.png in Resources */,
 				AB05E8481BBFD41300065D18 /* SIL Open Font License.txt in Resources */,
 				AB05E84B1BBFD41300065D18 /* SourceSansPro-Bold.otf in Resources */,
+				ABA165B92808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */,
+				ABA165BA2808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */,
+				ABA165BB2808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */,
+				ABA165BE2808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */,
+				ABA165BF2808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */,
+				ABA165C02808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */,
+				ABA165C12808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */,
+				ABA165C22808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */,
+				ABA165C32808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */,
+				ABA165C42808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */,
+				ABA165C52808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */,
+				ABA165C62808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */,
+				AB6D78972809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */,
+				ABEFFDE22A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4255,9 +4416,6 @@
 				ABAD0F7B15ACE7A00000EC47 /* InfoPlist.strings in Resources */,
 				ABAD0F7C15ACE7A00000EC47 /* MainMenu.xib in Resources */,
 				ABAD0F7D15ACE7A00000EC47 /* Localizable.strings in Resources */,
-				ABAD0F7E15ACE7A00000EC47 /* Icon_ActionReplay_32x32.png in Resources */,
-				ABAD0F7F15ACE7A00000EC47 /* Icon_CodeBreaker_32x32.png in Resources */,
-				ABAD0F8015ACE7A00000EC47 /* Icon_DeSmuME_32x32.png in Resources */,
 				ABAD0F8115ACE7A00000EC47 /* HID_usage_strings.plist in Resources */,
 				ABAD0F8215ACE7A00000EC47 /* AppIcon_ROMCheats.icns in Resources */,
 				ABAD0F8315ACE7A00000EC47 /* Icon_VolumeFull_16x16.png in Resources */,
@@ -4346,6 +4504,20 @@
 				AB0819FD1B4E64AE008CE1EC /* Icon_VolumeTwoThird_16x16@2x.png in Resources */,
 				AB05E8551BBFD41300065D18 /* SIL Open Font License.txt in Resources */,
 				AB05E8581BBFD41300065D18 /* SourceSansPro-Bold.otf in Resources */,
+				ABA165AB2808BD6A00C8CFF5 /* Icon_ActionReplay_32x32.png in Resources */,
+				ABA165AC2808BD6A00C8CFF5 /* Icon_CodeBreaker_32x32.png in Resources */,
+				ABA165AD2808BD6A00C8CFF5 /* Icon_DeSmuME_32x32.png in Resources */,
+				ABA165B02808BD6A00C8CFF5 /* Icon_MicrophoneOff_DarkMode_256x256.png in Resources */,
+				ABA165B12808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16.png in Resources */,
+				ABA165B22808BD6A00C8CFF5 /* Icon_VolumeFull_DarkMode_16x16@2x.png in Resources */,
+				ABA165B32808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16.png in Resources */,
+				ABA165B42808BD6A00C8CFF5 /* Icon_VolumeMute_DarkMode_16x16@2x.png in Resources */,
+				ABA165B52808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16.png in Resources */,
+				ABA165B62808BD6A00C8CFF5 /* Icon_VolumeOneThird_DarkMode_16x16@2x.png in Resources */,
+				ABA165B72808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16.png in Resources */,
+				ABA165B82808BD6A00C8CFF5 /* Icon_VolumeTwoThird_DarkMode_16x16@2x.png in Resources */,
+				AB6D78962809FA43007C6B0A /* Icon_MicrophoneIdleNoHardware_256x256.png in Resources */,
+				ABEFFDE12A78CB67009C3A2D /* CheatDatabaseViewer.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4691,6 +4863,8 @@
 				ABD1267720AE812900EFE1B2 /* ClientAVCaptureObject.cpp in Sources */,
 				ABD1267820AE812900EFE1B2 /* macOS_driver.cpp in Sources */,
 				AB4B5A22217E47E400381363 /* WifiSettingsPanel.mm in Sources */,
+				ABEBCE382A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */,
+				AB1B20AD2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4885,6 +5059,8 @@
 				ABD1267920AE812900EFE1B2 /* ClientAVCaptureObject.cpp in Sources */,
 				ABD1267A20AE812900EFE1B2 /* macOS_driver.cpp in Sources */,
 				AB4B5A23217E47E400381363 /* WifiSettingsPanel.mm in Sources */,
+				ABEBCE392A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */,
+				AB1B20AE2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5109,6 +5285,8 @@
 				ABD1267520AE812900EFE1B2 /* ClientAVCaptureObject.cpp in Sources */,
 				ABD1267620AE812900EFE1B2 /* macOS_driver.cpp in Sources */,
 				AB4B5A21217E47E400381363 /* WifiSettingsPanel.mm in Sources */,
+				ABEBCE372A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */,
+				AB1B20AC2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5333,6 +5511,8 @@
 				ABD1267D20AE812900EFE1B2 /* ClientAVCaptureObject.cpp in Sources */,
 				ABD1267E20AE812900EFE1B2 /* macOS_driver.cpp in Sources */,
 				AB4B5A25217E47E400381363 /* WifiSettingsPanel.mm in Sources */,
+				ABEBCE3B2A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */,
+				AB1B20B02AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5527,6 +5707,8 @@
 				ABD1267B20AE812900EFE1B2 /* ClientAVCaptureObject.cpp in Sources */,
 				ABD1267C20AE812900EFE1B2 /* macOS_driver.cpp in Sources */,
 				AB4B5A24217E47E400381363 /* WifiSettingsPanel.mm in Sources */,
+				ABEBCE3A2A703E260028CE8A /* CheatDatabaseWindowController.mm in Sources */,
+				AB1B20AF2AD5ED59007CA7EB /* slot2_hcv1000.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -5573,6 +5755,14 @@
 			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
+		ABEFFDDC2A78CB67009C3A2D /* CheatDatabaseViewer.xib */ = {
+			isa = PBXVariantGroup;
+			children = (
+				ABEFFDDD2A78CB67009C3A2D /* English */,
+			);
+			name = CheatDatabaseViewer.xib;
+			sourceTree = "<group>";
+		};
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
@@ -5580,9 +5770,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = ppc;
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				"GCC_MODEL_TUNING[sdk=macosx10.5][arch=ppc]" = G5;
-				PRODUCT_NAME = "DeSmuME (Debug-PPC)";
+				PRODUCT_NAME = "DeSmuME (ppc)";
 				SDKROOT = macosx10.5;
 				SKIP_INSTALL = NO;
 			};
@@ -5596,7 +5785,7 @@
 					NDEBUG,
 					PUBLIC_RELEASE,
 				);
-				PRODUCT_NAME = "DeSmuME (PPC)";
+				PRODUCT_NAME = "DeSmuME (ppc32)";
 				SDKROOT = macosx10.5;
 			};
 			name = Release;
@@ -5608,7 +5797,6 @@
 					ppc,
 					ppc64,
 				);
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_VERSION = com.apple.compilers.llvmgcc42;
 				"GCC_VERSION[sdk=macosx10.5][arch=ppc64]" = 4.2;
 				PRODUCT_NAME = "DeSmuME (Debug-PPC)";
@@ -5634,7 +5822,6 @@
 		AB711F7D1481C35F009011C8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				OTHER_LDFLAGS = (
 					"-weak_library",
 					/usr/lib/libSystem.B.dylib,
@@ -5656,7 +5843,6 @@
 		AB73AA311507C9F500A310C8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_VERSION = com.apple.compilers.llvmgcc42;
 				"GCC_VERSION[sdk=macosx10.5][arch=ppc64]" = 4.2;
 				OTHER_LDFLAGS = (
@@ -5686,7 +5872,6 @@
 					ppc,
 					ppc64,
 				);
-				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				PRODUCT_NAME = "DeSmuME (Debug-PPC)";
 				SDKROOT = macosx10.5;
 				SKIP_INSTALL = NO;
@@ -5759,7 +5944,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				OTHER_CFLAGS = "-I./../../";
 				PRODUCT_NAME = "DeSmuME (Debug)";
-				SDKROOT = macosx;
+				SDKROOT = macosx10.6;
 				SKIP_INSTALL = YES;
 				STRIP_INSTALLED_PRODUCT = NO;
 			};
@@ -5814,7 +5999,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.5;
 				OTHER_CFLAGS = "-I./../../";
 				PRODUCT_NAME = DeSmuME;
-				SDKROOT = macosx;
+				SDKROOT = macosx10.6;
 				STRIP_INSTALLED_PRODUCT = NO;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -5823,7 +6008,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AB2A9A761725F00F0062C1A1 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; PowerPC Release Build)" */ = {
+		AB2A9A761725F00F0062C1A1 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; Release Stage 1 PowerPC32 -- Xcode 3)" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AB2A9A771725F00F0062C1A1 /* Debug */,
@@ -5832,7 +6017,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AB2F3C4215CF9C6000858373 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; PowerPC; LLVM-GCC)" */ = {
+		AB2F3C4215CF9C6000858373 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; PowerPC; LLVM-GCC)" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AB2F3C4315CF9C6000858373 /* Debug */,
@@ -5841,7 +6026,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AB711F7C1481C35F009011C8 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; Intel; LLVM-Clang)" */ = {
+		AB711F7C1481C35F009011C8 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; Intel; LLVM-Clang)" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AB711F7D1481C35F009011C8 /* Debug */,
@@ -5850,7 +6035,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AB73AA301507C9F500A310C8 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; Intel; LLVM-GCC)" */ = {
+		AB73AA301507C9F500A310C8 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; Intel; LLVM-GCC)" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AB73AA311507C9F500A310C8 /* Debug */,
@@ -5859,7 +6044,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		ABAD104615ACE7A00000EC47 /* Build configuration list for PBXNativeTarget "DeSmuME (OS X App; PowerPC; LLVM-Clang)" */ = {
+		ABAD104615ACE7A00000EC47 /* Build configuration list for PBXNativeTarget "DeSmuME (macOS App; PowerPC; LLVM-Clang)" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				ABAD104715ACE7A00000EC47 /* Debug */,
@@ -5868,7 +6053,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C01FCF4E08A954540054247B /* Build configuration list for PBXProject "DeSmuME (XCode 3)" */ = {
+		C01FCF4E08A954540054247B /* Build configuration list for PBXProject "DeSmuME (Xcode 3)" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C01FCF4F08A954540054247B /* Debug */,

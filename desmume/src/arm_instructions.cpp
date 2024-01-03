@@ -1,7 +1,7 @@
 /*
 	Copyright (C) 2006 yopyop
 	Copyright (C) 2006-2007 shash
-	Copyright (C) 2008-2016 DeSmuME team
+	Copyright (C) 2008-2021 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -279,7 +279,7 @@ TEMPLATE static u32 FASTCALL  OP_UND(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -418,7 +418,7 @@ TEMPLATE static u32 FASTCALL  OP_AND_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -557,7 +557,7 @@ TEMPLATE static u32 FASTCALL  OP_EOR_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -706,7 +706,7 @@ TEMPLATE static u32 FASTCALL  OP_SUB_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -855,7 +855,7 @@ TEMPLATE static u32 FASTCALL  OP_RSB_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -1004,7 +1004,7 @@ TEMPLATE static u32 FASTCALL  OP_ADD_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -1164,7 +1164,7 @@ TEMPLATE static u32 FASTCALL  OP_ADC_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -1324,7 +1324,7 @@ TEMPLATE static u32 FASTCALL  OP_SBC_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -1754,7 +1754,7 @@ TEMPLATE static u32 FASTCALL  OP_CMN_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -1894,7 +1894,7 @@ TEMPLATE static u32 FASTCALL  OP_ORR_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -2040,7 +2040,7 @@ TEMPLATE static u32 FASTCALL  OP_MOV_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -2179,7 +2179,7 @@ TEMPLATE static u32 FASTCALL  OP_BIC_S_IMM_VAL(const u32 i)
 		Status_Reg SPSR = cpu->SPSR; \
 		armcpu_switchMode(cpu, SPSR.bits.mode); \
 		cpu->CPSR=SPSR; \
-		cpu->changeCPSR(); \
+		armcpu_changeCPSR(); \
 		cpu->R[15] &= (0xFFFFFFFC|(((u32)cpu->CPSR.bits.T)<<1)); \
 		cpu->next_instruction = cpu->R[15]; \
 		return b; \
@@ -2419,7 +2419,7 @@ TEMPLATE static u32 FASTCALL  OP_UMLAL_S(const u32 i)
 	cpu->R[REG_POS(i,12)] += tmp; 
 	 
 	cpu->CPSR.bits.N = BIT31(cpu->R[REG_POS(i,16)]);
-	cpu->CPSR.bits.Z = (cpu->R[REG_POS(i,16)]==0) & (cpu->R[REG_POS(i,12)]==0);
+	cpu->CPSR.bits.Z = (cpu->R[REG_POS(i,16)]==0) && (cpu->R[REG_POS(i,12)]==0);
 	
 	MUL_UMxxL_END(3);
 }
@@ -2479,7 +2479,7 @@ TEMPLATE static u32 FASTCALL  OP_SMULL_S(const u32 i)
 	cpu->R[REG_POS(i,16)] = (u32)(res>>32);	
 	
 	cpu->CPSR.bits.N = BIT31(cpu->R[REG_POS(i,16)]);
-	cpu->CPSR.bits.Z = (cpu->R[REG_POS(i,16)]==0) & (cpu->R[REG_POS(i,12)]==0);
+	cpu->CPSR.bits.Z = (cpu->R[REG_POS(i,16)]==0) && (cpu->R[REG_POS(i,12)]==0);
 
 	MUL_SMxxL_END(2);
 }
@@ -2494,7 +2494,7 @@ TEMPLATE static u32 FASTCALL  OP_SMLAL_S(const u32 i)
 	cpu->R[REG_POS(i,12)] += tmp;
 	 
 	cpu->CPSR.bits.N = BIT31(cpu->R[REG_POS(i,16)]);
-	cpu->CPSR.bits.Z = (cpu->R[REG_POS(i,16)]==0) & (cpu->R[REG_POS(i,12)]==0);
+	cpu->CPSR.bits.Z = (cpu->R[REG_POS(i,16)]==0) && (cpu->R[REG_POS(i,12)]==0);
 
 	MUL_SMxxL_END(3);
 }
@@ -2990,7 +2990,7 @@ TEMPLATE static u32 FASTCALL  OP_MRS_SPSR(const u32 i)
 	if(cpu->CPSR.bits.mode != USR && BIT16(i)) \
 		{ armcpu_switchMode(cpu, operand & 0x1F); } \
 	cpu->CPSR.val = (cpu->CPSR.val & ~byte_mask) | (operand & byte_mask); \
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 
 #define OP_MSR_SPSR_(operand) \
 	if(cpu->CPSR.bits.mode == USR || cpu->CPSR.bits.mode == SYS) return 1; \
@@ -2999,7 +2999,7 @@ TEMPLATE static u32 FASTCALL  OP_MRS_SPSR(const u32 i)
 					(BIT18(i)?0x00FF0000:0x00000000) | \
 					(BIT19(i)?0xFF000000:0x00000000); \
 	cpu->SPSR.val = (cpu->SPSR.val & ~byte_mask) | (operand & byte_mask); \
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 
 //#define __NEW_MSR
 #ifdef __NEW_MSR
@@ -3104,6 +3104,10 @@ TEMPLATE static u32 FASTCALL  OP_BLX_REG(const u32 i)
 	cpu->CPSR.bits.T = BIT0(tmp);
 	cpu->R[15] = tmp & (0xFFFFFFFC|(cpu->CPSR.bits.T<<1));
 	cpu->next_instruction = cpu->R[15];
+	if (cpu->runToRet) {
+		cpu->runToRet = false;
+		cpu->runToRetTmp = cpu->next_instruction + 4;
+	}
 	return 3;
 }
 
@@ -3145,6 +3149,10 @@ TEMPLATE static u32 FASTCALL  OP_BL(const u32 i)
 	cpu->R[15] += (off<<2);
 	cpu->R[15] &= (0xFFFFFFFC|(cpu->CPSR.bits.T<<1));
 	cpu->next_instruction = cpu->R[15];
+	if (cpu->runToRet) {
+		cpu->runToRet = false;
+		cpu->runToRetTmp = cpu->next_instruction + 4;
+	}
 
 	return 3;
 }
@@ -4750,6 +4758,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMIA(const u32 i)
 		//start += 4;
 		cpu->next_instruction = registres[15];
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 	
 	return MMU_aluMemCycles<PROCNUM>(2, c);
@@ -4791,6 +4805,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMIB(const u32 i)
 		else
 			registres[15] = tmp & 0xFFFFFFFC;
 		cpu->next_instruction = registres[15];
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 		return MMU_aluMemCycles<PROCNUM>(4, c);
 	}
 	
@@ -4817,6 +4837,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMDA(const u32 i)
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
 		start -= 4;
 		cpu->next_instruction = registres[15];
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 
 	OP_L_DA(14, start);
@@ -4858,6 +4884,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMDB(const u32 i)
 			registres[15] = tmp & 0xFFFFFFFC;
 		cpu->next_instruction = registres[15];
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 
 	OP_L_DB(14, start);
@@ -4915,6 +4947,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMIA_W(const u32 i)
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
 		start += 4;
 		cpu->next_instruction = registres[15];
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 
 	if(i & (1 << REG_POS(i,16))) {
@@ -4965,6 +5003,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMIB_W(const u32 i)
 		else
 			registres[15] = tmp & 0xFFFFFFFC;
 		cpu->next_instruction = registres[15];
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 
 	if(i & (1 << REG_POS(i,16))) {
@@ -4998,6 +5042,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMDA_W(const u32 i)
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
 		start -= 4;
 		cpu->next_instruction = registres[15];
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 
 	OP_L_DA(14, start);
@@ -5047,6 +5097,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMDB_W(const u32 i)
 			registres[15] = tmp & 0xFFFFFFFC;
 		cpu->next_instruction = registres[15];
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 
 	OP_L_DB(14, start);
@@ -5121,10 +5177,16 @@ TEMPLATE static u32 FASTCALL  OP_LDMIA2(const u32 i)
 		SPSR = cpu->SPSR;
 		armcpu_switchMode(cpu, SPSR.bits.mode);
 		cpu->CPSR=SPSR;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 		//start += 4;
 		cpu->next_instruction = cpu->R[15];
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 	return MMU_aluMemCycles<PROCNUM>(2, c);
 }
@@ -5177,9 +5239,15 @@ TEMPLATE static u32 FASTCALL  OP_LDMIB2(const u32 i)
 		SPSR = cpu->SPSR;
 		armcpu_switchMode(cpu, SPSR.bits.mode);
 		cpu->CPSR=SPSR;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 		cpu->next_instruction = registres[15];
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 	return MMU_aluMemCycles<PROCNUM>(2, c);
 }
@@ -5208,10 +5276,16 @@ TEMPLATE static u32 FASTCALL  OP_LDMDA2(const u32 i)
 		u32 tmp = READ32(cpu->mem_if->data, start);
 		registres[15] = tmp & (0XFFFFFFFC | (BIT0(tmp)<<1));
 		cpu->CPSR = cpu->SPSR;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
 		start -= 4;
 		cpu->next_instruction = registres[15];
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
  
 	OP_L_DA(14, start);
@@ -5239,7 +5313,7 @@ TEMPLATE static u32 FASTCALL  OP_LDMDA2(const u32 i)
 		Status_Reg SPSR = cpu->SPSR;
 		armcpu_switchMode(cpu, SPSR.bits.mode);
 		cpu->CPSR=SPSR;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 	}
 	
 	return MMU_aluMemCycles<PROCNUM>(2, c);
@@ -5267,9 +5341,15 @@ TEMPLATE static u32 FASTCALL  OP_LDMDB2(const u32 i)
 		tmp = READ32(cpu->mem_if->data, start);
 		registres[15] = tmp & (0XFFFFFFFC | (BIT0(tmp)<<1));
 		cpu->CPSR = cpu->SPSR;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 		cpu->next_instruction = registres[15];
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
+
+		// debugging
+		if (cpu->runToRet) {
+			execute = false;
+			cpu->runToRet = false;
+		}
 	}
 
 	OP_L_DB(14, start);
@@ -5297,7 +5377,7 @@ TEMPLATE static u32 FASTCALL  OP_LDMDB2(const u32 i)
 		Status_Reg SPSR = cpu->SPSR;
 		armcpu_switchMode(cpu, SPSR.bits.mode);
 		cpu->CPSR=SPSR;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 	}
 	
 	return MMU_aluMemCycles<PROCNUM>(2, c);
@@ -5352,7 +5432,7 @@ TEMPLATE static u32 FASTCALL  OP_LDMIA2_W(const u32 i)
 	SPSR = cpu->SPSR;
 	armcpu_switchMode(cpu, SPSR.bits.mode);
 	cpu->CPSR=SPSR;
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 	cpu->next_instruction = registres[15];
 	c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
 
@@ -5407,12 +5487,12 @@ TEMPLATE static u32 FASTCALL  OP_LDMIB2_W(const u32 i)
 	tmp = READ32(cpu->mem_if->data, start + 4);
 	registres[15] = tmp & (0XFFFFFFFC | (BIT0(tmp)<<1));
 	cpu->CPSR = cpu->SPSR;
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 	cpu->next_instruction = registres[15];
 	SPSR = cpu->SPSR;
 	armcpu_switchMode(cpu, SPSR.bits.mode);
 	cpu->CPSR=SPSR;
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 	c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
 	
 	return MMU_aluMemCycles<PROCNUM>(2, c);
@@ -5473,7 +5553,7 @@ TEMPLATE static u32 FASTCALL  OP_LDMDA2_W(const u32 i)
 	SPSR = cpu->SPSR;
 	armcpu_switchMode(cpu, SPSR.bits.mode);
 	cpu->CPSR=SPSR;
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 	return MMU_aluMemCycles<PROCNUM>(2, c);
 }
 
@@ -5503,7 +5583,7 @@ TEMPLATE static u32 FASTCALL  OP_LDMDB2_W(const u32 i)
 		c += MMU_memAccessCycles<PROCNUM,32,MMU_AD_READ>(start);
 		registres[15] = tmp & (0XFFFFFFFC | (BIT0(tmp)<<1));
 		cpu->CPSR = cpu->SPSR;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 		cpu->next_instruction = registres[15];
 	}
 
@@ -5535,7 +5615,7 @@ TEMPLATE static u32 FASTCALL  OP_LDMDB2_W(const u32 i)
 	SPSR = cpu->SPSR;
 	armcpu_switchMode(cpu, SPSR.bits.mode);
 	cpu->CPSR=SPSR;
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 	return MMU_aluMemCycles<PROCNUM>(2, c);
 }
 
@@ -6127,7 +6207,7 @@ TEMPLATE static u32 FASTCALL  OP_MCR(const u32 i)
 		return 2;
 	}
 
-	cp15.moveARM2CP(cpu->R[REG_POS(i, 12)], REG_POS(i, 16), REG_POS(i, 0), (i>>21)&0x7, (i>>5)&0x7);
+	armcp15_moveARM2CP(&cp15, cpu->R[REG_POS(i, 12)], REG_POS(i, 16), REG_POS(i, 0), (i>>21)&0x7, (i>>5)&0x7);
 
 	return 2;
 }
@@ -6158,7 +6238,7 @@ TEMPLATE static u32 FASTCALL  OP_MRC(const u32 i)
 	//	Rd = data
 
 	u32 data = 0;
-	cp15.moveCP2ARM(&data, REG_POS(i, 16), REG_POS(i, 0), (i>>21)&0x7, (i>>5)&0x7);
+	armcp15_moveCP2ARM(&cp15, &data, REG_POS(i, 16), REG_POS(i, 0), (i>>21)&0x7, (i>>5)&0x7);
 	if (REG_POS(i, 12) == 15)
 	{
 		cpu->CPSR.bits.N = BIT31(data);
@@ -6212,7 +6292,7 @@ TEMPLATE static u32 FASTCALL  OP_SWI(const u32 i)
 		cpu->SPSR = tmp;							/* save old CPSR as new SPSR */
 		cpu->CPSR.bits.T = 0;						/* handle as ARM32 code */
 		cpu->CPSR.bits.I = 1;
-		cpu->changeCPSR();
+		armcpu_changeCPSR();
 		cpu->R[15] = cpu->intVector + 0x08;
 		cpu->next_instruction = cpu->R[15];
 		return 3;
@@ -6259,7 +6339,7 @@ TEMPLATE static u32 FASTCALL OP_BKPT(const u32 i)
 	cpu->SPSR = tmp;							// save old CPSR as new SPSR
 	cpu->CPSR.bits.T = 0;						// handle as ARM32 code
 	cpu->CPSR.bits.I = 1;
-	cpu->changeCPSR();
+	armcpu_changeCPSR();
 	cpu->R[15] = cpu->intVector + 0x0C;
 	cpu->next_instruction = cpu->R[15];
 	return 4;

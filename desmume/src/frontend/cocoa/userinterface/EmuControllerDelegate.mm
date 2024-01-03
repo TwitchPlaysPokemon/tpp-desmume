@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013-2018 DeSmuME Team
+	Copyright (C) 2013-2023 DeSmuME Team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 #import "DisplayWindowController.h"
 #import "InputManager.h"
 #import "cheatWindowDelegate.h"
+#import "CheatDatabaseWindowController.h"
 #import "Slot2WindowDelegate.h"
 #import "MacAVCaptureTool.h"
 #import "MacScreenshotCaptureTool.h"
@@ -35,6 +36,10 @@
 #import "cocoa_rom.h"
 #import "cocoa_slot2.h"
 
+#if HAVE_OSAVAILABLE && defined(MAC_OS_X_VERSION_10_14) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14)
+	#import <AVFoundation/AVFoundation.h>
+#endif
+
 @implementation EmuControllerDelegate
 
 @synthesize inputManager;
@@ -42,7 +47,6 @@
 @synthesize currentRom;
 @dynamic cdsFirmware;
 @dynamic cdsSpeaker;
-@synthesize cdsCheats;
 
 @synthesize cheatWindowDelegate;
 @synthesize screenshotCaptureToolDelegate;
@@ -53,10 +57,10 @@
 @synthesize cdsCoreController;
 @synthesize cdsSoundController;
 @synthesize cheatWindowController;
-@synthesize cheatListController;
-@synthesize cheatDatabaseController;
 @synthesize slot2WindowController;
 @synthesize inputDeviceListController;
+
+@synthesize cheatDatabaseRecentsMenu;
 
 @synthesize romInfoPanel;
 
@@ -82,13 +86,16 @@
 
 @synthesize lastSetSpeedScalar;
 
+@synthesize isRunningDarkMode;
 @synthesize isWorking;
 @synthesize isRomLoading;
 @synthesize statusText;
 @synthesize isHardwareMicAvailable;
 @synthesize currentMicGainValue;
 @dynamic currentVolumeValue;
+@synthesize micStatusTooltip;
 @synthesize currentMicStatusIcon;
+@synthesize ndsMicLevelIndicator;
 @synthesize currentVolumeIcon;
 
 @synthesize isShowingSaveStateDialog;
@@ -111,11 +118,13 @@
 		return nil;
 	}
 	
-	spinlockFirmware = OS_SPINLOCK_INIT;
-	spinlockSpeaker = OS_SPINLOCK_INIT;
+	_unfairlockFirmware = apple_unfairlock_create();
+	_unfairlockSpeaker = apple_unfairlock_create();
 	
 	mainWindow = nil;
 	windowList = [[NSMutableArray alloc] initWithCapacity:32];
+	
+	isRunningDarkMode = [CocoaDSUtil determineDarkModeAppearance];
 	
 	_displayRotationPanelTitle = nil;
 	_displaySeparationPanelTitle = nil;
@@ -125,7 +134,6 @@
 	currentRom = nil;
 	cdsFirmware = nil;
 	cdsSpeaker = nil;
-	dummyCheatList = nil;
 	
 	isSaveStateEdited = NO;
 	isShowingSaveStateDialog = NO;
@@ -143,28 +151,36 @@
 	isSoundMuted = NO;
 	lastSetVolumeValue = MAX_VOLUME;
 	
-	iconExecute				= [[NSImage imageNamed:@"Icon_Execute_420x420"] retain];
-	iconPause				= [[NSImage imageNamed:@"Icon_Pause_420x420"] retain];
-	iconSpeedNormal			= [[NSImage imageNamed:@"Icon_Speed1x_420x420"] retain];
-	iconSpeedDouble			= [[NSImage imageNamed:@"Icon_Speed2x_420x420"] retain];
+	iconExecute           = [[NSImage imageNamed:@"Icon_Execute_420x420"] retain];
+	iconPause             = [[NSImage imageNamed:@"Icon_Pause_420x420"] retain];
+	iconSpeedNormal       = [[NSImage imageNamed:@"Icon_Speed1x_420x420"] retain];
+	iconSpeedDouble       = [[NSImage imageNamed:@"Icon_Speed2x_420x420"] retain];
 	
-	iconMicDisabled			= [[NSImage imageNamed:@"Icon_MicrophoneBlack_256x256"] retain];
-	iconMicIdle				= [[NSImage imageNamed:@"Icon_MicrophoneDarkGreen_256x256"] retain];
-	iconMicActive			= [[NSImage imageNamed:@"Icon_MicrophoneGreen_256x256"] retain];
-	iconMicInClip			= [[NSImage imageNamed:@"Icon_MicrophoneRed_256x256"] retain];
-	iconMicManualOverride	= [[NSImage imageNamed:@"Icon_MicrophoneGray_256x256"] retain];
+	iconMicDisabled       = [[NSImage imageNamed:@"Icon_MicrophoneBlack_256x256"] retain];
+	iconMicDisabledDM     = [[NSImage imageNamed:@"Icon_MicrophoneOff_DarkMode_256x256"] retain];
+	iconMicIdle           = [[NSImage imageNamed:@"Icon_MicrophoneDarkGreen_256x256"] retain];
+	iconMicIdleNoHardware = [[NSImage imageNamed:@"Icon_MicrophoneIdleNoHardware_256x256"] retain];
+	iconMicActive         = [[NSImage imageNamed:@"Icon_MicrophoneGreen_256x256"] retain];
+	iconMicInClip         = [[NSImage imageNamed:@"Icon_MicrophoneRed_256x256"] retain];
+	iconMicManualOverride = [[NSImage imageNamed:@"Icon_MicrophoneGray_256x256"] retain];
 	
-	iconVolumeFull			= [[NSImage imageNamed:@"Icon_VolumeFull_16x16"] retain];
-	iconVolumeTwoThird		= [[NSImage imageNamed:@"Icon_VolumeTwoThird_16x16"] retain];
-	iconVolumeOneThird		= [[NSImage imageNamed:@"Icon_VolumeOneThird_16x16"] retain];
-	iconVolumeMute			= [[NSImage imageNamed:@"Icon_VolumeMute_16x16"] retain];
+	iconVolumeFull        = [[NSImage imageNamed:@"Icon_VolumeFull_16x16"] retain];
+	iconVolumeTwoThird    = [[NSImage imageNamed:@"Icon_VolumeTwoThird_16x16"] retain];
+	iconVolumeOneThird    = [[NSImage imageNamed:@"Icon_VolumeOneThird_16x16"] retain];
+	iconVolumeMute        = [[NSImage imageNamed:@"Icon_VolumeMute_16x16"] retain];
+	
+	iconVolumeFullDM      = [[NSImage imageNamed:@"Icon_VolumeFull_DarkMode_16x16"] retain];
+	iconVolumeTwoThirdDM  = [[NSImage imageNamed:@"Icon_VolumeTwoThird_DarkMode_16x16"] retain];
+	iconVolumeOneThirdDM  = [[NSImage imageNamed:@"Icon_VolumeOneThird_DarkMode_16x16"] retain];
+	iconVolumeMuteDM      = [[NSImage imageNamed:@"Icon_VolumeMute_DarkMode_16x16"] retain];
 	
 	isWorking = NO;
 	isRomLoading = NO;
 	statusText = NSSTRING_STATUS_READY;
 	currentVolumeValue = MAX_VOLUME;
-	currentMicStatusIcon = [iconMicDisabled retain];
-	currentVolumeIcon = [iconVolumeFull retain];
+	micStatusTooltip = @"";
+	currentMicStatusIcon = (isRunningDarkMode) ? [iconMicDisabledDM retain] : [iconMicDisabled retain];
+	currentVolumeIcon = (isRunningDarkMode) ? [iconVolumeFullDM retain] : [iconVolumeFull retain];
 	
 	[[NSNotificationCenter defaultCenter] addObserver:self
 											 selector:@selector(loadRomDidFinish:)
@@ -174,6 +190,16 @@
 	[[NSNotificationCenter defaultCenter] addObserver:self
 											 selector:@selector(handleNDSError:)
 												 name:@"org.desmume.DeSmuME.handleNDSError"
+											   object:nil];
+	
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(handleEmulatorExecutionState:)
+												 name:@"org.desmume.DeSmuME.handleEmulatorExecutionState"
+											   object:nil];
+	
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(updateCheatDatabaseRecentsMenu:)
+												 name:@"org.desmume.DeSmuME.updateCheatDatabaseRecentsMenu"
 											   object:nil];
 	
 	return self;
@@ -189,7 +215,9 @@
 	[iconSpeedDouble release];
 	
 	[iconMicDisabled release];
+	[iconMicDisabledDM release];
 	[iconMicIdle release];
+	[iconMicIdleNoHardware release];
 	[iconMicActive release];
 	[iconMicInClip release];
 	[iconMicManualOverride release];
@@ -199,10 +227,14 @@
 	[iconVolumeOneThird release];
 	[iconVolumeMute release];
 	
+	[iconVolumeFullDM release];
+	[iconVolumeTwoThirdDM release];
+	[iconVolumeOneThirdDM release];
+	[iconVolumeMuteDM release];
+	
 	[[self currentRom] release];
 	[self setCurrentRom:nil];
 	
-	[self setCdsCheats:nil];
 	[self setCdsSpeaker:nil];
 	
 	[self setIsWorking:NO];
@@ -217,6 +249,9 @@
 	[self setMainWindow:nil];
 	[windowList release];
 	
+	apple_unfairlock_destroy(_unfairlockFirmware);
+	apple_unfairlock_destroy(_unfairlockSpeaker);
+	
 	[super dealloc];
 }
 
@@ -224,11 +259,11 @@
 
 - (void) setCdsFirmware:(CocoaDSFirmware *)theFirmware
 {
-	OSSpinLockLock(&spinlockFirmware);
+	apple_unfairlock_lock(_unfairlockFirmware);
 	
 	if (theFirmware == cdsFirmware)
 	{
-		OSSpinLockUnlock(&spinlockFirmware);
+		apple_unfairlock_unlock(_unfairlockFirmware);
 		return;
 	}
 	
@@ -245,25 +280,25 @@
 	[cdsFirmware release];
 	cdsFirmware = theFirmware;
 	
-	OSSpinLockUnlock(&spinlockFirmware);
+	apple_unfairlock_unlock(_unfairlockFirmware);
 }
 
 - (CocoaDSFirmware *) cdsFirmware
 {
-	OSSpinLockLock(&spinlockFirmware);
+	apple_unfairlock_lock(_unfairlockFirmware);
 	CocoaDSFirmware *theFirmware = cdsFirmware;
-	OSSpinLockUnlock(&spinlockFirmware);
+	apple_unfairlock_unlock(_unfairlockFirmware);
 	
 	return theFirmware;
 }
 
 - (void) setCdsSpeaker:(CocoaDSSpeaker *)theSpeaker
 {
-	OSSpinLockLock(&spinlockSpeaker);
+	apple_unfairlock_lock(_unfairlockSpeaker);
 	
 	if (theSpeaker == cdsSpeaker)
 	{
-		OSSpinLockUnlock(&spinlockSpeaker);
+		apple_unfairlock_unlock(_unfairlockSpeaker);
 		return;
 	}
 	
@@ -277,20 +312,21 @@
 	[cdsSpeaker release];
 	cdsSpeaker = theSpeaker;
 	
-	OSSpinLockUnlock(&spinlockSpeaker);
+	apple_unfairlock_unlock(_unfairlockSpeaker);
 }
 
 - (CocoaDSSpeaker *) cdsSpeaker
 {
-	OSSpinLockLock(&spinlockSpeaker);
+	apple_unfairlock_lock(_unfairlockSpeaker);
 	CocoaDSSpeaker *theSpeaker = cdsSpeaker;
-	OSSpinLockUnlock(&spinlockSpeaker);
+	apple_unfairlock_unlock(_unfairlockSpeaker);
 	
 	return theSpeaker;
 }
 
 - (void) setCurrentVolumeValue:(float)vol
 {
+	const BOOL currentDarkModeState = [self isRunningDarkMode];
 	currentVolumeValue = vol;
 	
 	// Update the icon.
@@ -298,23 +334,23 @@
 	NSImage *newImage = nil;
 	if (vol <= 0.0f)
 	{
-		newImage = iconVolumeMute;
+		newImage = (currentDarkModeState) ? iconVolumeMuteDM : iconVolumeMute;
 	}
 	else if (vol > 0.0f && vol <= VOLUME_THRESHOLD_LOW)
 	{
-		newImage = iconVolumeOneThird;
+		newImage = (currentDarkModeState) ? iconVolumeOneThirdDM : iconVolumeOneThird;
 		isSoundMuted = NO;
 		lastSetVolumeValue = vol;
 	}
 	else if (vol > VOLUME_THRESHOLD_LOW && vol <= VOLUME_THRESHOLD_HIGH)
 	{
-		newImage = iconVolumeTwoThird;
+		newImage = (currentDarkModeState) ? iconVolumeTwoThirdDM : iconVolumeTwoThird;
 		isSoundMuted = NO;
 		lastSetVolumeValue = vol;
 	}
 	else
 	{
-		newImage = iconVolumeFull;
+		newImage = (currentDarkModeState) ? iconVolumeFullDM : iconVolumeFull;
 		isSoundMuted = NO;
 		lastSetVolumeValue = vol;
 	}
@@ -356,6 +392,7 @@
 	}
 	
 	NSURL *selectedFile = nil;
+	NSInteger buttonClicked = 0;
 	
 	NSOpenPanel *panel = [NSOpenPanel openPanel];
 	[panel setCanChooseDirectories:NO];
@@ -365,16 +402,24 @@
 	[panel setTitle:NSSTRING_TITLE_OPEN_ROM_PANEL];
 	NSArray *fileTypes = [NSArray arrayWithObjects:@FILE_EXT_ROM_DS, @FILE_EXT_ROM_GBA, nil]; 
 	
-	// The NSOpenPanel method -(NSInt)runModalForDirectory:file:types:
-	// is deprecated in Mac OS X v10.6.
+	// While [NSOpenPanel setAllowedFileTypes:] and [NSOpenPanel runModal]
+	// are available in Leopard, the allowedFileTypes property is ignored on
+	// that version of macOS. To maintain compatibility with Leopard, we need
+	// to call the deprecated method [NSOpenPanel runModalForDirectory:file:types]
+	// instead.
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_5
-	[panel setAllowedFileTypes:fileTypes];
-	const NSInteger buttonClicked = [panel runModal];
-#else
-	const NSInteger buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		[panel setAllowedFileTypes:fileTypes];
+		buttonClicked = [panel runModal];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes] );
+	}
 	
-	if (buttonClicked == NSFileHandlingPanelOKButton)
+	if (buttonClicked == GUI_RESPONSE_OK)
 	{
 		selectedFile = [[panel URLs] lastObject];
 		if(selectedFile == nil)
@@ -415,6 +460,7 @@
 - (IBAction) openEmuSaveState:(id)sender
 {
 	NSURL *selectedFile = nil;
+	NSInteger buttonClicked = 0;
 	
 	NSOpenPanel *panel = [NSOpenPanel openPanel];
 	[panel setCanChooseDirectories:NO];
@@ -424,16 +470,24 @@
 	[panel setTitle:NSSTRING_TITLE_OPEN_STATE_FILE_PANEL];
 	NSArray *fileTypes = [NSArray arrayWithObjects:@FILE_EXT_SAVE_STATE, nil];
 	
-	// The NSOpenPanel method -(NSInt)runModalForDirectory:file:types:
-	// is deprecated in Mac OS X v10.6.
+	// While [NSOpenPanel setAllowedFileTypes:] and [NSOpenPanel runModal]
+	// are available in Leopard, the allowedFileTypes property is ignored on
+	// that version of macOS. To maintain compatibility with Leopard, we need
+	// to call the deprecated method [NSOpenPanel runModalForDirectory:file:types]
+	// instead.
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_5
-	[panel setAllowedFileTypes:fileTypes];
-	const NSInteger buttonClicked = [panel runModal];
-#else
-	const NSInteger buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		[panel setAllowedFileTypes:fileTypes];
+		buttonClicked = [panel runModal];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes] );
+	}
 	
-	if (buttonClicked == NSFileHandlingPanelOKButton)
+	if (buttonClicked == GUI_RESPONSE_OK)
 	{
 		selectedFile = [[panel URLs] lastObject];
 		if(selectedFile == nil)
@@ -502,17 +556,24 @@
 	[panel setCanCreateDirectories:YES];
 	[panel setTitle:NSSTRING_TITLE_SAVE_STATE_FILE_PANEL];
 	
-	// The NSSavePanel method -(void)setRequiredFileType:
-	// is deprecated in Mac OS X v10.6.
+	// While [NSSavePanel setAllowedFileTypes:] is available in Leopard, the
+	// allowedFileTypes property is ignored on that version of macOS. To maintain
+	// compatibility with Leopard, we need to call the deprecated method
+	// [NSSavePanel setRequiredFileType:] instead.
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_5
-	NSArray *fileTypes = [NSArray arrayWithObjects:@FILE_EXT_SAVE_STATE, nil];
-	[panel setAllowedFileTypes:fileTypes];
-#else
-	[panel setRequiredFileType:@FILE_EXT_SAVE_STATE];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		NSArray *fileTypes = [NSArray arrayWithObjects:@FILE_EXT_SAVE_STATE, nil];
+		[panel setAllowedFileTypes:fileTypes];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( [panel setRequiredFileType:@FILE_EXT_SAVE_STATE] );
+	}
 	
 	const NSInteger buttonClicked = [panel runModal];
-	if(buttonClicked == NSOKButton)
+	if (buttonClicked == GUI_RESPONSE_OK)
 	{
 		NSURL *saveFileURL = [panel URL];
 		
@@ -577,6 +638,7 @@
 - (IBAction) openReplay:(id)sender
 {
 	NSURL *selectedFile = nil;
+	NSInteger buttonClicked = 0;
 	
 	NSOpenPanel *panel = [NSOpenPanel openPanel];
 	[panel setCanChooseDirectories:NO];
@@ -586,16 +648,24 @@
 	[panel setTitle:@"Load Replay"];
 	NSArray *fileTypes = [NSArray arrayWithObjects:@"dsm", nil];
 	
-	// The NSOpenPanel method -(NSInt)runModalForDirectory:file:types:
-	// is deprecated in Mac OS X v10.6.
+	// While [NSOpenPanel setAllowedFileTypes:] and [NSOpenPanel runModal]
+	// are available in Leopard, the allowedFileTypes property is ignored on
+	// that version of macOS. To maintain compatibility with Leopard, we need
+	// to call the deprecated method [NSOpenPanel runModalForDirectory:file:types]
+	// instead.
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_5
-	[panel setAllowedFileTypes:fileTypes];
-	const NSInteger buttonClicked = [panel runModal];
-#else
-	const NSInteger buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		[panel setAllowedFileTypes:fileTypes];
+		buttonClicked = [panel runModal];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes] );
+	}
 	
-	if (buttonClicked == NSFileHandlingPanelOKButton)
+	if (buttonClicked == GUI_RESPONSE_OK)
 	{
 		selectedFile = [[panel URLs] lastObject];
 		if(selectedFile == nil)
@@ -616,17 +686,24 @@
 	[panel setCanCreateDirectories:YES];
 	[panel setTitle:@"Record Replay"];
 	
-	// The NSSavePanel method -(void)setRequiredFileType:
-	// is deprecated in Mac OS X v10.6.
+	// While [NSSavePanel setAllowedFileTypes:] is available in Leopard, the
+	// allowedFileTypes property is ignored on that version of macOS. To maintain
+	// compatibility with Leopard, we need to call the deprecated method
+	// [NSSavePanel setRequiredFileType:] instead.
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_5
-	NSArray *fileTypes = [NSArray arrayWithObjects:@"dsm", nil];
-	[panel setAllowedFileTypes:fileTypes];
-#else
-	[panel setRequiredFileType:@"dsm"];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		NSArray *fileTypes = [NSArray arrayWithObjects:@"dsm", nil];
+		[panel setAllowedFileTypes:fileTypes];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( [panel setRequiredFileType:@"dsm"] );
+	}
 	
 	const NSInteger buttonClicked = [panel runModal];
-	if (buttonClicked == NSFileHandlingPanelOKButton)
+	if (buttonClicked == GUI_RESPONSE_OK)
 	{
 		NSURL *fileURL = [panel URL];
 		if(fileURL == nil)
@@ -638,9 +715,9 @@
 		CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 		NSURL *sramURL = [CocoaDSFile fileURLFromRomURL:[[self currentRom] fileURL] toKind:@"ROM Save"];
 		
-		NSFileManager *fileManager = [[NSFileManager alloc] init];
-		const BOOL exists = [fileManager isReadableFileAtPath:[sramURL path]];
-		[fileManager release];
+		//NSFileManager *fileManager = [[NSFileManager alloc] init];
+		//const BOOL exists = [fileManager isReadableFileAtPath:[sramURL path]];
+		//[fileManager release];
 		
 		const BOOL isMovieStarted = [cdsCore startReplayRecording:fileURL sramURL:sramURL];
 		[self setStatusText:(isMovieStarted) ? @"Replay recording started." : @"Replay creation failed!"];
@@ -661,6 +738,7 @@
 - (IBAction) importRomSave:(id)sender
 {
 	NSURL *selectedFile = nil;
+	NSInteger buttonClicked = 0;
 	
 	NSOpenPanel *panel = [NSOpenPanel openPanel];
 	[panel setCanChooseDirectories:NO];
@@ -677,16 +755,24 @@
 	
 	[self pauseCore];
 	
-	// The NSOpenPanel method -(NSInt)runModalForDirectory:file:types:
-	// is deprecated in Mac OS X v10.6.
+	// While [NSOpenPanel setAllowedFileTypes:] and [NSOpenPanel runModal]
+	// are available in Leopard, the allowedFileTypes property is ignored on
+	// that version of macOS. To maintain compatibility with Leopard, we need
+	// to call the deprecated method [NSOpenPanel runModalForDirectory:file:types]
+	// instead.
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_5
-	[panel setAllowedFileTypes:fileTypes];
-	const NSInteger buttonClicked = [panel runModal];
-#else
-	const NSInteger buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		[panel setAllowedFileTypes:fileTypes];
+		buttonClicked = [panel runModal];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( buttonClicked = [panel runModalForDirectory:nil file:nil types:fileTypes] );
+	}
 	
-	if (buttonClicked == NSFileHandlingPanelOKButton)
+	if (buttonClicked == GUI_RESPONSE_OK)
 	{
 		selectedFile = [[panel URLs] lastObject];
 		if(selectedFile == nil)
@@ -711,7 +797,7 @@
 	[self pauseCore];
 	
 	const NSInteger buttonClicked = [panel runModal];
-	if(buttonClicked == NSOKButton)
+	if (buttonClicked == GUI_RESPONSE_OK)
 	{
 		NSURL *romSaveURL = [CocoaDSFile fileURLFromRomURL:[[self currentRom] fileURL] toKind:@"ROM Save"];
 		if (romSaveURL != nil)
@@ -722,6 +808,104 @@
 	}
 	
 	[self restoreCoreState];
+}
+
+- (IBAction) openCheatDatabaseFile:(id)sender
+{
+	CheatDatabaseWindowController *newWindowController = [[CheatDatabaseWindowController alloc] initWithWindowNibName:@"CheatDatabaseViewer" delegate:cheatWindowDelegate];
+	[newWindowController window]; // Just reference the window to force the NSWindow object to load.
+	
+	[[newWindowController window] makeKeyAndOrderFront:sender];
+	[[newWindowController window] makeMainWindow];
+	[newWindowController openFile:sender];
+}
+
+- (IBAction) clearCheatDatabaseRecents:(id)sender
+{
+	NSArray *menuItemList = [cheatDatabaseRecentsMenu itemArray];
+	
+	for (NSMenuItem *menuItem in menuItemList)
+	{
+		if ( ([menuItem action] == @selector(openRecentCheatDatabase:)) || [menuItem isSeparatorItem] )
+		{
+			[cheatDatabaseRecentsMenu removeItem:menuItem];
+		}
+	}
+	
+	NSArray *emptyArray = [[[NSArray alloc] init] autorelease];
+	[[NSUserDefaults standardUserDefaults] setObject:emptyArray forKey:@"CheatDatabase_RecentFilePath"];
+	
+	// Also remove the legacy setting.
+	[[NSUserDefaults standardUserDefaults] removeObjectForKey:@"R4Cheat_DatabasePath"];
+}
+
+- (IBAction) openRecentCheatDatabase:(id)sender
+{
+	CheatDatabaseWindowController *newWindowController = [[CheatDatabaseWindowController alloc] initWithWindowNibName:@"CheatDatabaseViewer" delegate:cheatWindowDelegate];
+	[newWindowController window]; // Just reference the window to force the NSWindow object to load.
+	
+	[[newWindowController window] makeKeyAndOrderFront:self];
+	[[newWindowController window] makeMainWindow];
+	
+	NSArray *recentDBFilePathsList = [[NSUserDefaults standardUserDefaults] arrayForKey:@"CheatDatabase_RecentFilePath"];
+	NSInteger index = [CocoaDSUtil getIBActionSenderTag:sender];
+	NSDictionary *recentItem = (NSDictionary *)[recentDBFilePathsList objectAtIndex:index];
+	NSString *recentItemFilePath = nil;
+	
+	if (recentItem != nil)
+	{
+		NSNumber *compatibilityCheckNumber = (NSNumber *)[recentItem objectForKey:@"OptionIgnoreCompatibilityCheck"];
+		if (compatibilityCheckNumber != nil)
+		{
+			[newWindowController setIsOptionWarningSilenced:YES];
+			[newWindowController setIsCompatibilityCheckIgnored:[compatibilityCheckNumber boolValue]];
+			[newWindowController setIsOptionWarningSilenced:NO];
+		}
+		
+		// Set up the window properties.
+		NSString *windowFrameString = (NSString *)[recentItem objectForKey:@"WindowFrame"];
+		if (windowFrameString != nil)
+		{
+			[[newWindowController window] setFrameFromString:windowFrameString];
+		}
+		
+		NSNumber *windowSplitViewDividerPositionNumber = (NSNumber *)[recentItem objectForKey:@"WindowSplitViewDividerPosition"];
+		if (windowSplitViewDividerPositionNumber != nil)
+		{
+			CGFloat dividerPosition = [windowSplitViewDividerPositionNumber floatValue];
+			[[newWindowController splitView] setPosition:dividerPosition ofDividerAtIndex:0];
+		}
+		
+		// Check for the file's existence at its path, and then handle appropriately.
+		recentItemFilePath = (NSString *)[recentItem objectForKey:@"FilePath"];
+		NSFileManager *fileManager = [[NSFileManager alloc] init];
+		BOOL doesFileExist = [fileManager fileExistsAtPath:recentItemFilePath];
+		[fileManager release];
+		
+		if (!doesFileExist)
+		{
+			// If the file does not exist, then report the error to the user, and the remove the
+			// nonexistent file from the recents menu.
+			[newWindowController showErrorSheet:CheatSystemError_FileDoesNotExist];
+			
+			NSMutableArray *newRecentsList = [NSMutableArray arrayWithCapacity:[recentDBFilePathsList count]];
+			
+			for (NSDictionary *theItem in recentDBFilePathsList)
+			{
+				if (theItem != recentItem)
+				{
+					[newRecentsList addObject:theItem];
+				}
+			}
+			
+			[[NSUserDefaults standardUserDefaults] setObject:newRecentsList forKey:@"CheatDatabase_RecentFilePath"];
+			[self updateCheatDatabaseRecentsMenu:nil];
+			return;
+		}
+	}
+	
+	NSURL *dbFileURL = [NSURL fileURLWithPath:recentItemFilePath];
+	[newWindowController loadFileStart:dbFileURL];
 }
 
 - (IBAction) toggleExecutePause:(id)sender
@@ -764,6 +948,12 @@
 	[inputManager dispatchCommandUsingIBAction:_cmd sender:sender];
 }
 
+- (IBAction) framesToSkipSetting:(id)sender
+{
+	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
+	[cdsCore setFramesToSkipSetting:[CocoaDSUtil getIBActionSenderTag:sender]];
+}
+
 - (IBAction) toggleGPUState:(id)sender
 {
 	[inputManager dispatchCommandUsingIBAction:_cmd sender:sender];
@@ -787,6 +977,31 @@
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 	[cdsCore changeRomSaveType:saveTypeID];
+}
+
+- (IBAction) changeHostMicrophonePermission:(id)sender
+{
+#if HAVE_OSAVAILABLE && defined(MAC_OS_X_VERSION_10_14) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14)
+	if (IsOSXVersionSupported(10, 14, 0))
+	{
+		if (@available(macOS 10.14, *))
+		{
+			[AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL isAuthorized) {
+				if (isAuthorized)
+				{
+					puts("DeSmuME: User has just granted access to the microphone.");
+				}
+				
+				[self updateHostMicrophonePermissionStatus];
+			}];
+		}
+	}
+	else
+#endif
+	{
+		puts("DeSmuME: User is not running macOS v10.14 Mojave or later -- microphone usage is automatically authorized.");
+		[self updateHostMicrophonePermissionStatus];
+	}
 }
 
 - (IBAction) toggleCheats:(id)sender
@@ -903,22 +1118,25 @@
 	[panel setAllowsMultipleSelection:NO];
 	[panel setTitle:@"Select R4 Directory"];
 	
-	// The NSOpenPanel/NSSavePanel method -(void)beginSheetForDirectory:file:types:modalForWindow:modalDelegate:didEndSelector:contextInfo
-	// is deprecated in Mac OS X v10.6.
 #if MAC_OS_X_VERSION_MIN_REQUIRED > MAC_OS_X_VERSION_10_5
-	[panel beginSheetModalForWindow:slot1ManagerWindow
-				  completionHandler:^(NSInteger result) {
-					  [self didEndChooseSlot1R4Directory:panel returnCode:result contextInfo:nil];
-				  } ];
-#else
-	[panel beginSheetForDirectory:nil
-							 file:nil
-							types:nil
-				   modalForWindow:slot1ManagerWindow
-					modalDelegate:self
-				   didEndSelector:@selector(didEndChooseSlot1R4Directory:returnCode:contextInfo:)
-					  contextInfo:nil];
+	if (IsOSXVersionSupported(10, 6, 0))
+	{
+		[panel beginSheetModalForWindow:slot1ManagerWindow
+					  completionHandler:^(NSInteger result) {
+						  [self didEndChooseSlot1R4Directory:panel returnCode:(int)result contextInfo:nil];
+					  } ];
+	}
+	else
 #endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_6( [panel beginSheetForDirectory:nil
+																 file:nil
+																types:nil
+													   modalForWindow:slot1ManagerWindow
+														modalDelegate:self
+													   didEndSelector:@selector(didEndChooseSlot1R4Directory:returnCode:contextInfo:)
+														  contextInfo:nil] );
+	}
 }
 
 - (IBAction) slot1Eject:(id)sender
@@ -1105,7 +1323,7 @@
 	NSWindow *sheet = [(NSControl *)sender window];
 	const NSInteger code = [(NSControl *)sender tag];
 	
-    [NSApp endSheet:sheet returnCode:code];
+	[CocoaDSUtil endSheet:sheet returnCode:code];
 }
 
 #pragma mark Class Methods
@@ -1632,11 +1850,25 @@
 		[self setIsUserInterfaceBlockingExecution:YES];
 		[self setIsShowingFileMigrationDialog:YES];
 		
-		[NSApp beginSheet:saveFileMigrationSheet
-		   modalForWindow:[[windowList objectAtIndex:0] window]
-            modalDelegate:self
-		   didEndSelector:@selector(didEndFileMigrationSheet:returnCode:contextInfo:)
-			  contextInfo:fileURL];
+		NSWindow *window = [[windowList objectAtIndex:0] window];
+		
+#if defined(MAC_OS_X_VERSION_10_9) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_9)
+		if ([window respondsToSelector:@selector(beginSheet:completionHandler:)])
+		{
+			[window beginSheet:saveFileMigrationSheet
+			 completionHandler:^(NSModalResponse response) {
+				[self didEndFileMigrationSheet:nil returnCode:response contextInfo:fileURL];
+			} ];
+		}
+		else
+#endif
+		{
+			SILENCE_DEPRECATION_MACOS_10_10( [NSApp beginSheet:saveFileMigrationSheet
+												modalForWindow:window
+												 modalDelegate:self
+												didEndSelector:@selector(didEndFileMigrationSheet:returnCode:contextInfo:)
+												   contextInfo:fileURL] );
+		}
 	}
 	else
 	{
@@ -1679,11 +1911,41 @@
 		[self setIsUserInterfaceBlockingExecution:YES];
 		[self setIsShowingSaveStateDialog:YES];
 		
-		[NSApp beginSheet:saveStatePrecloseSheet
-		   modalForWindow:(NSWindow *)[[windowList objectAtIndex:0] window]
-            modalDelegate:self
-		   didEndSelector:endSheetSelector
-			  contextInfo:romURL];
+		NSWindow *window = [[windowList objectAtIndex:0] window];
+		
+#if defined(MAC_OS_X_VERSION_10_9) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_9)
+		if ([window respondsToSelector:@selector(beginSheet:completionHandler:)])
+		{
+			[window beginSheet:saveStatePrecloseSheet
+			 completionHandler:^(NSModalResponse response) {
+				switch (reasonID)
+				{
+					case REASONFORCLOSE_NORMAL:
+						[self didEndSaveStateSheet:nil returnCode:response contextInfo:romURL];
+						break;
+						
+					case REASONFORCLOSE_OPEN:
+						[self didEndSaveStateSheetOpen:nil returnCode:response contextInfo:romURL];
+						break;
+						
+					case REASONFORCLOSE_TERMINATE:
+						[self didEndSaveStateSheetTerminate:nil returnCode:response contextInfo:romURL];
+						break;
+						
+					default:
+						break;
+				}
+			} ];
+		}
+		else
+#endif
+		{
+			SILENCE_DEPRECATION_MACOS_10_10( [NSApp beginSheet:saveStatePrecloseSheet
+												modalForWindow:window
+												 modalDelegate:self
+												didEndSelector:endSheetSelector
+												   contextInfo:romURL] );
+		}
 	}
 	else
 	{
@@ -1774,75 +2036,8 @@
 	[romInfoPanelController setContent:[theRom bindings]];
 	
 	// If the ROM has an associated cheat file, load it now.
-	NSString *cheatsPath = [[CocoaDSFile fileURLFromRomURL:[theRom fileURL] toKind:@"Cheat"] path];
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
-	CocoaDSCheatManager *newCheatList = [[[CocoaDSCheatManager alloc] initWithFileURL:[NSURL fileURLWithPath:cheatsPath]] autorelease];
-	if (newCheatList != nil)
-	{
-		NSMutableDictionary *cheatWindowBindings = (NSMutableDictionary *)[cheatWindowController content];
-		
-		[CocoaDSCheatManager setMasterCheatList:newCheatList];
-		[cheatListController setContent:[newCheatList list]];
-		[self setCdsCheats:newCheatList];
-		[cheatWindowBindings setValue:newCheatList forKey:@"cheatList"];
-		
-		NSString *filePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"R4Cheat_DatabasePath"];
-		if (filePath != nil)
-		{
-			NSURL *fileURL = [NSURL fileURLWithPath:filePath];
-			NSInteger error = 0;
-			NSMutableArray *dbList = [[self cdsCheats] cheatListFromDatabase:fileURL errorCode:&error];
-			if (dbList != nil)
-			{
-				[cheatDatabaseController setContent:dbList];
-				
-				NSString *titleString = [[self cdsCheats] dbTitle];
-				NSString *dateString = [[self cdsCheats] dbDate];
-				
-				[cheatWindowBindings setValue:titleString forKey:@"cheatDBTitle"];
-				[cheatWindowBindings setValue:dateString forKey:@"cheatDBDate"];
-				[cheatWindowBindings setValue:[NSString stringWithFormat:@"%ld", (unsigned long)[dbList count]] forKey:@"cheatDBItemCount"];
-			}
-			else
-			{
-				[cheatWindowBindings setValue:@"---" forKey:@"cheatDBItemCount"];
-				
-				switch (error)
-				{
-					case CHEATEXPORT_ERROR_FILE_NOT_FOUND:
-						NSLog(@"R4 Cheat Database read failed! Could not load the database file!");
-						[cheatWindowBindings setValue:@"Database not loaded." forKey:@"cheatDBTitle"];
-						[cheatWindowBindings setValue:@"CANNOT LOAD FILE" forKey:@"cheatDBDate"];
-						break;
-						
-					case CHEATEXPORT_ERROR_WRONG_FILE_FORMAT:
-						NSLog(@"R4 Cheat Database read failed! Wrong file format!");
-						[cheatWindowBindings setValue:@"Database load error." forKey:@"cheatDBTitle"];
-						[cheatWindowBindings setValue:@"FAILED TO LOAD FILE" forKey:@"cheatDBDate"];
-						break;
-						
-					case CHEATEXPORT_ERROR_SERIAL_NOT_FOUND:
-						NSLog(@"R4 Cheat Database read failed! Could not find the serial number for this game in the database!");
-						[cheatWindowBindings setValue:@"ROM not found in database." forKey:@"cheatDBTitle"];
-						[cheatWindowBindings setValue:@"ROM not found." forKey:@"cheatDBDate"];
-						break;
-						
-					case CHEATEXPORT_ERROR_EXPORT_FAILED:
-						NSLog(@"R4 Cheat Database read failed! Could not read the database file!");
-						[cheatWindowBindings setValue:@"Database read error." forKey:@"cheatDBTitle"];
-						[cheatWindowBindings setValue:@"CANNOT READ FILE" forKey:@"cheatDBDate"];
-						break;
-						
-					default:
-						break;
-				}
-			}
-		}
-		
-		[cheatWindowDelegate setCdsCheats:newCheatList];
-		[[cheatWindowDelegate cdsCheatSearch] setRwlockCoreExecute:[cdsCore rwlockCoreExecute]];
-		[cheatWindowDelegate setCheatSearchViewByStyle:CHEATSEARCH_SEARCHSTYLE_EXACT_VALUE];
-	}
+	[cheatWindowDelegate cheatSystemStart:[cdsCore cdsCheatManager]];
 	
 	// Add the last loaded ROM to the Recent ROMs list.
 	[[NSDocumentController sharedDocumentController] noteNewRecentDocumentURL:[theRom fileURL]];
@@ -1888,35 +2083,19 @@
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 	[self setCurrentSaveStateURL:nil];
 	
+	[self setIsWorking:YES];
 	isSaveStateEdited = NO;
 	for (DisplayWindowController *windowController in windowList)
 	{
 		[[windowController window] setDocumentEdited:isSaveStateEdited];
+		[[windowController window] displayIfNeeded];
 	}
 	
-	// Save the ROM's cheat list before unloading.
-	[[self cdsCheats] save];
+	[cheatWindowDelegate cheatSystemEnd];
 	
 	// Update the UI to indicate that the ROM has started the process of unloading.
 	[self setStatusText:NSSTRING_STATUS_ROM_UNLOADING];
 	[romInfoPanelController setContent:[CocoaDSRom romNotLoadedBindings]];
-	[cheatListController setContent:nil];
-	[cheatWindowDelegate resetSearch:nil];
-	[cheatWindowDelegate setCdsCheats:nil];
-	[cheatDatabaseController setContent:nil];
-	
-	NSMutableDictionary *cheatWindowBindings = (NSMutableDictionary *)[cheatWindowController content];
-	[cheatWindowBindings setValue:@"No ROM loaded." forKey:@"cheatDBTitle"];
-	[cheatWindowBindings setValue:@"No ROM loaded." forKey:@"cheatDBDate"];
-	[cheatWindowBindings setValue:@"---" forKey:@"cheatDBItemCount"];
-	[cheatWindowBindings setValue:nil forKey:@"cheatList"];
-	
-	[self setIsWorking:YES];
-	
-	for (DisplayWindowController *windowController in windowList)
-	{
-		[[windowController window] displayIfNeeded];
-	}
 	
 	// Unload the ROM.
 	if (![cdsCore emuFlagUseExternalBios] || ![cdsCore emuFlagUseExternalFirmware])
@@ -1926,14 +2105,6 @@
 	
 	[[self currentRom] release];
 	[self setCurrentRom:nil];
-	
-	// Release the current cheat list and assign the empty list.
-	[self setCdsCheats:nil];
-	if (dummyCheatList == nil)
-	{
-		dummyCheatList = [[CocoaDSCheatManager alloc] init];
-	}
-	[CocoaDSCheatManager setMasterCheatList:dummyCheatList];
 	
 	// Update the UI to indicate that the ROM has finished unloading.
 	[self updateAllWindowTitles];
@@ -1953,11 +2124,6 @@
 	[slot2WindowDelegate setAutoSelectedDeviceText:[[slot2WindowDelegate deviceManager] autoSelectedDeviceName]];
 	[[slot2WindowDelegate deviceManager] updateStatus];
 	
-	for (DisplayWindowController *windowController in windowList)
-	{
-		[[windowController window] displayIfNeeded];
-	}
-	
 	[cdsCore setSlot1StatusText:NSSTRING_STATUS_EMULATION_NOT_RUNNING];
 	[cdsCore updateCurrentSessionMACAddressString:NO];
 	[[cdsCore cdsController] reset];
@@ -1965,6 +2131,93 @@
 	result = YES;
 	
 	return result;
+}
+
+- (void) updateCheatDatabaseRecentsMenu:(NSNotification *)aNotification
+{
+	NSArray *dbRecentsList = (NSArray *)[aNotification object];
+	BOOL needReleaseObject = (dbRecentsList != nil);
+	
+	if ( (dbRecentsList == nil) || ([dbRecentsList count] == 0) )
+	{
+		dbRecentsList = [[NSUserDefaults standardUserDefaults] arrayForKey:@"CheatDatabase_RecentFilePath"];
+	}
+	
+	NSMutableArray *newRecentsList = [NSMutableArray arrayWithArray:dbRecentsList];
+	
+	// Note that we're relying on the notification object to retain this prior to
+	// sending the notification.
+	if (needReleaseObject)
+	{
+		[dbRecentsList release];
+	}
+	
+	NSString *legacyFilePath = [[NSUserDefaults standardUserDefaults] stringForKey:@"R4Cheat_DatabasePath"];
+	BOOL useLegacyFilePath = ( (legacyFilePath != nil) && ([legacyFilePath length] > 0) );
+	
+	if (useLegacyFilePath)
+	{
+		// We need to check if the legacy file path also exists in the recents list.
+		// If it does, then the recents list version takes priority.
+		for (NSDictionary *dbRecentItem in dbRecentsList)
+		{
+			NSString *dbRecentItemFilePath = (NSString *)[dbRecentItem valueForKey:@"FilePath"];
+			if ([dbRecentItemFilePath isEqualToString:legacyFilePath])
+			{
+				useLegacyFilePath = NO;
+				break;
+			}
+		}
+	}
+	
+	if (useLegacyFilePath)
+	{
+		// The legacy file path must always be the first entry of the recents list.
+		NSDictionary *legacyRecentItem = [NSDictionary dictionaryWithObjectsAndKeys:legacyFilePath, @"FilePath",
+										  [legacyFilePath lastPathComponent], @"FileName",
+										  nil];
+		[newRecentsList insertObject:legacyRecentItem atIndex:0];
+		
+		if ([newRecentsList count] == 1)
+		{
+			// If the legacy file path is the only item in the recents list, then we can write it
+			// back to user defaults right now.
+			[[NSUserDefaults standardUserDefaults] setObject:newRecentsList forKey:@"CheatDatabase_RecentFilePath"];
+		}
+	}
+	
+	NSArray *recentsMenuItems = [cheatDatabaseRecentsMenu itemArray];
+	for (NSMenuItem *menuItem in recentsMenuItems)
+	{
+		if ( [menuItem action] == @selector(openRecentCheatDatabase:) )
+		{
+			[cheatDatabaseRecentsMenu removeItem:menuItem];
+		}
+	}
+	
+	if ([newRecentsList count] > 0)
+	{
+		if ( ![[cheatDatabaseRecentsMenu itemAtIndex:0] isSeparatorItem] )
+		{
+			[cheatDatabaseRecentsMenu insertItem:[NSMenuItem separatorItem] atIndex:0];
+		}
+	}
+	
+	// Recent files are added in reverse order, in which least recent files appear below
+	// more recent files in the menu. The most recent file should be at the top of the menu.
+	for (NSDictionary *recentItem in newRecentsList)
+	{
+		NSString *menuNameString = [recentItem objectForKey:@"FileName"];
+		if ( (menuNameString == nil) || ([menuNameString length] == 0) )
+		{
+			menuNameString = [recentItem objectForKey:@"FilePath"];
+		}
+		
+		NSMenuItem *newMenuItem = [[[NSMenuItem alloc] initWithTitle:menuNameString action:@selector(openRecentCheatDatabase:) keyEquivalent:@""] autorelease];
+		[newMenuItem setTag:[newRecentsList indexOfObject:recentItem]];
+		[newMenuItem setTarget:self];
+		[cheatDatabaseRecentsMenu insertItem:newMenuItem atIndex:0];
+	}
 }
 
 - (void) handleNDSError:(NSNotification *)aNotification
@@ -2004,11 +2257,36 @@
 	newTextFieldRect.size.height = 16.0f * lineCount;
 	[ndsErrorStatusTextField setFrame:newTextFieldRect];
 	
-	[NSApp beginSheet:ndsErrorSheet
-	   modalForWindow:(NSWindow *)[[windowList objectAtIndex:0] window]
-		modalDelegate:self
-	   didEndSelector:@selector(didEndErrorSheet:returnCode:contextInfo:)
-		  contextInfo:nil];
+	NSWindow *window = [[windowList objectAtIndex:0] window];
+	
+#if defined(MAC_OS_X_VERSION_10_9) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_9)
+	if ([window respondsToSelector:@selector(beginSheet:completionHandler:)])
+	{
+		[window beginSheet:ndsErrorSheet
+		 completionHandler:^(NSModalResponse response) {
+			[self didEndErrorSheet:nil returnCode:response contextInfo:nil];
+		} ];
+	}
+	else
+#endif
+	{
+		SILENCE_DEPRECATION_MACOS_10_10( [NSApp beginSheet:ndsErrorSheet
+											modalForWindow:window
+											 modalDelegate:self
+											didEndSelector:@selector(didEndErrorSheet:returnCode:contextInfo:)
+											   contextInfo:nil] );
+	}
+}
+
+- (void) handleEmulatorExecutionState:(NSNotification *)aNotification
+{
+	CocoaDSCore *cdsCore = [aNotification object];
+	NSDictionary *userInfo = [aNotification userInfo];
+	ExecutionBehavior execState = (ExecutionBehavior)[(NSNumber *)[userInfo valueForKey:@"ExecutionState"] integerValue];
+	NSString *frameStatusString = (NSString *)[userInfo valueForKey:@"FrameStatusString"];
+	
+	[cdsCore setEmulationPaused:(execState == ExecutionBehavior_Pause)];
+	[cdsCore setFrameStatus:frameStatusString];
 }
 
 - (void) addOutputToCore:(CocoaDSOutput *)theOutput
@@ -2055,31 +2333,35 @@
 {
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 	CocoaDSController *cdsController = [cdsCore cdsController];
-	NSImage *micIcon = iconMicDisabled;
+	NSImage *micIcon = ([self isRunningDarkMode]) ? iconMicDisabledDM : iconMicDisabled;
 	
-	if ([cdsController softwareMicState])
+	if (![cdsCore emulationPaused])
 	{
-		micIcon = iconMicManualOverride;
-	}
-	else
-	{
-		if ([cdsController isHardwareMicAvailable])
+		if ([cdsController softwareMicState])
 		{
-			if ([cdsController hardwareMicPause])
+			micIcon = iconMicManualOverride;
+		}
+		else
+		{
+			micIcon = iconMicIdleNoHardware;
+			
+			if (![cdsController hardwareMicMute])
 			{
-				micIcon = iconMicDisabled;
-			}
-			else if ([cdsController isHardwareMicInClip])
-			{
-				micIcon = iconMicInClip;
-			}
-			else if ([cdsController isHardwareMicIdle])
-			{
-				micIcon = iconMicIdle;
-			}
-			else
-			{
-				micIcon = iconMicActive;
+				if ([cdsController isHardwareMicAvailable])
+				{
+					if ([cdsController isHardwareMicInClip])
+					{
+						micIcon = iconMicInClip;
+					}
+					else if ([cdsController isHardwareMicIdle])
+					{
+						micIcon = iconMicIdle;
+					}
+					else
+					{
+						micIcon = iconMicActive;
+					}
+				}
 			}
 		}
 	}
@@ -2088,6 +2370,8 @@
 	{
 		[self performSelectorOnMainThread:@selector(setCurrentMicStatusIcon:) withObject:micIcon waitUntilDone:NO];
 	}
+	
+	[ndsMicLevelIndicator performSelectorOnMainThread:@selector(setNeedsDisplay) withObject:nil waitUntilDone:NO];
 }
 
 - (AudioSampleBlockGenerator *) selectedAudioFileGenerator
@@ -2111,7 +2395,7 @@
 	
 	switch (returnCode)
 	{
-		case NSOKButton:
+		case GUI_RESPONSE_OK:
 			[CocoaDSFile moveFileToCurrentDirectory:romSaveURL];
 			break;
 			
@@ -2133,7 +2417,7 @@
 	
 	switch (returnCode)
 	{
-		case NSCancelButton: // Cancel
+		case GUI_RESPONSE_CANCEL: // Cancel
 			[self restoreCoreState];
 			[self setIsUserInterfaceBlockingExecution:NO];
 			[self setIsShowingSaveStateDialog:NO];
@@ -2177,7 +2461,7 @@
 {
 	[self didEndSaveStateSheet:sheet returnCode:returnCode contextInfo:contextInfo];
 	
-	if (returnCode == NSCancelButton)
+	if (returnCode == GUI_RESPONSE_CANCEL)
 	{
 		[NSApp replyToApplicationShouldTerminate:NO];
 	}
@@ -2194,7 +2478,7 @@
 {
 	[sheet orderOut:self];
 	
-	if (returnCode == NSCancelButton)
+	if (returnCode == GUI_RESPONSE_CANCEL)
 	{
 		return;
 	}
@@ -2222,7 +2506,7 @@
 			[self reset:self];
 			break;
 			
-		case NSCancelButton: // Stop
+		case GUI_RESPONSE_CANCEL: // Stop
 		default:
 			break;
 	}
@@ -2312,8 +2596,8 @@
 	
 	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
 	[cdsCore updateCurrentSessionMACAddressString:NO];
-	[screenshotCaptureToolDelegate setSharedData:[[cdsCore cdsGPU] sharedData]];
-	[avCaptureToolDelegate setSharedData:[[cdsCore cdsGPU] sharedData]];
+	[screenshotCaptureToolDelegate setFetchObject:[[cdsCore cdsGPU] fetchObject]];
+	[avCaptureToolDelegate setFetchObject:[[cdsCore cdsGPU] fetchObject]];
 	[self fillOpenGLMSAAMenu];
 }
 
@@ -2346,6 +2630,60 @@
 	}
 	
 	[openglMSAAPopUpButton selectItemAtIndex:0];
+}
+
+- (NSInteger) updateHostMicrophonePermissionStatus
+{
+	CocoaDSCore *cdsCore = (CocoaDSCore *)[cdsCoreController content];
+	CocoaDSController *cdsController = [cdsCore cdsController];
+	
+	NSInteger authStatus = 0;
+	
+#if HAVE_OSAVAILABLE && defined(MAC_OS_X_VERSION_10_14) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14)
+	if (IsOSXVersionSupported(10, 14, 0))
+	{
+		if (@available(macOS 10.14, *))
+		{
+			BOOL authFlag = NO;
+			authStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+			
+			switch (authStatus)
+			{
+				case AVAuthorizationStatusNotDetermined:
+					[self setMicStatusTooltip:@"Hardware microphone usage has yet to be authorized. If you need access, click \"OK\" when DeSmuME requests permission from the system."];
+					break;
+					
+				case AVAuthorizationStatusRestricted:
+					[self setMicStatusTooltip:@"Hardware microphone usage has been restricted. Please see your system administrator."];
+					break;
+					
+				case AVAuthorizationStatusDenied:
+					[self setMicStatusTooltip:@"Hardware microphone usage has been denied. If you need access, change your microphone privacy settings for DeSmuME in System Preferences."];
+					break;
+						
+				case AVAuthorizationStatusAuthorized:
+					[self setMicStatusTooltip:@""];
+					authFlag = YES;
+					break;
+					
+				default:
+					[self setMicStatusTooltip:@"Hardware microphone usage is currently unknown. If you need access, change your microphone privacy settings for DeSmuME in System Preferences."];
+					break;
+			}
+			
+			[cdsController setHardwareMicAuthorization:authFlag];
+		}
+	}
+	else
+#endif
+	{
+		authStatus = 3; // AVAuthorizationStatusAuthorized
+		[self setMicStatusTooltip:@""];
+		[cdsController setHardwareMicAuthorization:YES];
+	}
+	
+	[self updateMicStatusIcon];
+	return authStatus;
 }
 
 - (void) readUserDefaults
@@ -2399,7 +2737,7 @@
 	[[cdsCore cdsGPU] setOpenGLEmulateNDSDepthCalculation:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_OpenGL_EmulateNDSDepthCalculation"]];
 	[[cdsCore cdsGPU] setOpenGLEmulateDepthLEqualPolygonFacing:[[NSUserDefaults standardUserDefaults] boolForKey:@"Render3D_OpenGL_EmulateDepthLEqualPolygonFacing"]];
 	
-	[[[cdsCore cdsGPU] sharedData] fetchSynchronousAtIndex:0];
+	((MacGPUFetchObjectAsync *)[[cdsCore cdsGPU] fetchObject])->FetchSynchronousAtIndex(0);
 	
 	// Set the stylus options per user preferences.
 	[[cdsCore cdsController] setStylusPressure:[[NSUserDefaults standardUserDefaults] integerForKey:@"Emulation_StylusPressure"]];
@@ -2635,6 +2973,18 @@
 	}
 }
 
+- (void) handleAppearanceChange
+{
+	const BOOL newDarkModeState = [CocoaDSUtil determineDarkModeAppearance];
+	
+	if (newDarkModeState != [self isRunningDarkMode])
+	{
+		[self setIsRunningDarkMode:newDarkModeState];
+		[self setCurrentVolumeValue:[self currentVolumeValue]];
+		[self updateMicStatusIcon];
+	}
+}
+
 #pragma mark NSUserInterfaceValidations Protocol
 
 - (BOOL)validateUserInterfaceItem:(id <NSValidatedUserInterfaceItem>)theItem
@@ -2792,11 +3142,11 @@
 		{
 			if ([CocoaDSFile saveStateExistsForSlot:[[self currentRom] fileURL] slotNumber:[theItem tag] + 1])
 			{
-				[(NSMenuItem*)theItem setState:NSOnState];
+				[(NSMenuItem*)theItem setState:GUI_STATE_ON];
 			}
 			else
 			{
-				[(NSMenuItem*)theItem setState:NSOffState];
+				[(NSMenuItem*)theItem setState:GUI_STATE_OFF];
 			}
 		}
 	}
@@ -2821,6 +3171,13 @@
 			enable = NO;
 		}
 	}
+	else if (theAction == @selector(clearCheatDatabaseRecents:))
+	{
+		if ([cheatDatabaseRecentsMenu numberOfItems] < 2)
+		{
+			enable = NO;
+		}
+	}
 	else if (theAction == @selector(changeCoreSpeed:))
 	{
 		NSInteger speedScalar = (NSInteger)([cdsCore speedScalar] * 100.0);
@@ -2833,16 +3190,16 @@
 					speedScalar == (NSInteger)(SPEED_SCALAR_NORMAL * 100.0) ||
 					speedScalar == (NSInteger)(SPEED_SCALAR_DOUBLE * 100.0))
 				{
-					[(NSMenuItem*)theItem setState:NSOffState];
+					[(NSMenuItem*)theItem setState:GUI_STATE_OFF];
 				}
 				else
 				{
-					[(NSMenuItem*)theItem setState:NSOnState];
+					[(NSMenuItem*)theItem setState:GUI_STATE_ON];
 				}
 			}
 			else
 			{
-				[(NSMenuItem*)theItem setState:(speedScalar == [theItem tag]) ? NSOnState : NSOffState];
+				[(NSMenuItem*)theItem setState:(speedScalar == [theItem tag]) ? GUI_STATE_ON : GUI_STATE_OFF];
 			}
 		}
 		else if ([(id)theItem isMemberOfClass:[NSToolbarItem class]])
@@ -2880,6 +3237,13 @@
 			enable = NO;
 		}
 	}
+	else if (theAction == @selector(framesToSkipSetting:))
+	{
+		if ([(id)theItem isMemberOfClass:[NSMenuItem class]])
+		{
+			[(NSMenuItem*)theItem setState:([cdsCore framesToSkipSetting] == [theItem tag]) ? GUI_STATE_ON : GUI_STATE_OFF];
+		}
+	}
 	else if (theAction == @selector(toggleCheats:))
 	{
 		if ([(id)theItem isMemberOfClass:[NSMenuItem class]])
@@ -2891,7 +3255,7 @@
 	{
 		if ([(id)theItem isMemberOfClass:[NSMenuItem class]])
 		{
-			[(NSMenuItem*)theItem setState:([self selectedRomSaveTypeID] == [theItem tag]) ? NSOnState : NSOffState];
+			[(NSMenuItem*)theItem setState:([self selectedRomSaveTypeID] == [theItem tag]) ? GUI_STATE_ON : GUI_STATE_OFF];
 		}
 	}
 	else if (theAction == @selector(openEmuSaveState:) ||
@@ -2917,7 +3281,7 @@
 	{
 		if ([(id)theItem isMemberOfClass:[NSMenuItem class]])
 		{
-			[(NSMenuItem*)theItem setState:([cdsCore.cdsGPU gpuStateByBit:[theItem tag]]) ? NSOnState : NSOffState];
+			[(NSMenuItem*)theItem setState:([[cdsCore cdsGPU] gpuStateByBit:(UInt32)[theItem tag]]) ? GUI_STATE_ON : GUI_STATE_OFF];
 		}
 	}
 	
@@ -2934,8 +3298,9 @@
 - (void) doMicHardwareStateChangedFromController:(CocoaDSController *)cdsController
 									   isEnabled:(BOOL)isHardwareEnabled
 										isLocked:(BOOL)isHardwareLocked
+									isAuthorized:(BOOL)isAuthorized
 {
-	const BOOL hwMicAvailable = (isHardwareEnabled && !isHardwareLocked);
+	const BOOL hwMicAvailable = (isHardwareEnabled && !isHardwareLocked && isAuthorized);
 	[self setIsHardwareMicAvailable:hwMicAvailable];
 	[self updateMicStatusIcon];
 }

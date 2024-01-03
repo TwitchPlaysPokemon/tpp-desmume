@@ -1,6 +1,6 @@
 /* cheats.cpp - this file is part of DeSmuME
  *
- * Copyright (C) 2006-2009 DeSmuME Team
+ * Copyright (C) 2006-2023 DeSmuME Team
  *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,25 +77,26 @@ enabled_toggled(GtkCellRendererToggle * cell,
     GtkTreeModel *model = (GtkTreeModel *) data;
     GtkTreeIter iter;
     GtkTreePath *path = gtk_tree_path_new_from_string(path_str);
-    gboolean enabled;
+    gboolean guiEnabled;
 
     gtk_tree_model_get_iter(model, &iter, path);
-    gtk_tree_model_get(model, &iter, COLUMN_ENABLED, &enabled, -1);
+    gtk_tree_model_get(model, &iter, COLUMN_ENABLED, &guiEnabled, -1);
 
-    enabled ^= 1;
-    CHEATS_LIST cheat;
+    guiEnabled ^= 1;
+    const bool cheatEnabled = (guiEnabled) ? true : false;
+    CHEATS_LIST tempCheatItem;
     u32 ii;
     GtkTreePath *path1;
 
     path1 = gtk_tree_model_get_path (model, &iter);
     ii = gtk_tree_path_get_indices (path)[0];
 
-    cheats->get(&cheat, ii);
+	cheats->copyItemFromIndex(ii, tempCheatItem);
 
-    cheats->update(cheat.size, cheat.code[0][0], cheat.code[0][1], cheat.description,
-                 enabled, ii);
+    cheats->update(tempCheatItem.size, tempCheatItem.code[0][0], tempCheatItem.code[0][1], tempCheatItem.description,
+                 cheatEnabled, ii);
 
-    gtk_list_store_set(GTK_LIST_STORE(model), &iter, COLUMN_ENABLED, enabled, -1);
+    gtk_list_store_set(GTK_LIST_STORE(model), &iter, COLUMN_ENABLED, guiEnabled, -1);
 
     gtk_tree_path_free(path);
 }
@@ -121,7 +122,7 @@ static void cheat_list_modify_cheat(GtkCellRendererText * cell,
         path1 = gtk_tree_model_get_path (model, &iter);
         ii = gtk_tree_path_get_indices (path)[0];
 
-        cheats->get(&cheat, ii);
+		cheats->copyItemFromIndex(ii, cheat);
 
         gtk_tree_path_free (path1);
 
@@ -180,7 +181,7 @@ static void cheat_list_add_cheat(GtkWidget * widget, gpointer data)
 #define NEW_DESC "New cheat"
     GtkListStore *store = (GtkListStore *) data;
     GtkTreeIter iter;
-    cheats->add(1, 0, 0, g_strdup(NEW_DESC), FALSE);
+    cheats->add(1, 0, 0, g_strdup(NEW_DESC), false);
     gtk_list_store_append(store, &iter);
     gtk_list_store_set(store, &iter,
                        COLUMN_ENABLED, FALSE,
@@ -276,7 +277,7 @@ static void cheatListEnd()
 {
     cheats->save();
     if(shouldBeRunning)
-        Launch();
+        Launch(NULL, NULL, NULL);
 }
 
 static GtkListStore *cheat_list_populate()
@@ -285,10 +286,10 @@ static GtkListStore *cheat_list_populate()
             G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING);
 
     CHEATS_LIST cheat;
-    u32 chsize = cheats->getSize();
+    u32 chsize = cheats->getListSize();
     for(u32 ii = 0; ii < chsize; ii++){
         GtkTreeIter iter;
-        cheats->get(&cheat, ii);
+		cheats->copyItemFromIndex(ii, cheat);
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter,
                 COLUMN_ENABLED, cheat.enabled,
@@ -305,13 +306,13 @@ static GtkWidget *cheat_list_create_ui()
 {
     GtkListStore *store = cheat_list_populate();
     GtkWidget *tree = gtk_tree_view_new_with_model (GTK_TREE_MODEL (store));
-    GtkWidget *vbox = gtk_vbox_new(FALSE, 1);
-    GtkWidget *hbbox = gtk_hbutton_box_new();
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *hbbox = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
     GtkWidget *button;
   
-    gtk_container_add(GTK_CONTAINER(vbox), GTK_WIDGET(tree));
-    gtk_container_add(GTK_CONTAINER(vbox), GTK_WIDGET(hbbox));
-    gtk_container_add(GTK_CONTAINER(win), GTK_WIDGET(vbox));
+    gtk_container_add(GTK_CONTAINER(box), GTK_WIDGET(tree));
+    gtk_container_add(GTK_CONTAINER(box), GTK_WIDGET(hbbox));
+    gtk_container_add(GTK_CONTAINER(win), GTK_WIDGET(box));
 
     button = gtk_button_new_with_label("add cheat");
     g_signal_connect (button, "clicked", G_CALLBACK (cheat_list_add_cheat), store);
@@ -331,10 +332,10 @@ static GtkWidget *cheat_list_create_ui()
     return tree;
 }
 
-void CheatList ()
+void CheatList(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     shouldBeRunning = desmume_running();
-    Pause();
+    Pause(NULL, NULL, NULL);
     win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(win),"Cheat List");
     gtk_window_set_modal(GTK_WINDOW(win), TRUE);
@@ -352,15 +353,15 @@ void CheatList ()
 static void cheat_search_create_ui()
 {
     GtkWidget *button;
-    GtkWidget *vbox = gtk_vbox_new(FALSE, 1);
-    GtkWidget *hbbox = gtk_hbutton_box_new();
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *hbbox = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
     GtkWidget *b;
     
-    gtk_container_add(GTK_CONTAINER(win), GTK_WIDGET(vbox));
+    gtk_container_add(GTK_CONTAINER(win), GTK_WIDGET(box));
 
     {
-        b = gtk_hbox_new(FALSE, 1);
-        gtk_container_add(GTK_CONTAINER(vbox), GTK_WIDGET(b));
+        b = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
+        gtk_container_add(GTK_CONTAINER(box), GTK_WIDGET(b));
 
         {
             GtkTreeModel * size_model;
@@ -381,8 +382,8 @@ static void cheat_search_create_ui()
             gtk_container_add(GTK_CONTAINER(b), w);
         }
 
-        b = gtk_hbox_new(FALSE, 1);
-        gtk_container_add(GTK_CONTAINER(vbox), GTK_WIDGET(b));
+        b = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
+        gtk_container_add(GTK_CONTAINER(box), GTK_WIDGET(b));
 
         {
             GtkWidget *w;
@@ -407,7 +408,7 @@ static void cheat_search_create_ui()
 
     // BUTTONS:
 
-    gtk_container_add(GTK_CONTAINER(vbox), GTK_WIDGET(hbbox));
+    gtk_container_add(GTK_CONTAINER(box), GTK_WIDGET(hbbox));
 
     button = gtk_button_new_with_label("add cheats");
 //    g_signal_connect (button, "clicked", g_callback (cheat_list_add_cheat), store);
@@ -417,18 +418,18 @@ static void cheat_search_create_ui()
 //    g_signal_connect (button, "clicked", g_callback (cheat_list_add_cheat), store);
     gtk_container_add(GTK_CONTAINER(hbbox),button);
 
-//    GtkWidget *vbox = gtk_vbox_new(FALSE, 1);
-//    gtk_container_add(GTK_CONTAINER(win), GTK_WIDGET(vbox));
+//    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+//    gtk_container_add(GTK_CONTAINER(win), GTK_WIDGET(box));
 }
 
 static void cheatSearchEnd()
 {
 }
 
-void CheatSearch ()
+void CheatSearch(GSimpleAction *action, GVariant *parameter, gpointer user_data)
 {
     shouldBeRunning = desmume_running();
-    Pause();
+    Pause(NULL, NULL, NULL);
     win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(win),"Cheat Search");
     gtk_window_set_modal(GTK_WINDOW(win), TRUE);

@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2011 Roger Manuel
-	Copyright (C) 2012-2018 DeSmuME team
+	Copyright (C) 2012-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -53,19 +53,43 @@
 + (BOOL) getIBActionSenderButtonStateBool:(id)sender
 {
 	BOOL theState = NO;
-	NSInteger buttonState = NSOffState;
+	
+#if defined(MAC_OS_X_VERSION_10_14) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14)
+	NSControlStateValue buttonState = GUI_STATE_OFF;
+#else
+	NSInteger buttonState = GUI_STATE_OFF;
+#endif
 	
 	if ([sender respondsToSelector:@selector(state)])
 	{
 		buttonState = [sender state];
 	}
 	
-	if (buttonState == NSOnState)
+	if (buttonState == GUI_STATE_ON)
 	{
 		theState = YES;
 	}
 	
 	return theState;
+}
+
++ (void) endSheet:(NSWindow *)sheet returnCode:(NSInteger)code
+{
+	if (sheet == nil)
+	{
+		return;
+	}
+	
+#if defined(MAC_OS_X_VERSION_10_9) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_9)
+	if ([sheet respondsToSelector:@selector(sheetParent)] && [[sheet sheetParent] respondsToSelector:@selector(endSheet:returnCode:)])
+	{
+		[[sheet sheetParent] endSheet:sheet returnCode:code];
+	}
+	else
+#endif
+	{
+		[NSApp endSheet:sheet returnCode:code];
+	}
 }
 
 + (NSColor *) NSColorFromRGBA8888:(uint32_t)theColor
@@ -87,9 +111,9 @@
 
 + (uint32_t) RGBA8888FromNSColor:(NSColor *)theColor
 {
-	if (![[theColor colorSpaceName] isEqualToString:NSDeviceRGBColorSpace])
+	if ([theColor colorSpace] != [NSColorSpace deviceRGBColorSpace])
 	{
-		theColor = [theColor colorUsingColorSpaceName:NSDeviceRGBColorSpace];
+		theColor = [theColor colorUsingColorSpace:[NSColorSpace deviceRGBColorSpace]];
 		if (theColor == nil)
 		{
 			return 0x00000000;
@@ -112,6 +136,31 @@
 #endif
 }
 
++ (NSString *) filePathFromCPath:(const char *)cPath
+{
+	if (cPath == NULL)
+	{
+		return nil;
+	}
+	
+	return [[NSFileManager defaultManager] stringWithFileSystemRepresentation:cPath length:strlen(cPath)];
+}
+
++ (NSURL *) fileURLFromCPath:(const char *)cPath
+{
+	return [NSURL fileURLWithPath:[CocoaDSUtil filePathFromCPath:cPath]];
+}
+
++ (const char *) cPathFromFilePath:(NSString *)filePath
+{
+	return (filePath != nil) ? [filePath fileSystemRepresentation] : NULL;
+}
+
++ (const char *) cPathFromFileURL:(NSURL *)fileURL
+{
+	return (fileURL != nil) ? [CocoaDSUtil cPathFromFilePath:[fileURL path]] : NULL;
+}
+
 + (NSInteger) appVersionNumeric
 {
 	return (NSInteger)EMU_DESMUME_VERSION_NUMERIC();
@@ -130,6 +179,42 @@
 + (NSString *) appCompilerDetailString
 {
 	return [NSString stringWithCString:EMU_DESMUME_COMPILER_DETAIL() encoding:NSUTF8StringEncoding];
+}
+
++ (BOOL) determineDarkModeAppearance
+{
+	const NSInteger appAppearanceMode = [[NSUserDefaults standardUserDefaults] integerForKey:@"Debug_AppAppearanceMode"];
+	BOOL darkModeState = NO; // Default to Light Mode appearance
+	
+	if ( (appAppearanceMode == APP_APPEARANCEMODE_AUTOMATIC) && IsOSXVersionSupported(10, 10, 0) )
+	{
+		// We're doing a Yosemite-style check for Dark Mode by reading the AppleInterfaceStyle key from NSGlobalDomain.
+		//
+		// Apple recommends using [[NSView effectiveAppearance] name] to check for Dark Mode, which requires Mojave.
+		// While this Mojave method may be the "correct" method according to Apple, we would be forcing the user to
+		// run Mojave or later, with this method only being useful if DeSmuME's GUI uses a mix of both Light Mode and
+		// Dark Mode windows. We want to keep DeSmuME's GUI simple by only using a single appearance mode for the
+		// entire app, and so the Mojave method gives no benefits to DeSmuME over the Yosemite method, and because we
+		// don't want DeSmuME to be limited to running only on the more advanced versions of macOS.
+		//
+		// And so we call this method in response to the "AppleInterfaceThemeChangedNotification" notification from
+		// NSDistributedNotificationCenter. Doing this causes a serious technical problem to occur for the Mojave
+		// method, in which macOS Mojave and Cataline experience a race condition if you try to call
+		// [[NSView effectiveAppearance] name] when the user switches appearance modes in System Preferences. This
+		// race condition causes an unreliable read of the Dark Mode state on Mojave and Catalina.
+		//
+		// With the aforementioned reliability issue being the final straw on top of the previously mentioned reasons,
+		// this makes the Yosemite method for checking the Dark Mode state the correct choice.
+		const NSDictionary *globalPersistentDomain = [[NSUserDefaults standardUserDefaults] persistentDomainForName:NSGlobalDomain];
+		const NSString *interfaceStyle = [globalPersistentDomain valueForKey:@"AppleInterfaceStyle"];
+		darkModeState = (interfaceStyle != nil) && [interfaceStyle isEqualToString:@"Dark"] && IsOSXVersionSupported(10, 14, 0);
+	}
+	else if (appAppearanceMode == APP_APPEARANCEMODE_DARK)
+	{
+		darkModeState = YES; // Force Dark Mode appearance
+	}
+	
+	return darkModeState;
 }
 
 + (NSString *) operatingSystemString
@@ -230,7 +315,14 @@
 		return self;
 	}
 	
-	[self registerForDraggedTypes:[NSArray arrayWithObjects: NSURLPboardType, nil]];
+#if HAVE_OSAVAILABLE && defined(MAC_OS_X_VERSION_10_13) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_13)
+	// We need to use @available here when compiling against macOS v10.13 SDK and later in order to
+	// silence a silly warning.
+	if (@available(macOS 10_13, *))
+#endif
+	{
+		[self registerForDraggedTypes:[NSArray arrayWithObjects:PASTEBOARDTYPE_URL, nil]];
+	}
 	
 	return self;
 }
@@ -245,8 +337,18 @@
 {
 	NSDragOperation dragOp = NSDragOperationNone;
 	NSPasteboard *pboard = [sender draggingPasteboard];
+	BOOL pboardHasURL = NO;
 	
-	if ([[pboard types] containsObject:NSURLPboardType])
+#if HAVE_OSAVAILABLE && defined(MAC_OS_X_VERSION_10_13) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_13)
+	// We need to use @available here when compiling against macOS v10.13 SDK and later in order to
+	// silence a silly warning.
+	if (@available(macOS 10_13, *))
+#endif
+	{
+		pboardHasURL = [[pboard types] containsObject:PASTEBOARDTYPE_URL];
+	}
+	
+	if (pboardHasURL)
 	{
 		NSURL *fileURL = [NSURL URLFromPasteboard:pboard];
 		NSString *filePath = [fileURL path];
@@ -271,9 +373,19 @@
 	NSWindow *window = [self window];
 	id <DirectoryURLDragDestTextFieldProtocol> delegate = (id <DirectoryURLDragDestTextFieldProtocol>)[window delegate];
 	NSPasteboard *pboard = [sender draggingPasteboard];
+	BOOL pboardHasURL = NO;
 	NSString *filePath = NULL;
 	
-	if ([[pboard types] containsObject:NSURLPboardType])
+#if HAVE_OSAVAILABLE && defined(MAC_OS_X_VERSION_10_13) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_13)
+	// We need to use @available here when compiling against macOS v10.13 SDK and later in order to
+	// silence a silly warning.
+	if (@available(macOS 10_13, *))
+#endif
+	{
+		pboardHasURL = [[pboard types] containsObject:PASTEBOARDTYPE_URL];
+	}
+	
+	if (pboardHasURL)
 	{
 		NSURL *fileURL = [NSURL URLFromPasteboard:pboard];
 		filePath = [fileURL path];

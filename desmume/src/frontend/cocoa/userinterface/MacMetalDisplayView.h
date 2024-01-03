@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2017-2018 DeSmuME team
+	Copyright (C) 2017-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -20,11 +20,13 @@
 
 #import <Cocoa/Cocoa.h>
 #import <Metal/Metal.h>
-#include <libkern/OSAtomic.h>
+#include "../utilities.h"
 
 #include <mach/task.h>
 #include <mach/semaphore.h>
 #include <mach/sync_policy.h>
+
+#include <queue>
 
 #import "DisplayViewCALayer.h"
 #import "../cocoa_GPU.h"
@@ -86,6 +88,9 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 @interface MetalDisplayViewSharedData : MacClientSharedObject
 {
 	id<MTLDevice> device;
+	NSString *name;
+	NSString *description;
+	
 	id<MTLCommandQueue> _fetchCommandQueue;
 	id<MTLCommandQueue> commandQueue;
 	id<MTLLibrary> defaultLibrary;
@@ -95,8 +100,9 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 	id<MTLComputePipelineState> _fetch888Pipeline;
 	id<MTLComputePipelineState> _fetch555ConvertOnlyPipeline;
 	id<MTLComputePipelineState> _fetch666ConvertOnlyPipeline;
+	id<MTLComputePipelineState> _fetch888ConvertOnlyPipeline;
 	id<MTLComputePipelineState> deposterizePipeline;
-	id<MTLRenderPipelineState> hudPipeline;
+	id<MTLRenderPipelineState> hudBGRAPipeline;
 	id<MTLRenderPipelineState> hudRGBAPipeline;
 	
 	id<MTLSamplerState> samplerHUDBox;
@@ -138,11 +144,14 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 }
 
 @property (readonly, nonatomic) id<MTLDevice> device;
+@property (readonly, nonatomic) NSString *name;
+@property (readonly, nonatomic) NSString *description;
+
 @property (readonly, nonatomic) id<MTLCommandQueue> commandQueue;
 @property (readonly, nonatomic) id<MTLLibrary> defaultLibrary;
 
 @property (readonly, nonatomic) id<MTLComputePipelineState> deposterizePipeline;
-@property (readonly, nonatomic) id<MTLRenderPipelineState> hudPipeline;
+@property (readonly, nonatomic) id<MTLRenderPipelineState> hudBGRAPipeline;
 @property (readonly, nonatomic) id<MTLRenderPipelineState> hudRGBAPipeline;
 @property (readonly, nonatomic) id<MTLSamplerState> samplerHUDBox;
 @property (readonly, nonatomic) id<MTLSamplerState> samplerHUDText;
@@ -179,7 +188,6 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 	MTLRenderPassDescriptor *_outputRenderPassDesc;
 	MTLRenderPassColorAttachmentDescriptor *colorAttachment0Desc;
 	id<MTLComputePipelineState> pixelScalePipeline;
-	id<MTLRenderPipelineState> outputRGBAPipeline;
 	id<MTLRenderPipelineState> outputDrawablePipeline;
 	MTLPixelFormat drawableFormat;
 	
@@ -208,7 +216,7 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 	BOOL needsScreenVerticesUpdate;
 	BOOL needsHUDVerticesUpdate;
 	
-	OSSpinLock _spinlockRenderBufferStates[RENDER_BUFFER_COUNT];
+	apple_unfairlock_t _unfairlockRenderBufferStates[RENDER_BUFFER_COUNT];
 	dispatch_semaphore_t _semRenderBuffers[RENDER_BUFFER_COUNT];
 	volatile ClientDisplayBufferState _renderBufferState[RENDER_BUFFER_COUNT];
 	
@@ -220,7 +228,6 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 @property (assign, nonatomic) MetalDisplayViewSharedData *sharedData;
 @property (readonly, nonatomic) MTLRenderPassColorAttachmentDescriptor *colorAttachment0Desc;
 @property (retain) id<MTLComputePipelineState> pixelScalePipeline;
-@property (retain) id<MTLRenderPipelineState> outputRGBAPipeline;
 @property (retain) id<MTLRenderPipelineState> outputDrawablePipeline;
 @property (assign) MTLPixelFormat drawableFormat;
 @property (retain) id<MTLBuffer> bufCPUFilterDstMain;
@@ -248,7 +255,8 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 			   hudPipelineState:(id<MTLRenderPipelineState>)hudPipelineState
 					texDisplays:(MetalTexturePair)texDisplay
 						   mrfi:(MetalRenderFrameInfo)mrfi
-						doYFlip:(BOOL)willFlip;
+						doYFlip:(BOOL)willFlip
+					   doSwapRB:(BOOL)willSwapRB;
 - (void) renderStartAtIndex:(uint8_t)index;
 - (void) renderFinishAtIndex:(uint8_t)index;
 - (ClientDisplayBufferState) renderBufferStateAtIndex:(uint8_t)index;
@@ -262,7 +270,7 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 	MacDisplayLayeredView *_cdv;
 	MacMetalDisplayPresenterObject *presenterObject;
 	dispatch_semaphore_t _semDrawable;
-	id<CAMetalDrawable> _currentDrawable;
+	std::queue< id<CAMetalDrawable> > *_drawableQueue;
 	id<CAMetalDrawable> layerDrawable0;
 	id<CAMetalDrawable> layerDrawable1;
 	id<CAMetalDrawable> layerDrawable2;
@@ -285,7 +293,7 @@ typedef DisplayViewShaderProperties DisplayViewShaderProperties;
 
 #pragma mark -
 
-class MacMetalFetchObject : public GPUClientFetchObject
+class MacMetalFetchObject : public MacGPUFetchObjectDisplayLink
 {
 protected:
 	bool _useDirectToCPUFilterPipeline;
@@ -304,6 +312,8 @@ public:
 	virtual void CopyFromSrcClone(uint32_t *dstBufferPtr, const NDSDisplayID displayID, const u8 bufferIndex);
 	virtual void SetFetchBuffers(const NDSDisplayInfo &currentDisplayInfo);
 	virtual void FetchFromBufferIndex(const u8 index);
+	
+	virtual void FlushMultipleViews(const std::vector<ClientDisplay3DView *> &cdvFlushList, const CVTimeStamp *timeStampNow, const CVTimeStamp *timeStampOutput);
 };
 
 #pragma mark -
@@ -324,6 +334,7 @@ protected:
 	virtual void _UpdateClientSize();
 	virtual void _UpdateViewScale();
 	virtual void _LoadNativeDisplayByID(const NDSDisplayID displayID);
+	virtual void _LoadCustomDisplayByID(const NDSDisplayID displayID);
 	virtual void _ResizeCPUPixelScaler(const VideoFilterTypeID filterID);
 	
 public:
@@ -357,7 +368,7 @@ private:
 	void __InstanceInit(MacClientSharedObject *sharedObject);
 	
 protected:
-	OSSpinLock _spinlockViewNeedsFlush;
+	apple_unfairlock_t _unfairlockViewNeedsFlush;
 	
 public:
 	MacMetalDisplayView();

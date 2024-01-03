@@ -1,6 +1,6 @@
-/*
+﻿/*
 	Copyright (C) 2006 Theo Berkau
-	Copyright (C) 2006-2019 DeSmuME team
+	Copyright (C) 2006-2023 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -357,7 +357,7 @@ Lock::~Lock() { LeaveCriticalSection(m_cs); }
 
 LRESULT CALLBACK WindowProcedure (HWND, UINT, WPARAM, LPARAM);
 
-char SavName[MAX_PATH] = {0};
+wchar_t SavName[MAX_PATH] = {0};
 char ImportSavName[MAX_PATH] = {0};
 char szClassName[ ] = "DeSmuME";
 int romnum = 0;
@@ -1214,16 +1214,26 @@ void CheckMessages()
 
 	while( PeekMessage( &msg, 0, 0, 0, PM_NOREMOVE ) )
 	{
-		if( GetMessage( &msg, 0,  0, 0)>0 )
+		if (GetMessage(&msg, 0, 0, 0) > 0)
 		{
 			if (RamWatchHWnd && IsDialogMessage(RamWatchHWnd, &msg))
 			{
-				if(msg.message == WM_KEYDOWN) // send keydown messages to the dialog (for accelerators, and also needed for the Alt key to work)
+				if (msg.message == WM_KEYDOWN) // send keydown messages to the dialog (for accelerators, and also needed for the Alt key to work)
 					SendMessage(RamWatchHWnd, msg.message, msg.wParam, msg.lParam);
 				continue;
 			}
 			if (SoundView_GetHWnd() && IsDialogMessage(SoundView_GetHWnd(), &msg))
 				continue;
+
+			if (DisViewWnd[0] && msg.message == WM_MOUSEWHEEL && IsDialogMessage(DisViewWnd[0], &msg))
+			{
+				SendMessage(DisViewWnd[0], msg.message, msg.wParam, msg.lParam);
+			}
+
+			if (DisViewWnd[1] && msg.message == WM_MOUSEWHEEL && IsDialogMessage(DisViewWnd[1], &msg))
+			{
+				SendMessage(DisViewWnd[1], msg.message, msg.wParam, msg.lParam);
+			}
 
 			if(!TranslateAccelerator(hwnd,hAccel,&msg))
 			{
@@ -1284,6 +1294,8 @@ static void StepRunLoop_Core()
 
 static void StepRunLoop_Paused()
 {
+	input_acquire();
+
 	paused = TRUE;
 	Sleep(50);
 
@@ -1478,7 +1490,7 @@ bool NDS_Pause(bool showMsg)
 	while (!paused) {}
 	if (showMsg) INFO("Emulation paused\n");
 
-	SetWindowText(MainWindow->getHWnd(), "Paused");
+	SetWindowTextW(MainWindow->getHWnd(), L"Paused");
 	MainWindowToolbar->ChangeButtonBitmap(IDM_PAUSE, IDB_PLAY);
 	return true;
 }
@@ -1493,7 +1505,7 @@ void NDS_UnPause(bool showMsg)
 		SPU_Pause(0);
 		if (showMsg) INFO("Emulation unpaused\n");
 
-		SetWindowText(MainWindow->getHWnd(), (char*)EMU_DESMUME_NAME_AND_VERSION());
+		UpdateTitle();
 		MainWindowToolbar->ChangeButtonBitmap(IDM_PAUSE, IDB_PAUSE);
 	}
 }
@@ -1568,6 +1580,7 @@ static BOOL LoadROM(const char * filename, const char * physicalName, const char
 		Guitar.Enabled	= (selectedSlot2Type == NDS_SLOT2_GUITARGRIP)?true:false;
 		Piano.Enabled	= (selectedSlot2Type == NDS_SLOT2_EASYPIANO)?true:false;
 		Paddle.Enabled	= (selectedSlot2Type == NDS_SLOT2_PADDLE)?true:false;
+		HCV1000.Enabled = (selectedSlot2Type == NDS_SLOT2_HCV1000)?true:false;
 		
 		LoadSaveStateInfo();
 		lagframecounter=0;
@@ -1638,7 +1651,7 @@ bool DemandLua()
 	HMODULE mod = LoadLibrary("lua51.dll");
 	if(!mod)
 	{
-		MessageBox(NULL, "lua51.dll was not found. Please get it into your PATH or in the same directory as desmume.exe", "DeSmuME", MB_OK | MB_ICONERROR);
+		MessageBox(NULL, "lua51.dll was not found. Please get it into your PATH or in the same directory as desmume.exe", DESMUME_NAME, MB_OK | MB_ICONERROR);
 		return false;
 	}
 	FreeLibrary(mod);
@@ -1856,7 +1869,7 @@ static void RefreshMicSettings()
 	{
 		if(!LoadSamples(MicSampleName))
 		{
-			MessageBox(NULL, "Unable to read the mic sample", "DeSmuME", (MB_OK | MB_ICONEXCLAMATION));
+			MessageBox(NULL, "Unable to read the mic sample", DESMUME_NAME, (MB_OK | MB_ICONEXCLAMATION));
 		}
 		else
 		{
@@ -1966,9 +1979,9 @@ int _main()
 	CommonSettings.backupSave = GetPrivateProfileBool("General", "backupSave", false, IniName);
 
 	ColorCtrl_Register();
-	if (!RegWndClass("DeSmuME", WindowProcedure, CS_DBLCLKS, LoadIcon(hAppInst, MAKEINTRESOURCE(ICONDESMUME))))
+	if (!RegWndClass(L"DeSmuME", WindowProcedure, CS_DBLCLKS, LoadIcon(hAppInst, MAKEINTRESOURCE(ICONDESMUME))))
 	{
-		MessageBox(NULL, "Error registering windows class", "DeSmuME", MB_OK);
+		MessageBox(NULL, "Error registering windows class", DESMUME_NAME, MB_OK);
 		exit(-1);
 	}
 
@@ -2102,12 +2115,19 @@ int _main()
 	if(CommonSettings.single_core())
 		SetProcessAffinityMask(GetCurrentProcess(),1);
 
-	MainWindow = new WINCLASS("DeSmuME", hAppInst);
-	if (!MainWindow->create((char*)EMU_DESMUME_NAME_AND_VERSION(), WndX, WndY, video.width,video.height+video.screengap,
+	wchar_t boffo[256];
+	const char* emu_desmume_name_and_version = EMU_DESMUME_NAME_AND_VERSION();
+	size_t len = strlen(emu_desmume_name_and_version);
+	for(int i=0;i<len;i++)
+		boffo[i] = emu_desmume_name_and_version[i];
+	boffo[len] = 0;
+
+	MainWindow = new WINCLASS(L"DeSmuME", hAppInst);
+	if (!MainWindow->createW(boffo, WndX, WndY, video.width,video.height+video.screengap,
 		WS_CAPTION | WS_SYSMENU | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN | WS_CLIPSIBLINGS, 
 		NULL))
 	{
-		MessageBox(NULL, "Error creating main window", "DeSmuME", MB_OK);
+		MessageBox(NULL, "Error creating main window", DESMUME_NAME, MB_OK);
 		delete MainWindow;
 		exit(-1);
 	}
@@ -2129,7 +2149,7 @@ int _main()
 
 	if(MenuInit() == 0)
 	{
-		MessageBox(NULL, "Error creating main menu", "DeSmuME", MB_OK);
+		MessageBox(NULL, "Error creating main menu", DESMUME_NAME, MB_OK);
 		delete MainWindow;
 		exit(-1);
 	}
@@ -2178,6 +2198,9 @@ int _main()
 	win32_CFlash_cfgDirectory = GetPrivateProfileStdString("Slot2.CFlash", "path", "");
 	win32_CFlash_cfgFileName = GetPrivateProfileStdString("Slot2.CFlash", "filename", "");
 	win32_GBA_cfgRomPath = GetPrivateProfileStdString("Slot2.GBAgame", "filename", "");
+
+	slot2_HCV1000_barcode = GetPrivateProfileStdString("Slot2.HCV1000", "barcode", "").substr(0, 16);
+	HCV1000_setBarcode(slot2_HCV1000_barcode);
 
 	cmdline.process_addonCommands();
 	WIN_InstallCFlash();
@@ -2239,6 +2262,8 @@ int _main()
 			break;
 		case NDS_SLOT2_PASSME:
 			break;
+		case NDS_SLOT2_HCV1000:
+			break;
 		default:
 			slot2_device_type = NDS_SLOT2_NONE;
 			break;
@@ -2249,6 +2274,7 @@ int _main()
 	Guitar.Enabled	= (slot2_device_type == NDS_SLOT2_GUITARGRIP)?true:false;
 	Piano.Enabled	= (slot2_device_type == NDS_SLOT2_EASYPIANO)?true:false;
 	Paddle.Enabled	= (slot2_device_type == NDS_SLOT2_PADDLE)?true:false;
+	HCV1000.Enabled = (slot2_device_type == NDS_SLOT2_HCV1000)?true:false;
 
 	CommonSettings.WifiBridgeDeviceID = GetPrivateProfileInt("Wifi", "BridgeAdapter", 0, IniName);
 
@@ -2424,40 +2450,7 @@ int _main()
 
 	video.setfilter(GetPrivateProfileInt("Video", "Filter", video.NONE, IniName));
 	FilterUpdate(MainWindow->getHWnd(),false);
-	
-	// Generate the unique MAC address.
-	{
-		// Get the host's IP4 address.
-		char hostname[256];
-		if (gethostname(hostname, 256) != 0)
-			strncpy(hostname, "127.0.0.1", 256);
 		
-		hostent *he = gethostbyname(hostname);
-		u32 ipaddr;
-		if (he == NULL || he->h_addr_list[0] == NULL)
-			ipaddr = 0x0100007F; // 127.0.0.1
-		else
-			ipaddr = *(u32 *)he->h_addr_list[0];
-		
-		u32 hash = (u32)GetCurrentProcessId();
-		
-		while ((hash & 0xFF000000) == 0)
-		{
-			hash <<= 1;
-		}
-		
-		hash >>= 1;
-		hash += ipaddr >> 8;
-		hash &= 0x00FFFFFF;
-		
-		CommonSettings.fwConfig.MACAddress[0] = 0x00;
-		CommonSettings.fwConfig.MACAddress[1] = 0x09;
-		CommonSettings.fwConfig.MACAddress[2] = 0xBF;
-		CommonSettings.fwConfig.MACAddress[3] = hash >> 16;
-		CommonSettings.fwConfig.MACAddress[4] = (hash >> 8) & 0xFF;
-		CommonSettings.fwConfig.MACAddress[5] = hash & 0xFF;
-	}
-	
 	// Read the firmware settings from the init file
 	CommonSettings.fwConfig.favoriteColor = GetPrivateProfileInt("Firmware","favColor", 10, IniName);
 	CommonSettings.fwConfig.birthdayMonth = GetPrivateProfileInt("Firmware","bMonth", 7, IniName);
@@ -2483,11 +2476,14 @@ int _main()
 			CommonSettings.fwConfig.nickname[char_index] = temp_str[char_index];
 		}
 
-		GetPrivateProfileString("Firmware","Message", "DeSmuME makes you happy!", temp_str, 27, IniName);
+		GetPrivateProfileString("Firmware","Message", defaultMessage, temp_str, 27, IniName);
 		CommonSettings.fwConfig.messageLength = strlen( temp_str);
 		for ( char_index = 0; char_index < CommonSettings.fwConfig.messageLength; char_index++) {
 			CommonSettings.fwConfig.message[char_index] = temp_str[char_index];
 		}
+
+		GetPrivateProfileString("Firmware", "macAddress", defaultMacAddressStr, temp_str, 13, IniName);
+		NDS_SetFirmwareMACAddressFromStr(CommonSettings.fwConfig, temp_str);
 	}
 
 	if (cmdline.nds_file != "")
@@ -2579,7 +2575,7 @@ int _main()
 
 	ddraw.release();
 
-	UnregWndClass("DeSmuME");
+	UnregWndClass(L"DeSmuME");
 
 	return 0;
 }
@@ -2948,7 +2944,7 @@ void AviRecordTo()
 
 		dir = Path::GetFileDirectoryPath(outFilename);
 		path.setpath(path.AVI_FILES, dir);
-		WritePrivateProfileString(SECTION, AVIKEY, dir.c_str(), IniName);
+		WritePrivateProfileStringW(LSECTION, AVIKEY, mbstowcs(dir).c_str(), IniNameW);
 	}
 
 	NDS_UnPause();
@@ -2959,6 +2955,54 @@ void WavEnd()
 	NDS_Pause();
 	WAV_End();
 	NDS_UnPause();
+}
+
+void UpdateTitle()
+{
+	const wchar_t* currTitle = nullptr;
+	wchar_t boffo[256];
+	const char* emu_desmume_name_and_version = EMU_DESMUME_NAME_AND_VERSION();
+	size_t len = strlen(emu_desmume_name_and_version);
+	for(int i=0;i<len;i++)
+		boffo[i] = emu_desmume_name_and_version[i];
+	boffo[len] = 0;
+
+	if (gameInfo.hasRomBanner())
+	{
+		if (currTitle == nullptr) {
+			currTitle = boffo;
+		}
+
+		wchar_t newTitle[512];
+		wchar_t gameTitle[128];
+
+		wcscpy(newTitle, currTitle);
+
+		int newLength = wcslen(newTitle);
+
+		const RomBanner& banner = gameInfo.getRomBanner();
+		swprintf(gameTitle, L" | %s", (const wchar_t*)banner.titles[CommonSettings.fwConfig.language]);
+
+		int index = 0, gameLength = wcslen(gameTitle);
+		for (int i = 0; i < gameLength; i++)
+		{
+			if (gameTitle[i] == '\n')
+			{
+				gameTitle[i] = ' ';
+				index = i;
+			}
+		}
+
+		if (index != 0)
+		{
+			gameTitle[index] = '\0';
+			if (newLength + gameLength < 512) wcscat(newTitle + newLength, gameTitle); 
+		}
+
+		newTitle[511] = '\0'; // Stay safe
+
+		SetWindowTextW(MainWindow->getHWnd(), newTitle);
+	}
 }
 
 void UpdateToolWindows()
@@ -3026,7 +3070,7 @@ void WavRecordTo(int wavmode)
 
 		dir = Path::GetFileDirectoryPath(outFilename);
 		path.setpath(path.AVI_FILES, dir);
-		WritePrivateProfileString(SECTION, AVIKEY, dir.c_str(), IniName);
+		WritePrivateProfileStringW(LSECTION, AVIKEY, mbstowcs(dir).c_str(), IniNameW);
 	}
 
 	NDS_UnPause();
@@ -3088,7 +3132,10 @@ static BOOL OpenCore(const char* filename)
 		memset(batteryPath, 0, MAX_PATH);
 		path.getpathnoext(path.BATTERY, batteryPath);
 		std::string batteryPathString = std::string(batteryPath) + ".dsv";
-		FILE *testFs = fopen(batteryPathString.c_str(), "rb+");
+		std::wstring batteryPathStringW = mbstowcs(batteryPathString);
+		FILE *testFs = _wfopen(batteryPathStringW.c_str(), L"rb");
+		if (testFs == NULL)
+			testFs = _wfopen(batteryPathStringW.c_str(), L"wb");
 		if (testFs == NULL)
 		{
 			msgbox->warn("\
@@ -3099,6 +3146,8 @@ Choose Config > Path Settings and ensure that the SaveRam directory exists and i
 		{
 			fclose(testFs);
 		}
+
+		UpdateTitle();		
 		
 		return TRUE;
 	}
@@ -3150,7 +3199,7 @@ LRESULT OpenFile()
 		{
 			std::string dir = Path::GetFileDirectoryPath(wcstombs(filename));
 			path.setpath(path.ROMS, dir);
-			WritePrivateProfileString(SECTION, ROMKEY, dir.c_str(), IniName);
+			WritePrivateProfileStringW(LSECTION, ROMKEY, mbstowcs(dir).c_str(), IniNameW);
 		}
 	}
 
@@ -3166,8 +3215,6 @@ LRESULT OpenFile()
 //		}
 //		return 0;
 //	}
-
-
 
 	return 0;
 }
@@ -3914,6 +3961,8 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 				NDS_UnPause();
 			delete MainWindowToolbar;
 			KillTimer(hwnd, autoHideCursorTimer);
+			if(HudEditorMode)
+				osd->SaveHudEditor();
 			return 0;
 		}
 	case WM_TIMER:
@@ -4250,12 +4299,13 @@ DOKEYDOWN:
 
 	case WM_DROPFILES:
 		{
-			char filename[MAX_PATH] = "";
-			DragQueryFile((HDROP)wParam,0,filename,MAX_PATH);
+			wchar_t wfilename[MAX_PATH] = L"";
+			DragQueryFileW((HDROP)wParam,0,wfilename,MAX_PATH);
 			DragFinish((HDROP)wParam);
+			std::string fileDropped = wcstombs((std::wstring)wfilename);
+			const char* filename = fileDropped.c_str();
 			
 			//adelikat: dropping these in from FCEUX, I hope this is the best place for that
-			std::string fileDropped = filename;
 			//-------------------------------------------------------
 			//Check if Movie file
 			//-------------------------------------------------------
@@ -4323,7 +4373,7 @@ DOKEYDOWN:
 			//Else load it as a ROM
 			//-------------------------------------------------------
 
-			else if(OpenCoreSystemCP(filename))
+			else if(OpenCore(filename))
 			{
 				romloaded = TRUE;
 			}
@@ -4715,60 +4765,60 @@ DOKEYDOWN:
 
 		case IDM_STATE_LOAD:
 			{
-				OPENFILENAME ofn;
+				OPENFILENAMEW ofn;
 				NDS_Pause();
 				ZeroMemory(&ofn, sizeof(ofn));
 				ofn.lStructSize = sizeof(ofn);
 				ofn.hwndOwner = hwnd;
-				ofn.lpstrFilter = "DeSmuME Savestate (*.dst or *.ds#)\0*.dst;*.ds0*;*.ds1*;*.ds2*;*.ds3*;*.ds4*;*.ds5*;*.ds6*;*.ds7*;*.ds8*;*.ds9*;*.ds-*\0DeSmuME Savestate (*.dst only)\0*.dst\0All files (*.*)\0*.*\0\0";
+				ofn.lpstrFilter = L"DeSmuME Savestate (*.dst or *.ds#)\0*.dst;*.ds0*;*.ds1*;*.ds2*;*.ds3*;*.ds4*;*.ds5*;*.ds6*;*.ds7*;*.ds8*;*.ds9*;*.ds-*\0DeSmuME Savestate (*.dst only)\0*.dst\0All files (*.*)\0*.*\0\0";
 				ofn.nFilterIndex = 1;
 				ofn.lpstrFile =  SavName;
 				ofn.nMaxFile = MAX_PATH;
-				ofn.lpstrDefExt = "dst";
+				ofn.lpstrDefExt = L"dst";
 				ofn.Flags = OFN_HIDEREADONLY | OFN_FILEMUSTEXIST;
-				std::string dir = path.getpath(path.STATES);
+				std::wstring dir = mbstowcs(path.getpath(path.STATES));
 				ofn.lpstrInitialDir = dir.c_str();
 
-				if(!GetOpenFileName(&ofn))
+				if(!GetOpenFileNameW(&ofn))
 				{
 					NDS_UnPause();
 					return 0;
 				}
 
-				dir = Path::GetFileDirectoryPath(SavName);
-				path.setpath(path.STATES, dir);
-				WritePrivateProfileString(SECTION, STATEKEY, dir.c_str(), IniName);
+				std::string utf8dir = Path::GetFileDirectoryPath(wcstombs(SavName));
+				path.setpath(path.STATES, utf8dir);
+				WritePrivateProfileStringW(LSECTION, STATEKEY, mbstowcs(utf8dir).c_str(), IniNameW);
 
-				savestate_load(SavName);
+				savestate_load(wcstombs(SavName).c_str());
 				UpdateToolWindows();
 				NDS_UnPause();
 			}
 			return 0;
 		case IDM_STATE_SAVE:
 			{
-				OPENFILENAME ofn;
+				OPENFILENAMEW ofn;
 				bool unpause = NDS_Pause();
 				ZeroMemory(&ofn, sizeof(ofn));
 				ofn.lStructSize = sizeof(ofn);
 				ofn.hwndOwner = hwnd;
-				ofn.lpstrFilter = "DeSmuME Savestate (*.dst or *.ds#)\0*.dst;*.ds0*;*.ds1*;*.ds2*;*.ds3*;*.ds4*;*.ds5*;*.ds6*;*.ds7*;*.ds8*;*.ds9*;*.ds-*\0DeSmuME Savestate (*.dst only)\0*.dst\0All files (*.*)\0*.*\0\0";
+				ofn.lpstrFilter = L"DeSmuME Savestate (*.dst or *.ds#)\0*.dst;*.ds0*;*.ds1*;*.ds2*;*.ds3*;*.ds4*;*.ds5*;*.ds6*;*.ds7*;*.ds8*;*.ds9*;*.ds-*\0DeSmuME Savestate (*.dst only)\0*.dst\0All files (*.*)\0*.*\0\0";
 				ofn.nFilterIndex = 1;
 				ofn.lpstrFile =  SavName;
 				ofn.nMaxFile = MAX_PATH;
-				ofn.lpstrDefExt = "dst";
+				ofn.lpstrDefExt = L"dst";
 				ofn.Flags = OFN_NOREADONLYRETURN | OFN_PATHMUSTEXIST;
-				std::string dir = path.getpath(path.STATES);
+				std::wstring dir = mbstowcs(path.getpath(path.STATES));
 				ofn.lpstrInitialDir = dir.c_str();
 
-				if(GetSaveFileName(&ofn))
+				if(GetSaveFileNameW(&ofn))
 				{
-					savestate_save(SavName);
+					savestate_save(wcstombs(SavName).c_str());
 					LoadSaveStateInfo();
 				}
 
-				dir = Path::GetFileDirectoryPath(SavName);
-				path.setpath(path.STATES, dir);
-				WritePrivateProfileString(SECTION, STATEKEY, dir.c_str(), IniName);
+				std::string utf8dir = Path::GetFileDirectoryPath(wcstombs(SavName));
+				path.setpath(path.STATES, utf8dir);
+				WritePrivateProfileStringW(LSECTION, STATEKEY, mbstowcs(utf8dir).c_str(), IniNameW);
 
 				if(unpause) NDS_UnPause();
 				return 0;
@@ -4916,7 +4966,7 @@ DOKEYDOWN:
 			return 0;
 		case IDM_IOREG:
 			//ViewRegisters->open();
-			if (!RegWndClass("DeSmuME_IORegView", IORegView_Proc, CS_DBLCLKS, LoadIcon(hAppInst, MAKEINTRESOURCE(ICONDESMUME)), sizeof(CIORegView*)))
+			if (!RegWndClass(L"DeSmuME_IORegView", IORegView_Proc, CS_DBLCLKS, LoadIcon(hAppInst, MAKEINTRESOURCE(ICONDESMUME)), sizeof(CIORegView*)))
 				return 0;
 
 			OpenToolWindow(new CIORegView());
@@ -4924,7 +4974,7 @@ DOKEYDOWN:
 		case IDM_MEMORY:
 			//if(!MemView_IsOpened(ARMCPU_ARM9)) MemView_DlgOpen(HWND_DESKTOP, "ARM9 memory", ARMCPU_ARM9);
 			//if(!MemView_IsOpened(ARMCPU_ARM7)) MemView_DlgOpen(HWND_DESKTOP, "ARM7 memory", ARMCPU_ARM7);
-			if (!RegWndClass("MemView_ViewBox", MemView_ViewBoxProc, 0, sizeof(CMemView*)))
+			if (!RegWndClass(L"MemView_ViewBox", MemView_ViewBoxProc, 0, sizeof(CMemView*)))
 				return 0;
 
 			OpenToolWindow(new CMemView());
@@ -5096,6 +5146,8 @@ DOKEYDOWN:
 			HudEditorMode ^= true;
 			osd->clear();
 			osd->border(HudEditorMode);
+			if(!HudEditorMode)
+				osd->SaveHudEditor();
 			return 0;
 
 		case ID_VIEW_DISPLAYMICROPHONE:
@@ -5322,7 +5374,7 @@ DOKEYDOWN:
 
 #ifndef BETA_VERSION
 		case IDM_SUBMITBUGREPORT:
-			ShellExecute(NULL, "open", "http://sourceforge.net/p/desmume/bugs/", NULL, NULL, SW_SHOWNORMAL);
+			ShellExecute(NULL, "open", "https://github.com/TASEmulators/desmume/issues/", NULL, NULL, SW_SHOWNORMAL);
 			return 0;
 #endif
 
@@ -5655,7 +5707,7 @@ DOKEYDOWN:
 			}
 			return 0;
 	}
-	return DefWindowProc (hwnd, message, wParam, lParam);
+	return DefWindowProcW (hwnd, message, wParam, lParam);
 }
 
 void Change3DCoreWithFallbackAndSave(int newCore)
@@ -6129,7 +6181,7 @@ LRESULT CALLBACK EmulationSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, L
 					{
 						std::string dir = Path::GetFileDirectoryPath(fileName);
 						path.setpath(path.FIRMWARE, dir);
-						WritePrivateProfileString(SECTION, FIRMWAREKEY, dir.c_str(), IniName);
+						WritePrivateProfileStringW(LSECTION, FIRMWAREKEY, mbstowcs(dir).c_str(), IniNameW);
 
 						HWND cur;
 
@@ -6249,7 +6301,7 @@ LRESULT CALLBACK MicrophoneSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, 
 					{
 						std::string dir = Path::GetFileDirectoryPath(fileName);
 						path.setpath(path.SOUNDS, dir);
-						WritePrivateProfileString(SECTION, SOUNDKEY, dir.c_str(), IniName);
+						WritePrivateProfileStringW(LSECTION, SOUNDKEY, mbstowcs(dir).c_str(), IniNameW);
 
 						HWND cur;
 
@@ -6445,6 +6497,7 @@ static LRESULT CALLBACK SoundSettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam
 			SendDlgItemMessage(hDlg, IDC_SPU_INTERPOLATION_CB, CB_ADDSTRING, 0, (LPARAM)"None (harsh, most accurate to NDS)");
 			SendDlgItemMessage(hDlg, IDC_SPU_INTERPOLATION_CB, CB_ADDSTRING, 0, (LPARAM)"Linear (smooth, most sound detail loss)");
 			SendDlgItemMessage(hDlg, IDC_SPU_INTERPOLATION_CB, CB_ADDSTRING, 0, (LPARAM)"Cosine (balanced, smooth and accurate)");
+			SendDlgItemMessage(hDlg, IDC_SPU_INTERPOLATION_CB, CB_ADDSTRING, 0, (LPARAM)"Catmull-Rom (smooth and bright)");
 			SendDlgItemMessage(hDlg, IDC_SPU_INTERPOLATION_CB, CB_SETCURSEL, (int)CommonSettings.spuInterpolationMode, 0);
 
 			// Setup Sound Buffer Size Edit Text

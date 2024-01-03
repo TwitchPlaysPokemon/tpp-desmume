@@ -2,7 +2,7 @@
 	Copyright (C) 2006 Normmatt
 	Copyright (C) 2006 Theo Berkau
 	Copyright (C) 2007 Pascal Giard
-	Copyright (C) 2008-2017 DeSmuME team
+	Copyright (C) 2008-2021 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -57,6 +57,7 @@
 
 #ifdef HOST_WINDOWS
 #include "frontend/windows/main.h"
+extern char IniName[MAX_PATH];
 #endif
 
 int lastSaveState = 0;		//Keeps track of last savestate used for quick save/load functions
@@ -606,7 +607,7 @@ static void cp15_savestate(EMUFILE &os)
 	//version
 	os.write_32LE(1);
 
-	cp15.saveone(os);
+	armcp15_saveone(&cp15, os);
 	//ARM7 not have coprocessor
 	//cp15_saveone((armcp15_t *)NDS_ARM7.coproc[15],os);
 }
@@ -618,22 +619,13 @@ static bool cp15_loadstate(EMUFILE &is, int size)
 	if (is.read_32LE(version) != 1) return false;
 	if (version > 1) return false;
 
-	if (!cp15.loadone(is)) return false;
+	if (!armcp15_loadone(&cp15, is)) return false;
 	
 	if (version == 0)
 	{
 		//ARM7 not have coprocessor
-		
-		// TODO: What's going on here with tmp_buf?
-		u8 *tmp_buf = new u8 [sizeof(armcp15_t)];
-		if (!tmp_buf) return false;
-		
-		if (!cp15.loadone(is))
-		{
-			delete [] tmp_buf;
+		if (!armcp15_loadone(&cp15, is))
 			return false;
-		}
-		delete [] tmp_buf;
 	}
 
 	return true;
@@ -663,7 +655,12 @@ void clear_savestates()
 // Scan for existing savestates and update struct
 void scan_savestates()
 {
+	#ifdef _MSC_VER
+	struct _stat64i32 sbuf;
+	#else 
 	struct stat sbuf;
+	#endif
+
 	char filename[MAX_PATH + 1];
 
 	clear_savestates();
@@ -674,7 +671,14 @@ void scan_savestates()
 
 		if (strlen(filename) + strlen(".dst") + strlen("-2147483648") /* = biggest string for i */ > MAX_PATH) return;
 		sprintf(filename + strlen(filename), ".ds%d", i);
+
+		#ifdef _MSC_VER
+		wchar_t wgarbage[1024] = {0};
+		MultiByteToWideChar(CP_UTF8, 0, filename, -1, wgarbage, 1024);
+		if (_wstat(wgarbage, &sbuf) == -1) continue;
+		#else
 		if (stat(filename, &sbuf) == -1) continue;
+		#endif
 		savestates[i].exists = TRUE;
 		strncpy(savestates[i].date, format_time(sbuf.st_mtime), 40);
 		savestates[i].date[40 - 1] = '\0';
@@ -721,13 +725,72 @@ void savestate_slot(int num)
 void loadstate_slot(int num)
 {
 	char filename[MAX_PATH];
+	int max_index = -1;
 
 	lastSaveState = num;		//Set last savestate used
 
 	path.getpathnoext(path.STATE_SLOTS, filename);
 
+	//save the state before we load the state, to give people a path for recovery in case they hit the wrong key
+	#ifdef HOST_WINDOWS
+	// Maximum backup number can be set in config: [General] BackupSavesMax=<n>
+	// Setting BackupSavesMax=0 would disable backups
+	max_index = GetPrivateProfileInt("General", "BackupSavesMax", -1, IniName); // 0 for disabled
+	int suppress_backups = GetPrivateProfileInt("General", "BackupSavestateSuppress", 0, IniName);
+	if(!suppress_backups && max_index != 0 )
+	#endif
+	{
+		if(movieMode == MOVIEMODE_INACTIVE)
+		{
+			std::string dirname = (std::string)filename + " (backups)";
+			#ifdef HOST_WINDOWS
+			static const char PSS = '\\';
+			#else
+			static const char PSS = '/';
+			#endif
+			mkdir(dirname.c_str(),0777);
+			
+			int cur_index = -1; // setup index, -1 in case it is first instance
+			if (max_index == -1) { // If not set
+				max_index = 200;
+			}
+			
+			std::string index_fname = dirname + PSS + "backup.index";
+			FILE* index_file = fopen(index_fname.c_str(), "r+"); // Read/update but don't create
+			if (index_file) {
+				fscanf(index_file, "%d", &cur_index);
+				rewind(index_file); // prepare to overwrite
+			}
+			else
+			{
+				index_file = fopen(index_fname.c_str(), "w"); // Create if doesn't exist
+			}
+			
+			if (index_file) {
+				cur_index = (cur_index + 1) % max_index; // next
+
+				fprintf(index_file, "%d", cur_index); // Store new index
+				fprintf(index_file, "%d", EOF); // Avoid overwriting just most significant digits(e.g.: 1 -> 200 = 100 )
+				fclose(index_file);
+
+				std::string fname = dirname + PSS;
+				char mini[100];
+				sprintf(mini, "%u", cur_index);
+				fname += mini + (std::string)".dst";
+
+				savestate_save(fname.c_str());
+				printf("Creating backup of current state prior to loadstate as path: %s\n", fname.c_str());
+			}
+			else {
+				printf("Failed to open indexing file %s\n Prior state backup not created, check location write permissions.\n", index_fname.c_str());
+			}
+			
+		}
+	}
+
 	if (strlen(filename) + strlen(".dsx") + strlen("-2147483648") /* = biggest string for num */ > MAX_PATH) return;
 	sprintf(filename + strlen(filename), ".ds%d", num);
+
 	if (savestate_load(filename))
 	{
 		driver->SetLineColor(255, 255, 255);
@@ -1040,17 +1103,15 @@ bool savestate_save(EMUFILE &outstream, int compressionLevel)
 bool savestate_save (const char *file_name)
 {
 	EMUFILE_MEMORY ms;
-	size_t elems_written;
 	if (!savestate_save(ms))
 		return false;
 
-	FILE* file = fopen(file_name,"wb");
-	if(file)
-	{
-		elems_written = fwrite(ms.buf(),1,ms.size(),file);
-		fclose(file);
-		return (elems_written == ms.size());
-	} else return false;
+	EMUFILE_FILE file(file_name, "wb");
+	if(file.fail())
+		return false;
+
+	file.fwrite(ms.buf(), ms.size());
+	return true;
 }
 
 static void wifi_savestate(EMUFILE &os)
@@ -1147,11 +1208,7 @@ static bool ReadStateChunks(EMUFILE &is, s32 totalsize)
 			case 91: if(!gfx3d_loadstate(is,size)) ret=false; break;
 			case 100: if(!ReadStateChunk(is,SF_MOVIE, size)) ret=false; break;
 			case 101: if(!mov_loadstate(is, size)) ret=false; break;
-				
-			case 111:
-				if(!wifiHandler->LoadState(is,size)) ret=false; break;
-				break;
-
+			case 111: if(!wifiHandler->LoadState(is,size)) ret=false; break;
 			case 120: if(!ReadStateChunk(is,SF_RTC,size)) ret=false; break;
 			case 130: if(!ReadStateChunk(is,SF_INFO,size)) ret=false; else haveInfo=true; break;
 			case 140: if(!s_slot1_loadstate(is, size)) ret=false; break;

@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2017 DeSmuME team
+	Copyright (C) 2017-2022 DeSmuME team
  
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -378,7 +378,8 @@ protected:
 	int16_t _paddleValueApplied;
 	int16_t _paddleAdjustApplied;
 	
-	float _avgMicLevel;
+	float _avgMicLevelPending;
+	float _avgMicLevelApplied;
 	float _avgMicLevelTotal;
 	float _avgMicLevelsRead;
 	bool _isHardwareMicMuted;
@@ -407,6 +408,7 @@ public:
 	float GetAverageMicLevel();	
 	void AddSampleToAverageMicLevel(uint8_t sampleValue);
 	void ClearAverageMicLevel();
+	void ApplyAverageMicLevel();
 	
 	bool IsMicrophoneIdle();
 	bool IsMicrophoneClipping();
@@ -435,6 +437,9 @@ public:
 	
 	void ProcessInputs();
 	void ApplyInputs();
+	
+	virtual void SetHardwareMicAuthorized(bool isAuthorized);
+	virtual bool IsHardwareMicAuthorized();
 	
 	virtual bool IsHardwareMicAvailable();
 	virtual void ResetHardwareMic();

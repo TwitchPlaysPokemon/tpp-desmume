@@ -5,8 +5,7 @@
 /desmume/src/frontend/windows/__bins
 /desmume/src/frontend/windows/*.tlog
 /desmume/src/frontend/windows/*.aps
-.vs/VSWorkspaceState.json
-.vs/slnx.sqlite
+.vs/
 *.user
 *.suo
 *.VC.db
@@ -76,3 +75,4 @@ xcuserdata/
 /config.log
 /.project
 /desmume/src/frontend/windows/.vs/DeSmuME/v15
+.DS_Store

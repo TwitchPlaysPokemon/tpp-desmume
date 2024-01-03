@@ -1,7 +1,7 @@
 /*
 The MIT License
 
-Copyright (C) 2009-2017 DeSmuME team
+Copyright (C) 2009-2021 DeSmuME team
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -47,11 +47,11 @@ class EMUFILE_MEMORY;
 
 class EMUFILE {
 protected:
-	bool failbit;
+	bool _failbit;
 
 public:
 	EMUFILE()
-		: failbit(false)
+		: _failbit(false)
 	{}
 
 
@@ -62,10 +62,10 @@ public:
 	
 	static bool readAllBytes(std::vector<u8>* buf, const std::string& fname);
 
-	bool fail(bool unset=false) { bool ret = failbit; if(unset) unfail(); return ret; }
-	void unfail() { failbit=false; }
+	bool fail(bool unset=false) { bool ret = this->_failbit; if(unset) unfail(); return ret; }
+	void unfail() { this->_failbit = false; }
 
-	bool eof() { return size()==ftell(); }
+	virtual bool eof() { return size()==ftell(); }
 
 	size_t fread(const void *ptr, size_t bytes){
 		return _fread(ptr,bytes);
@@ -82,6 +82,8 @@ public:
 
 	virtual int fgetc() = 0;
 	virtual int fputc(int c) = 0;
+
+	virtual char* fgets(char* str, int num) = 0;
 
 	virtual size_t _fread(const void *ptr, size_t bytes) = 0;
 	virtual size_t fwrite(const void *ptr, size_t bytes) = 0;
@@ -218,7 +220,7 @@ public:
 		//else return temp;
 		u32 remain = len-pos;
 		if(remain<1) {
-			failbit = true;
+			this->_failbit = true;
 			return -1;
 		}
 		temp = buf()[pos];
@@ -232,6 +234,11 @@ public:
 		fwrite(&temp,1);
 
 		return 0;
+	}
+
+	virtual char* fgets(char* str, int num)
+	{
+		throw "Not tested: emufile memory fgets";
 	}
 
 	virtual size_t _fread(const void *ptr, size_t bytes);
@@ -279,11 +286,11 @@ public:
 
 class EMUFILE_FILE : public EMUFILE { 
 protected:
-	FILE* fp;
-	std::string fname;
-	char mode[16];
-	long mFilePosition;
-	bool mPositionCacheEnabled;
+	FILE* _fp;
+	std::string _fname;
+	char _mode[16];
+	long _mFilePosition;
+	bool _mPositionCacheEnabled;
 	
 	enum eCondition
 	{
@@ -291,58 +298,54 @@ protected:
 		eCondition_Unknown,
 		eCondition_Read,
 		eCondition_Write
-	} mCondition;
+	} _mCondition;
 
 private:
-	void open(const char* fname, const char* mode)
-	{
-		mPositionCacheEnabled = false;
-		mCondition = eCondition_Clean;
-		mFilePosition = 0;
-		fp = fopen(fname,mode);
-		if(!fp)
-			failbit = true;
-		this->fname = fname;
-		strcpy(this->mode,mode);
-	}
+	void __open(const char* fname, const char* mode);
 
 public:
 
-	EMUFILE_FILE(const std::string& fname, const char* mode) { open(fname.c_str(),mode); }
-	EMUFILE_FILE(const char* fname, const char* mode) { open(fname,mode); }
+	EMUFILE_FILE(const std::string& fname, const char* mode) { __open(fname.c_str(),mode); }
+	EMUFILE_FILE(const char* fname, const char* mode) { __open(fname,mode); }
 
 	void EnablePositionCache();
 
 	virtual ~EMUFILE_FILE() {
-		if(NULL != fp)
-			fclose(fp);
+		if (NULL != this->_fp)
+			fclose(this->_fp);
 	}
 
 	virtual FILE *get_fp() {
-		return fp; 
+		return this->_fp;
 	}
 
 	virtual EMUFILE* memwrap();
 
-	bool is_open() { return fp != NULL; }
+	bool is_open() { return this->_fp != NULL; }
 
 	void DemandCondition(eCondition cond);
 
 	virtual void truncate(s32 length);
 
+	virtual bool eof() { return !!::feof(this->_fp); }
+
 	virtual int fprintf(const char *format, ...) {
 		va_list argptr;
 		va_start(argptr, format);
-		int ret = ::vfprintf(fp, format, argptr);
+		int ret = ::vfprintf(this->_fp, format, argptr);
 		va_end(argptr);
 		return ret;
 	};
 
 	virtual int fgetc() {
-		return ::fgetc(fp);
+		return ::fgetc(this->_fp);
 	}
 	virtual int fputc(int c) {
-		return ::fputc(c, fp);
+		return ::fputc(c, this->_fp);
+	}
+
+	virtual char* fgets(char* str, int num) {
+		return ::fgets(str, num, this->_fp);
 	}
 
 	virtual size_t _fread(const void *ptr, size_t bytes);
@@ -361,7 +364,7 @@ public:
 	}
 
 	virtual void fflush() {
-		::fflush(fp);
+		::fflush(this->_fp);
 	}
 
 };

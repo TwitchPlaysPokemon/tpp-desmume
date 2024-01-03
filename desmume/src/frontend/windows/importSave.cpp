@@ -23,6 +23,7 @@
 #include "MMU.h"
 #include "NDSSystem.h"
 #include "utils/advanscene.h"
+#include "utils/xstring.h"
 
 #include "resource.h"
 
@@ -190,7 +191,7 @@ bool importSave(HWND hwnd, HINSTANCE hAppInst)
 	{
 		std::string dir = Path::GetFileDirectoryPath(SavFName);
 		path.setpath(path.SRAM_IMPORT_EXPORT, dir);
-		WritePrivateProfileString(SECTION, SRAMIMPORTKEY, dir.c_str(), IniName);
+		WritePrivateProfileStringW(LSECTION, SRAMIMPORTKEY, mbstowcs(dir).c_str(), IniNameW);
 		
 		res = MMU_new.backupDevice.importData(SavFName, save_types[res+1].size);
 		if (res)
@@ -227,9 +228,9 @@ bool exportSave(HWND hwnd, HINSTANCE hAppInst)
 
 	dir = Path::GetFileDirectoryPath(SavFName);
 	path.setpath(path.SRAM_IMPORT_EXPORT, dir);
-	WritePrivateProfileString(SECTION, SRAMIMPORTKEY, dir.c_str(), IniName);
+	WritePrivateProfileStringW(LSECTION, SRAMIMPORTKEY, mbstowcs(dir).c_str(), IniNameW);
 
 	if (ofn.nFilterIndex == 2) strcat(SavFName, "*");
 
-	return !MMU_new.backupDevice.exportData(SavFName);
+	return MMU_new.backupDevice.exportData(SavFName);
 }

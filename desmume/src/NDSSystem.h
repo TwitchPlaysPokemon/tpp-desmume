@@ -1,6 +1,6 @@
 /*
 	Copyright (C) 2006 yopyop
-	Copyright (C) 2008-2019 DeSmuME team
+	Copyright (C) 2008-2022 DeSmuME team
 
 	This file is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -26,8 +26,6 @@
 #include "types.h"
 #include "ROMReader.h"
 #include "firmware.h"
-#include "render3D.h"
-#include "wifi.h"
 
 class CFIRMWARE;
 class EMUFILE;
@@ -192,7 +190,6 @@ struct NDS_header
 
 extern void debug();
 NDSError NDS_GetLastError();
-static void NDS_CurrentCPUInfoToNDSError(NDSError &ndsError);
 void emu_halt(EmuHaltReasonCode reasonCode, NDSErrorTag errorTag);
 
 extern u64 nds_timer;
@@ -404,6 +401,9 @@ typedef struct TSCalInfo
 } TSCalInfo;
 
 extern GameInfo gameInfo;
+
+extern std::vector<u32> memReadBreakPoints;
+extern std::vector<u32> memWriteBreakPoints;
 
 
 struct UserButtons : buttonstruct<bool>
